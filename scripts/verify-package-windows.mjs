@@ -85,7 +85,7 @@ const signatureResult = await run(
 );
 assert(signatureResult.stdout.trim() === "NotSigned", "Unexpected Windows signature state");
 
-const asarFiles = listPackage(asarPath);
+const asarFiles = listPackage(asarPath).map((path) => path.replaceAll("\\", "/"));
 for (const requiredFile of [
   "/package.json",
   "/THIRD_PARTY_NOTICES.md",
