@@ -69,7 +69,7 @@ const compactEnvironment = Object.fromEntries(
       : {
           HOME: process.env.HOME,
           LANG: process.env.LANG ?? "zh_CN.UTF-8",
-          PATH: "/usr/bin:/bin:/usr/sbin:/sbin",
+          PATH: process.env.PATH ?? "/usr/bin:/bin:/usr/sbin:/sbin",
           TMPDIR: process.env.TMPDIR,
           UV_PYTHON_INSTALL_DIR: process.env.UV_PYTHON_INSTALL_DIR,
         },
