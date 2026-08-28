@@ -30,6 +30,7 @@ describe("ninecli runtime policy", () => {
       SYSTEMROOT: "C:\\Windows",
       TEMP: "C:\\Temp",
       HTTPS_PROXY: "http://127.0.0.1:7890",
+      UV_PYTHON_INSTALL_DIR: "/tmp/uv-python-dir",
       NINEBOT_SECRET: "must-not-leak",
       AWS_SECRET_ACCESS_KEY: "must-not-leak",
     });
@@ -42,6 +43,7 @@ describe("ninecli runtime policy", () => {
       SYSTEMROOT: "C:\\Windows",
       TEMP: "C:\\Temp",
       HTTPS_PROXY: "http://127.0.0.1:7890",
+      UV_PYTHON_INSTALL_DIR: "/tmp/uv-python-dir",
     });
   });
 

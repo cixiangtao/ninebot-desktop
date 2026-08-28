@@ -52,6 +52,7 @@ const environmentKeys = [
   "SSL_CERT_FILE",
   "SSL_CERT_DIR",
   "UV_CACHE_DIR",
+  "UV_PYTHON_INSTALL_DIR",
   "XDG_CACHE_HOME",
 ] as const;
 
