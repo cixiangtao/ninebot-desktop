@@ -30,7 +30,7 @@
     "qa:recovery": "pnpm run build && node scripts/qa-recovery.mjs",
     "package:mac:dir": "pnpm run build && node scripts/qa-recovery.mjs && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac dir --arm64 --publish never -c.mac.identity=- -c.mac.hardenedRuntime=false && node scripts/verify-package.mjs && node scripts/qa-packaged.mjs",
     "package:mac:local": "pnpm run build && node scripts/qa-recovery.mjs && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac dmg zip --arm64 --publish never -c.mac.identity=- -c.mac.hardenedRuntime=false && node scripts/verify-package.mjs --artifacts && node scripts/qa-packaged.mjs",
-    "package:win:local": "pnpm run build && node scripts/qa-recovery.mjs && electron-builder --win nsis zip --x64 --publish never && node scripts/verify-package-windows.mjs --artifacts && node scripts/qa-packaged.mjs && node scripts/qa-windows-installer.mjs",
+    "package:win:local": "pnpm run build && electron-builder --win nsis zip --x64 --publish never && node scripts/verify-package-windows.mjs --artifacts && node scripts/qa-packaged.mjs && node scripts/qa-windows-installer.mjs",
     "release:mac": "pnpm run check && pnpm run build && node scripts/qa-recovery.mjs && electron-builder --mac dmg zip --arm64 --publish never -c.forceCodeSigning=true && node scripts/verify-package.mjs --release && node scripts/qa-packaged.mjs",
     "dist": "pnpm run package:mac:local"
   },

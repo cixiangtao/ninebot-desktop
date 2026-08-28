@@ -20,11 +20,14 @@ const waitForRemoval = async (path) => {
   const deadline = Date.now() + 15_000;
   while (Date.now() < deadline) {
     try {
+      // Polling must remain sequential so each attempt observes the latest filesystem state.
+      // oxlint-disable-next-line no-await-in-loop
       await access(path);
     } catch (error) {
       if (error.code === "ENOENT") return;
       throw error;
     }
+    // oxlint-disable-next-line no-await-in-loop
     await new Promise((resolveWait) => setTimeout(resolveWait, 200));
   }
   throw new Error(`Timed out waiting for uninstaller to remove ${path}`);
