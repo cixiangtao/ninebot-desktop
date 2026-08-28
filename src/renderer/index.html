@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://tiles.openfreemap.org; font-src 'self'; connect-src 'self' ws: https://tiles.openfreemap.org; worker-src 'self' blob:; child-src 'self' blob:;"
+    />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>骑迹</title>
+  </head>
+  <body>
+    <!--
+    THESIS: 骑行轨迹就是时间轴，拒绝把地图、曲线和极速拆成互不关联的后台卡片。
+    OWN-WORLD: 淡灰蓝地图场、白色浮层、深蓝黑文字、青绿路线；使用 iOS/macOS 式侧栏、圆角与克制材质。
+    STORY: 用户选择行程，在地图与速度曲线上同步回放，并直接读到电自极速。
+    FIRST VIEWPORT: 左侧 20% 导航，全幅地图为主体，右上指标浮层，底部 68% 宽的速度回放面板承载主操作。
+    FORM: 轨迹回放优先，三版构图中的第三版；方向种子 e0c9c75d。
+    FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance
+    -->
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

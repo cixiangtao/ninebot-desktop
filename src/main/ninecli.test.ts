@@ -1,0 +1,109 @@
+import { access, chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, describe, expect, it } from "vitest";
+import {
+  classifyNineCliFailure,
+  createNineCliEnvironment,
+  getExpectedBinarySha256,
+  isAllowedNineCliCommand,
+  NineCliClient,
+  resolveUvxExecutable,
+  runtimePolicy,
+} from "./ninecli.js";
+
+const temporaryDirectories: string[] = [];
+
+afterEach(async () => {
+  await Promise.all(
+    temporaryDirectories.splice(0).map((path) => rm(path, { force: true, recursive: true })),
+  );
+});
+
+describe("ninecli runtime policy", () => {
+  it("passes only the minimal environment and keeps proxy connectivity", () => {
+    const environment = createNineCliEnvironment({
+      PATH: "/usr/bin",
+      HOME: "/Users/example",
+      HTTPS_PROXY: "http://127.0.0.1:7890",
+      NINEBOT_SECRET: "must-not-leak",
+      AWS_SECRET_ACCESS_KEY: "must-not-leak",
+    });
+
+    expect(environment).toEqual({
+      PATH: "/usr/bin",
+      HOME: "/Users/example",
+      HTTPS_PROXY: "http://127.0.0.1:7890",
+    });
+  });
+
+  it("only allows the fixed application command set", () => {
+    expect(isAllowedNineCliCommand("whoami")).toBe(true);
+    expect(isAllowedNineCliCommand("vehicles")).toBe(true);
+    expect(isAllowedNineCliCommand("travel")).toBe(true);
+    expect(isAllowedNineCliCommand("status")).toBe(true);
+    expect(isAllowedNineCliCommand("battery")).toBe(true);
+    expect(isAllowedNineCliCommand("login")).toBe(true);
+    expect(isAllowedNineCliCommand("login-code")).toBe(true);
+    expect(isAllowedNineCliCommand("unlock")).toBe(false);
+    expect(isAllowedNineCliCommand("control")).toBe(false);
+  });
+
+  it("declares the session cache as memory-only and free of raw responses", () => {
+    expect(runtimePolicy.sessionCache).toEqual({
+      storage: "memory-only",
+      rawResponsesStored: false,
+      persistsAcrossRestarts: false,
+      manualRefreshBypasses: true,
+    });
+  });
+
+  it("classifies the upstream SMS human-verification challenge without exposing raw output", () => {
+    const error = classifyNineCliFailure(
+      "",
+      'server code=<nil> resultCode=90202 desc="send code need verify"',
+    );
+
+    expect(error.kind).toBe("verification");
+    expect(error.message).toContain("人机验证");
+    expect(error.message).not.toContain("90202");
+  });
+
+  it("pins the verified macOS arm64 binary digest", () => {
+    expect(getExpectedBinarySha256("darwin", "arm64")).toBe(
+      "2d8aef91a74275528c995217fc7a56e5e2507d069acbd28f340e0aa573908f0a",
+    );
+    expect(getExpectedBinarySha256("linux", "x64")).toBeNull();
+  });
+
+  it("finds uvx in a Finder-safe user installation directory", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "ninecli-uvx-test-"));
+    temporaryDirectories.push(directory);
+    const executableDirectory = join(directory, ".local", "bin");
+    const executable = join(executableDirectory, "uvx");
+    await mkdir(executableDirectory, { recursive: true });
+    await writeFile(executable, "#!/bin/sh\n");
+    await chmod(executable, 0o755);
+
+    await expect(resolveUvxExecutable({ HOME: directory, PATH: "" }, "darwin")).resolves.toBe(
+      executable,
+    );
+  });
+
+  it("clears session artifacts but preserves non-token configuration", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "ninecli-client-test-"));
+    temporaryDirectories.push(directory);
+    await writeFile(join(directory, "config.json"), "configuration");
+    await writeFile(join(directory, "tokens.json"), "token");
+    await writeFile(join(directory, "vehicles.json"), "vehicle-cache");
+    const client = new NineCliClient(directory);
+
+    await client.logout();
+
+    await expect(readFile(join(directory, "config.json"), "utf8")).resolves.toBe("configuration");
+    await expect(access(join(directory, "tokens.json"))).rejects.toMatchObject({ code: "ENOENT" });
+    await expect(access(join(directory, "vehicles.json"))).rejects.toMatchObject({
+      code: "ENOENT",
+    });
+  });
+});

@@ -1,0 +1,110 @@
+{
+  "name": "ninebot-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "本地只读的九号骑行轨迹与速度回放客户端",
+  "homepage": "https://github.com/cixiangtao/qiji#readme",
+  "bugs": {
+    "url": "https://github.com/cixiangtao/qiji/issues"
+  },
+  "license": "UNLICENSED",
+  "author": {
+    "name": "anys"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cixiangtao/qiji.git"
+  },
+  "type": "module",
+  "main": "./out/main/index.js",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "pnpm run typecheck && electron-vite build",
+    "preview": "electron-vite preview",
+    "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
+    "lint": "oxlint .",
+    "format": "oxfmt . --write",
+    "format:check": "oxfmt . --check",
+    "test": "vitest run",
+    "check": "pnpm run format:check && pnpm run lint && pnpm run typecheck && pnpm run test",
+    "qa:recovery": "pnpm run build && node scripts/qa-recovery.mjs",
+    "package:mac:dir": "pnpm run build && node scripts/qa-recovery.mjs && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac dir --arm64 --publish never -c.mac.identity=- -c.mac.hardenedRuntime=false && node scripts/verify-package.mjs && node scripts/qa-packaged.mjs",
+    "package:mac:local": "pnpm run build && node scripts/qa-recovery.mjs && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac dmg zip --arm64 --publish never -c.mac.identity=- -c.mac.hardenedRuntime=false && node scripts/verify-package.mjs --artifacts && node scripts/qa-packaged.mjs",
+    "release:mac": "pnpm run check && pnpm run build && node scripts/qa-recovery.mjs && electron-builder --mac dmg zip --arm64 --publish never -c.forceCodeSigning=true && node scripts/verify-package.mjs --release && node scripts/qa-packaged.mjs",
+    "dist": "pnpm run package:mac:local"
+  },
+  "dependencies": {
+    "gcoord": "1.0.7",
+    "lucide-react": "1.34.0",
+    "maplibre-gl": "6.6.0",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
+    "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "4.3.3",
+    "@types/node": "26.3.0",
+    "@types/react": "19.2.18",
+    "@types/react-dom": "19.2.5",
+    "@vitejs/plugin-react": "5.2.0",
+    "electron": "44.0.0",
+    "electron-builder": "26.15.3",
+    "electron-vite": "5.0.0",
+    "oxfmt": "0.65.0",
+    "oxlint": "1.80.0",
+    "playwright": "1.62.1",
+    "tailwindcss": "4.3.3",
+    "typescript": "7.0.2",
+    "vite": "7.3.6",
+    "vitest": "4.1.11"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "packageManager": "pnpm@10.17.1",
+  "build": {
+    "appId": "dev.anys.qiji",
+    "productName": "骑迹",
+    "asar": true,
+    "compression": "normal",
+    "artifactName": "qiji-${version}-mac-${arch}.${ext}",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "out/**/*",
+      "package.json",
+      "THIRD_PARTY_NOTICES.md"
+    ],
+    "electronFuses": {
+      "runAsNode": false,
+      "enableCookieEncryption": true,
+      "enableNodeOptionsEnvironmentVariable": false,
+      "enableNodeCliInspectArguments": false,
+      "enableEmbeddedAsarIntegrityValidation": true,
+      "onlyLoadAppFromAsar": true,
+      "loadBrowserProcessSpecificV8Snapshot": false,
+      "grantFileProtocolExtraPrivileges": false
+    },
+    "mac": {
+      "category": "public.app-category.utilities",
+      "icon": "build/icon.icns",
+      "hardenedRuntime": true,
+      "notarize": true,
+      "entitlements": "build/entitlements.mac.plist",
+      "entitlementsInherit": "build/entitlements.mac.inherit.plist",
+      "target": [
+        "dmg",
+        "zip"
+      ]
+    },
+    "dmg": {
+      "title": "骑迹 ${version}",
+      "backgroundColor": "#edf1f5",
+      "window": {
+        "width": 540,
+        "height": 380
+      }
+    }
+  }
+}
