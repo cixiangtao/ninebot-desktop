@@ -86,7 +86,7 @@ Electron + React + TypeScript + Vite，使用 pnpm 管理依赖；Tailwind CSS �
 1. 已完成多车辆切换：完整呈现 `vehicles` 返回的拥有与共享车辆，设备状态、行程和请求竞态均绑定当前临时车辆 ID。
 2. 已完成月度与年度统计：使用 `travel` 顶层完整汇总计算次数、里程、时长、能耗和平均能耗；单月可选明细达到 20 条上限时显示“明细 20/总次数”，但不再低估年度总量，并且始终避免请求 GPS 详情。
 3. 已完成按需车辆位置页：普通设备快照在主进程丢弃 `status.loc` 坐标，授权前零坐标披露/瓦片请求；授权后独立桥接重新读取位置，切换车辆或停止显示会清除页面坐标。地图默认保持接口原值，并提供不改写原始数据的 `GCJ-02 → WGS84` 本地校准预览，用实车道路贴合情况继续确认坐标基准。
-4. 发布基础设施进行中：已完成 Apple Silicon DMG/ZIP、Windows x64 NSIS/ZIP、原创图标、ASAR 完整性、安全 Fuses、受控 `qiji://app` 协议、隐私说明、崩溃恢复、统一 SHA-256 清单和成品冒烟；待完成 Developer ID/公证、Windows Authenticode、ninecli 再分发证据与自动更新。
+4. 发布基础设施进行中：已完成 Apple Silicon DMG/ZIP、Windows x64 NSIS/ZIP、原创图标、ASAR 完整性、安全 Fuses、受控 `ninebot-desktop://app` 协议、隐私说明、崩溃恢复、统一 SHA-256 清单和成品冒烟；待完成 Developer ID/公证、Windows Authenticode、ninecli 再分发证据与自动更新。
 5. 已完成同月行程对比：按需读取第二条 `travel --detail`，比较轨迹实测极速、平均速度、里程、用时和五档速度里程占比；差值保持中性，不把不同路线与路况简单排名。
 6. 已完成行程能耗覆盖：读取 `ec` 与 `used_electricity`，在列表、详情和同月对比中展示 Wh 与电量消耗百分比，并完整保留到 GPX、CSV、JSON 导出。
 7. 已完成车辆诊断语义修正：分离 `pwr` 主电源与 `loc.acc` ACC，接入锂电类型、BMS 循环说明、智能服务状态及可用的充电完成时间，并对未知枚举保持空值而不是猜测。

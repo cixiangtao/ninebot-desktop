@@ -3,9 +3,9 @@
   "version": "0.2.0",
   "private": true,
   "description": "本地只读的九号骑行轨迹与速度回放客户端",
-  "homepage": "https://github.com/cixiangtao/qiji#readme",
+  "homepage": "https://github.com/cixiangtao/ninebot-desktop#readme",
   "bugs": {
-    "url": "https://github.com/cixiangtao/qiji/issues"
+    "url": "https://github.com/cixiangtao/ninebot-desktop/issues"
   },
   "license": "UNLICENSED",
   "author": {
@@ -13,7 +13,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/cixiangtao/qiji.git"
+    "url": "https://github.com/cixiangtao/ninebot-desktop.git"
   },
   "type": "module",
   "main": "./out/main/index.js",

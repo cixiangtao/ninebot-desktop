@@ -73,25 +73,25 @@ Windows 测试版目前没有 Authenticode 证书，Microsoft Defender SmartScre
 - 使用者需要先按 [uv 官方安装说明](https://docs.astral.sh/uv/getting-started/installation/)安装，例如 `brew install uv`。
 - macOS 从 `PATH`、`~/.local/bin`、`~/.cargo/bin`、`/opt/homebrew/bin` 和 `/usr/local/bin` 查找 `uvx`；Windows 从用户 `PATH`、`%USERPROFILE%\.local\bin`、`%USERPROFILE%\.cargo\bin` 和 WindowsApps 查找 `uvx.exe`。
 - 应用只请求 `ninecli==0.1.7`，并在执行前分别校验 macOS arm64 与 Windows x64 二进制的固定 SHA-256。
-- [PyPI 元数据](https://pypi.org/project/ninecli/0.1.7/)把 ninecli 标为 MIT，但 0.1.7 wheel 中没有许可证正文、版权声明或项目链接。公开发布前应取得可归档的原始许可证/源码仓库证据，或者继续保持由使用者本机通过 uv 获取，不把二进制放入骑迹安装包。
+- [PyPI 元数据](https://pypi.org/project/ninecli/0.1.7/)把 ninecli 标为 MIT，但 0.1.7 wheel 中没有许可证正文、版权声明或项目链接。公开发布前应取得可归档的原始许可证/源码仓库证据，或者继续保持由使用者本机通过 uv 获取，不把二进制放入韭号出行安装包。
 
 签名与公证要求以 [electron-builder macOS 文档](https://www.electron.build/docs/mac/)和[公证文档](https://www.electron.build/docs/notarization/)为准。
 
 ## 当前产物
 
 ```text
-release/mac-arm64/骑迹.app
-release/qiji-0.2.0-mac-arm64.dmg
-release/qiji-0.2.0-mac-arm64.zip
+release/mac-arm64/韭号出行.app
+release/ninebot-desktop-0.2.0-mac-arm64.dmg
+release/ninebot-desktop-0.2.0-mac-arm64.zip
 release/SHA256SUMS.txt
 ```
 
 Windows x64 还会生成：
 
 ```text
-release/win-unpacked/骑迹.exe
-release/qiji-0.2.0-win-x64.exe
-release/qiji-0.2.0-win-x64.zip
+release/win-unpacked/韭号出行.exe
+release/ninebot-desktop-0.2.0-win-x64.exe
+release/ninebot-desktop-0.2.0-win-x64.zip
 ```
 
 版本更新后文件名会随 `package.json` 中的版本自动变化；GitHub Release 中的 `SHA256SUMS.txt` 同时覆盖四个公开资产。
