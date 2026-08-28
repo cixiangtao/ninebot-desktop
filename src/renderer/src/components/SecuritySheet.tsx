@@ -35,6 +35,7 @@ const binaryStatusLabels: Record<RuntimeSecurityStatus["binary"]["status"], stri
 
 const permissionLabels: Record<RuntimeSecurityStatus["storage"]["permissions"], string> = {
   restricted: "仅当前用户可读写",
+  "platform-default": "由当前 Windows 用户保护",
   "needs-attention": "权限需要收紧",
   unavailable: "暂时无法检查",
 };
@@ -182,7 +183,12 @@ export const SecuritySheet = ({
                 label={`本地存储 · ${status.storage.directoryName}`}
                 value={permissionLabels[status.storage.permissions]}
                 hint={status.storage.tokensPresent ? "检测到本地登录令牌" : "当前没有本地登录令牌"}
-                tone={status.storage.permissions === "restricted" ? "good" : "warning"}
+                tone={
+                  status.storage.permissions === "restricted" ||
+                  status.storage.permissions === "platform-default"
+                    ? "good"
+                    : "warning"
+                }
               />
               <SecurityRow
                 icon={<ShieldCheck size={18} />}

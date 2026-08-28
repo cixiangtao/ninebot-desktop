@@ -74,7 +74,7 @@ export interface RuntimeSecurityStatus {
   storage: {
     directoryName: string;
     tokensPresent: boolean;
-    permissions: "restricted" | "needs-attention" | "unavailable";
+    permissions: "restricted" | "platform-default" | "needs-attention" | "unavailable";
   };
   policy: {
     allowedCommands: readonly string[];

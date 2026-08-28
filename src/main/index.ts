@@ -33,6 +33,10 @@ const loadRecoveryPage = async (reason: string) => {
 };
 
 const createWindow = async () => {
+  const macWindowOptions =
+    process.platform === "darwin"
+      ? ({ titleBarStyle: "hiddenInset", trafficLightPosition: { x: 18, y: 18 } } as const)
+      : {};
   mainWindow = new BrowserWindow({
     width: 1440,
     height: 900,
@@ -41,8 +45,7 @@ const createWindow = async () => {
     show: false,
     backgroundColor: "#edf1f5",
     title: "骑迹",
-    titleBarStyle: "hiddenInset",
-    trafficLightPosition: { x: 18, y: 18 },
+    ...macWindowOptions,
     webPreferences: {
       preload: join(import.meta.dirname, "../preload/index.cjs"),
       contextIsolation: true,
