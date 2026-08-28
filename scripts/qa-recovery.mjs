@@ -28,9 +28,13 @@ const waitForMainWindowUrl = async (pattern) => {
 
 try {
   await window.locator(".playback-panel").waitFor();
-  await app.evaluate(({ BrowserWindow }) => {
-    BrowserWindow.getAllWindows()[0]?.webContents.forcefullyCrashRenderer();
-  });
+  const rendererPid = await app.evaluate(
+    ({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.webContents.getOSProcessId() ?? 0,
+  );
+  if (rendererPid <= 0) throw new Error("Unable to resolve the renderer process for recovery QA");
+  // End the renderer after the Playwright command has returned. Calling
+  // forcefullyCrashRenderer() inside the CDP request can crash that request itself.
+  process.kill(rendererPid, "SIGKILL");
   await waitForMainWindowUrl(/^qiji:\/\/app\/recovery\.html/);
   const recoveryState = await app.evaluate(async ({ BrowserWindow }) => {
     const webContents = BrowserWindow.getAllWindows()[0]?.webContents;
