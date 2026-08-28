@@ -11,7 +11,10 @@ if (process.platform !== "win32") {
 const run = promisify(execFile);
 const projectRoot = resolve(import.meta.dirname, "..");
 const packageJson = JSON.parse(await readFile(resolve(projectRoot, "package.json"), "utf8"));
-const installerPath = resolve(projectRoot, `release/ninebot-desktop-${packageJson.version}-win-x64.exe`);
+const installerPath = resolve(
+  projectRoot,
+  `release/ninebot-desktop-${packageJson.version}-win-x64.exe`,
+);
 const qaRoot = await mkdtemp(join(tmpdir(), "ninebot-desktop-windows-installer-qa-"));
 const installDirectory = join(qaRoot, "installed");
 const installedExecutable = join(installDirectory, "韭号出行.exe");

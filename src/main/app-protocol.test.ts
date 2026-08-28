@@ -14,8 +14,14 @@ describe("packaged renderer protocol", () => {
     );
     expect(resolveRendererAssetPath(rendererRoot, "ninebot-desktop://other/index.html")).toBeNull();
     expect(resolveRendererAssetPath(rendererRoot, "https://app/index.html")).toBeNull();
-    expect(resolveRendererAssetPath(rendererRoot, "ninebot-desktop://app/../../tokens.json")).toBeNull();
-    expect(resolveRendererAssetPath(rendererRoot, "ninebot-desktop://app/%2e%2e%2ftokens.json")).toBeNull();
-    expect(resolveRendererAssetPath(rendererRoot, "ninebot-desktop://app/index.html", "POST")).toBeNull();
+    expect(
+      resolveRendererAssetPath(rendererRoot, "ninebot-desktop://app/../../tokens.json"),
+    ).toBeNull();
+    expect(
+      resolveRendererAssetPath(rendererRoot, "ninebot-desktop://app/%2e%2e%2ftokens.json"),
+    ).toBeNull();
+    expect(
+      resolveRendererAssetPath(rendererRoot, "ninebot-desktop://app/index.html", "POST"),
+    ).toBeNull();
   });
 });

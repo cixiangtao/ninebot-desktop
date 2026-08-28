@@ -27,10 +27,18 @@ describe("ride export", () => {
     expect(document.fileName).toMatch(/^韭号出行-F90 & -测试--2024-09-01-04-30\.gpx$/);
     expect(document.content).toContain("F90 &amp; &lt;测试&gt; 骑行轨迹");
     expect(document.content).toContain('<trkpt lat="39.92" lon="116.32">');
-    expect(document.content).toContain('<ninebot-desktop:speed unit="km/h">42</ninebot-desktop:speed>');
-    expect(document.content).toContain('<ninebot-desktop:energy unit="Wh">345</ninebot-desktop:energy>');
-    expect(document.content).toContain('<ninebot-desktop:battery-used unit="percent">6</ninebot-desktop:battery-used>');
-    expect(document.content).toContain('<ninebot-desktop:day-mileage unit="km">9.8</ninebot-desktop:day-mileage>');
+    expect(document.content).toContain(
+      '<ninebot-desktop:speed unit="km/h">42</ninebot-desktop:speed>',
+    );
+    expect(document.content).toContain(
+      '<ninebot-desktop:energy unit="Wh">345</ninebot-desktop:energy>',
+    );
+    expect(document.content).toContain(
+      '<ninebot-desktop:battery-used unit="percent">6</ninebot-desktop:battery-used>',
+    );
+    expect(document.content).toContain(
+      '<ninebot-desktop:day-mileage unit="km">9.8</ninebot-desktop:day-mileage>',
+    );
     expect(document.content).toContain("2024-09-01T04:32:00.000Z");
   });
 
