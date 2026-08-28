@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; img-src 'self' data:;"
+    />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>骑迹 · 恢复</title>
+    <style>
+      :root {
+        color: #182230;
+        background: #edf1f5;
+        font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "PingFang SC", sans-serif;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        min-height: 100vh;
+        margin: 0;
+        display: grid;
+        place-items: center;
+        padding: 40px;
+      }
+      main {
+        width: min(520px, 100%);
+        padding: 42px;
+        border: 1px solid rgb(255 255 255 / 75%);
+        border-radius: 28px;
+        background: rgb(255 255 255 / 92%);
+        box-shadow: 0 24px 70px rgb(29 49 72 / 14%);
+        text-align: center;
+      }
+      .mark {
+        width: 64px;
+        height: 64px;
+        margin: 0 auto 24px;
+        display: grid;
+        place-items: center;
+        border-radius: 18px;
+        color: white;
+        background: linear-gradient(145deg, #20d4c3, #079d99);
+        box-shadow: 0 12px 28px rgb(14 176 165 / 24%);
+      }
+      h1 {
+        margin: 0;
+        font-size: 28px;
+        letter-spacing: -0.03em;
+      }
+      p {
+        margin: 14px auto 0;
+        max-width: 390px;
+        color: #637083;
+        font-size: 14px;
+        line-height: 1.75;
+      }
+      button {
+        margin-top: 28px;
+        padding: 12px 22px;
+        border: 0;
+        border-radius: 13px;
+        color: white;
+        background: #0aa89b;
+        font: inherit;
+        font-weight: 700;
+        cursor: pointer;
+      }
+      button:focus-visible {
+        outline: 3px solid rgb(10 168 155 / 28%);
+        outline-offset: 3px;
+      }
+      small {
+        display: block;
+        margin-top: 20px;
+        color: #94a0af;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div class="mark" aria-hidden="true">
+        <svg width="34" height="34" viewBox="0 0 34 34" fill="none">
+          <path
+            d="M8 9h12a5 5 0 0 1 0 10h-6a5 5 0 0 0-5 5"
+            stroke="currentColor"
+            stroke-width="3"
+            stroke-linecap="round"
+          />
+          <circle cx="8" cy="9" r="3" fill="currentColor" />
+          <circle cx="24" cy="14" r="3" fill="currentColor" />
+          <circle cx="9" cy="25" r="3" fill="currentColor" />
+        </svg>
+      </div>
+      <h1>界面需要重新加载</h1>
+      <p>
+        本地渲染进程意外退出或页面没有成功载入。账号令牌和车辆数据仍保存在本机，没有因此上传到其他服务。
+      </p>
+      <button id="reload" type="button">重新加载骑迹</button>
+      <small id="reason">本地恢复页</small>
+    </main>
+    <script src="/recovery.js"></script>
+  </body>
+</html>
