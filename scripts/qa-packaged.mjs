@@ -64,12 +64,14 @@ const compactEnvironment = Object.fromEntries(
           PATHEXT: process.env.PATHEXT,
           TEMP: process.env.TEMP,
           TMP: process.env.TMP,
+          UV_PYTHON_INSTALL_DIR: process.env.UV_PYTHON_INSTALL_DIR,
         }
       : {
           HOME: process.env.HOME,
           LANG: process.env.LANG ?? "zh_CN.UTF-8",
           PATH: "/usr/bin:/bin:/usr/sbin:/sbin",
           TMPDIR: process.env.TMPDIR,
+          UV_PYTHON_INSTALL_DIR: process.env.UV_PYTHON_INSTALL_DIR,
         },
   ).filter((entry) => entry[1] !== undefined),
 );
