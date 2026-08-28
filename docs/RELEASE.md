@@ -1,6 +1,6 @@
-# macOS 发布说明
+# 桌面端发布说明
 
-当前只验证 macOS Apple Silicon。这里把“本机可运行包”和“可公开分发包”明确分开，避免把生成 DMG 误认为已经完成正式发布。
+当前验证 macOS Apple Silicon 与 Windows x64。这里把“测试包”和“稳定正式包”明确分开，避免把生成安装程序误认为已经完成平台签名与信誉闭环。
 
 ## 本机验收包
 
@@ -22,14 +22,14 @@ ad-hoc 签名不能建立发布者身份，也没有 Apple 公证票据，其他
 
 ## GitHub 测试版发布
 
-推送与 `package.json` 版本一致的 `v*` 标签会触发 `.github/workflows/release-macos.yml`。GitHub Actions 在 Apple Silicon runner 上重新执行完整检查、生成 ad-hoc DMG/ZIP、验证成品并创建 prerelease；本地命令不上传 Release 资产。
+推送与 `package.json` 版本一致的 `v*` 标签会触发 `.github/workflows/release.yml`。GitHub Actions 分别在 Apple Silicon 与 Windows x64 runner 上重新执行完整检查：macOS 生成 ad-hoc DMG/ZIP；Windows 生成未签名的 NSIS 安装程序/ZIP，并完成解包、运行时、静默安装、安装后启动和卸载入口验收。两个平台都成功后，单独的发布任务才会合并资产、生成统一校验清单并创建 prerelease；本地命令不上传 Release 资产。
 
 ```bash
 git tag v0.1.0
 git push origin v0.1.0
 ```
 
-工作流只接受精确指向 `main` 当前提交的版本标签，且会校验标签版本、安装包内容、SHA-256 清单、ASAR、Electron Fuses、签名完整性、崩溃恢复和成品启动。正式稳定版仍必须走下方 Developer ID 与公证入口。
+工作流只接受精确指向 `main` 当前提交的版本标签，且会校验标签版本、安装包内容、SHA-256 清单、ASAR、Electron Fuses、平台签名状态、崩溃恢复和成品启动。正式稳定版仍必须完成下方的平台签名边界。
 
 ## 正式签名包
 
@@ -65,12 +65,14 @@ APPLE_TEAM_ID
 
 `release:mac` 强制要求代码签名；产物验收还会要求 Developer ID Authority、Gatekeeper 接受和有效的 stapled notarization ticket。任一条件缺失都会失败，而不是静默产出“看起来像正式版”的未签名包。
 
+Windows 测试版目前没有 Authenticode 证书，Microsoft Defender SmartScreen 可能警告或阻止运行。稳定 Windows 版需要可信的代码签名证书与可持续的签名流程；不能仅因为 NSIS 安装成功就称为正式签名版。
+
 ## ninecli 与 uv 边界
 
 - 当前包不内置 `uv` 或 `ninecli`。
 - 使用者需要先按 [uv 官方安装说明](https://docs.astral.sh/uv/getting-started/installation/)安装，例如 `brew install uv`。
-- 应用从 `PATH`、`~/.local/bin`、`~/.cargo/bin`、`/opt/homebrew/bin` 和 `/usr/local/bin` 查找 `uvx`。
-- 应用只请求 `ninecli==0.1.7`，并在执行前校验 macOS arm64 二进制的固定 SHA-256。
+- macOS 从 `PATH`、`~/.local/bin`、`~/.cargo/bin`、`/opt/homebrew/bin` 和 `/usr/local/bin` 查找 `uvx`；Windows 从用户 `PATH`、`%USERPROFILE%\.local\bin`、`%USERPROFILE%\.cargo\bin` 和 WindowsApps 查找 `uvx.exe`。
+- 应用只请求 `ninecli==0.1.7`，并在执行前分别校验 macOS arm64 与 Windows x64 二进制的固定 SHA-256。
 - [PyPI 元数据](https://pypi.org/project/ninecli/0.1.7/)把 ninecli 标为 MIT，但 0.1.7 wheel 中没有许可证正文、版权声明或项目链接。公开发布前应取得可归档的原始许可证/源码仓库证据，或者继续保持由使用者本机通过 uv 获取，不把二进制放入骑迹安装包。
 
 签名与公证要求以 [electron-builder macOS 文档](https://www.electron.build/docs/mac/)和[公证文档](https://www.electron.build/docs/notarization/)为准。
@@ -79,9 +81,17 @@ APPLE_TEAM_ID
 
 ```text
 release/mac-arm64/骑迹.app
-release/qiji-0.1.0-mac-arm64.dmg
-release/qiji-0.1.0-mac-arm64.zip
+release/qiji-0.2.0-mac-arm64.dmg
+release/qiji-0.2.0-mac-arm64.zip
 release/SHA256SUMS.txt
 ```
 
-版本更新后文件名会随 `package.json` 中的版本自动变化。
+Windows x64 还会生成：
+
+```text
+release/win-unpacked/骑迹.exe
+release/qiji-0.2.0-win-x64.exe
+release/qiji-0.2.0-win-x64.zip
+```
+
+版本更新后文件名会随 `package.json` 中的版本自动变化；GitHub Release 中的 `SHA256SUMS.txt` 同时覆盖四个公开资产。
