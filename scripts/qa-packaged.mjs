@@ -143,5 +143,10 @@ try {
     if (child.exitCode !== null) resolveExit();
     else child.once("exit", resolveExit);
   });
-  await rm(qaRoot, { recursive: true, force: true });
+  await rm(qaRoot, {
+    recursive: true,
+    force: true,
+    maxRetries: process.platform === "win32" ? 20 : 0,
+    retryDelay: 250,
+  });
 }
