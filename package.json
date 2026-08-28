@@ -1,6 +1,6 @@
 {
   "name": "ninebot-desktop",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "本地只读的九号骑行轨迹与速度回放客户端",
   "homepage": "https://github.com/cixiangtao/qiji#readme",
@@ -30,6 +30,7 @@
     "qa:recovery": "pnpm run build && node scripts/qa-recovery.mjs",
     "package:mac:dir": "pnpm run build && node scripts/qa-recovery.mjs && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac dir --arm64 --publish never -c.mac.identity=- -c.mac.hardenedRuntime=false && node scripts/verify-package.mjs && node scripts/qa-packaged.mjs",
     "package:mac:local": "pnpm run build && node scripts/qa-recovery.mjs && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac dmg zip --arm64 --publish never -c.mac.identity=- -c.mac.hardenedRuntime=false && node scripts/verify-package.mjs --artifacts && node scripts/qa-packaged.mjs",
+    "package:win:local": "pnpm run build && electron-builder --win nsis zip --x64 --publish never && node scripts/verify-package-windows.mjs --artifacts && node scripts/qa-packaged.mjs && node scripts/qa-windows-installer.mjs",
     "release:mac": "pnpm run check && pnpm run build && node scripts/qa-recovery.mjs && electron-builder --mac dmg zip --arm64 --publish never -c.forceCodeSigning=true && node scripts/verify-package.mjs --release && node scripts/qa-packaged.mjs",
     "dist": "pnpm run package:mac:local"
   },
@@ -67,7 +68,6 @@
     "productName": "骑迹",
     "asar": true,
     "compression": "normal",
-    "artifactName": "qiji-${version}-mac-${arch}.${ext}",
     "directories": {
       "output": "release"
     },
@@ -87,6 +87,7 @@
       "grantFileProtocolExtraPrivileges": false
     },
     "mac": {
+      "artifactName": "qiji-${version}-mac-${arch}.${ext}",
       "category": "public.app-category.utilities",
       "icon": "build/icon.icns",
       "hardenedRuntime": true,
@@ -97,6 +98,23 @@
         "dmg",
         "zip"
       ]
+    },
+    "win": {
+      "artifactName": "qiji-${version}-win-${arch}.${ext}",
+      "icon": "build/icon.png",
+      "target": [
+        "nsis",
+        "zip"
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "deleteAppDataOnUninstall": false,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "骑迹"
     },
     "dmg": {
       "title": "骑迹 ${version}",

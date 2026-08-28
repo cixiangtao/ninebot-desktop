@@ -25,6 +25,10 @@ describe("ninecli runtime policy", () => {
     const environment = createNineCliEnvironment({
       PATH: "/usr/bin",
       HOME: "/Users/example",
+      USERPROFILE: "C:\\Users\\example",
+      LOCALAPPDATA: "C:\\Users\\example\\AppData\\Local",
+      SYSTEMROOT: "C:\\Windows",
+      TEMP: "C:\\Temp",
       HTTPS_PROXY: "http://127.0.0.1:7890",
       NINEBOT_SECRET: "must-not-leak",
       AWS_SECRET_ACCESS_KEY: "must-not-leak",
@@ -33,6 +37,10 @@ describe("ninecli runtime policy", () => {
     expect(environment).toEqual({
       PATH: "/usr/bin",
       HOME: "/Users/example",
+      USERPROFILE: "C:\\Users\\example",
+      LOCALAPPDATA: "C:\\Users\\example\\AppData\\Local",
+      SYSTEMROOT: "C:\\Windows",
+      TEMP: "C:\\Temp",
       HTTPS_PROXY: "http://127.0.0.1:7890",
     });
   });
@@ -69,10 +77,14 @@ describe("ninecli runtime policy", () => {
     expect(error.message).not.toContain("90202");
   });
 
-  it("pins the verified macOS arm64 binary digest", () => {
+  it("pins the verified macOS arm64 and Windows x64 binary digests", () => {
     expect(getExpectedBinarySha256("darwin", "arm64")).toBe(
       "2d8aef91a74275528c995217fc7a56e5e2507d069acbd28f340e0aa573908f0a",
     );
+    expect(getExpectedBinarySha256("win32", "x64")).toBe(
+      "94338e423b1d5219a2f6bfeda9af34271b83814ef725220c2598676ac18d650e",
+    );
+    expect(getExpectedBinarySha256("win32", "arm64")).toBeNull();
     expect(getExpectedBinarySha256("linux", "x64")).toBeNull();
   });
 
@@ -88,6 +100,20 @@ describe("ninecli runtime policy", () => {
     await expect(resolveUvxExecutable({ HOME: directory, PATH: "" }, "darwin")).resolves.toBe(
       executable,
     );
+  });
+
+  it("finds uvx in the Windows user installation directory", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "ninecli-uvx-windows-test-"));
+    temporaryDirectories.push(directory);
+    const executableDirectory = join(directory, ".local", "bin");
+    const executable = join(executableDirectory, "uvx.exe");
+    await mkdir(executableDirectory, { recursive: true });
+    await writeFile(executable, "windows executable placeholder");
+    await chmod(executable, 0o755);
+
+    await expect(
+      resolveUvxExecutable({ USERPROFILE: directory, PATH: "C:\\missing;D:\\missing" }, "win32"),
+    ).resolves.toBe(executable);
   });
 
   it("clears session artifacts but preserves non-token configuration", async () => {

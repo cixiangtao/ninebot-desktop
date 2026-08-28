@@ -6,7 +6,11 @@ import { createServer } from "node:net";
 import { chromium } from "playwright";
 
 const projectRoot = resolve(import.meta.dirname, "..");
-const executablePath = resolve(projectRoot, "release/mac-arm64/骑迹.app/Contents/MacOS/骑迹");
+const executablePath =
+  process.env.QIJI_EXECUTABLE_PATH ??
+  (process.platform === "win32"
+    ? resolve(projectRoot, "release/win-unpacked/骑迹.exe")
+    : resolve(projectRoot, "release/mac-arm64/骑迹.app/Contents/MacOS/骑迹"));
 const qaRoot = await mkdtemp(resolve(tmpdir(), "qiji-packaged-qa-"));
 const userDataDirectory = resolve(qaRoot, "user-data");
 const configDirectory = resolve(qaRoot, "ninecli");
@@ -45,16 +49,37 @@ const waitForCdp = async (port) => {
 };
 
 const port = await reservePort();
+const compactEnvironment = Object.fromEntries(
+  Object.entries(
+    process.platform === "win32"
+      ? {
+          PATH: process.env.PATH,
+          USERPROFILE: process.env.USERPROFILE,
+          APPDATA: process.env.APPDATA,
+          LOCALAPPDATA: process.env.LOCALAPPDATA,
+          PROGRAMDATA: process.env.PROGRAMDATA,
+          SYSTEMROOT: process.env.SYSTEMROOT,
+          WINDIR: process.env.WINDIR,
+          COMSPEC: process.env.COMSPEC,
+          PATHEXT: process.env.PATHEXT,
+          TEMP: process.env.TEMP,
+          TMP: process.env.TMP,
+        }
+      : {
+          HOME: process.env.HOME,
+          LANG: process.env.LANG ?? "zh_CN.UTF-8",
+          PATH: "/usr/bin:/bin:/usr/sbin:/sbin",
+          TMPDIR: process.env.TMPDIR,
+        },
+  ).filter((entry) => entry[1] !== undefined),
+);
 const child = spawn(
   executablePath,
   [`--remote-debugging-port=${port}`, `--user-data-dir=${userDataDirectory}`],
   {
     cwd: projectRoot,
     env: {
-      HOME: process.env.HOME,
-      LANG: process.env.LANG ?? "zh_CN.UTF-8",
-      PATH: "/usr/bin:/bin:/usr/sbin:/sbin",
-      TMPDIR: process.env.TMPDIR,
+      ...compactEnvironment,
       NINEBOT_CONFIG_DIR: configDirectory,
     },
     stdio: ["ignore", "pipe", "pipe"],
@@ -99,9 +124,10 @@ try {
   console.log(
     JSON.stringify({
       title: await page.title(),
+      platform: process.platform,
       demoReady: true,
       bridgeReady: true,
-      finderSafeUvxLookup: true,
+      platformUvxLookup: true,
       binaryVerified: true,
       sessionCacheMemoryOnly: true,
       monthSummaryExportReady,

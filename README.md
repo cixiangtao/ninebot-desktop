@@ -4,19 +4,27 @@
 
 ## 下载
 
-[GitHub Releases](https://github.com/cixiangtao/qiji/releases) 提供 macOS Apple Silicon 测试版的 DMG、ZIP 和 SHA-256 校验清单。当前安装包采用 ad-hoc 签名、尚未经过 Apple 公证，因此 Release 会标记为 prerelease，Gatekeeper 可能阻止直接打开；请只在理解并接受这一风险时安装。稳定公开版仍以 Developer ID 签名和 Apple 公证为准。
+[GitHub Releases](https://github.com/cixiangtao/qiji/releases) 提供 macOS Apple Silicon 的 DMG/ZIP、Windows x64 的 NSIS 安装程序/ZIP，以及统一的 SHA-256 校验清单。当前 macOS 包采用 ad-hoc 签名且尚未经过 Apple 公证，Windows 包尚未进行 Authenticode 签名，因此 Release 会标记为 prerelease；Gatekeeper 或 Microsoft Defender SmartScreen 可能阻止直接打开，请只在理解并接受风险时安装。
 
 安装前先准备 `uv`，应用不会把 uv 或 ninecli 打进安装包：
 
+macOS：
+
 ```bash
 brew install uv
+```
+
+Windows PowerShell：
+
+```powershell
+winget install --id=astral-sh.uv -e
 ```
 
 本项目不是九号官方产品，也未获得九号品牌或商业背书。
 
 ## 开发
 
-源码开发需要 Node.js 24、pnpm 10、`uvx`。本地安装包的普通使用者只需安装 `uv`；应用可从 Finder 的精简环境中识别 Homebrew、`~/.local/bin` 和 `~/.cargo/bin` 内的 `uvx`。
+源码开发需要 Node.js 24、pnpm 10、`uvx`。本地安装包的普通使用者只需安装 `uv`；应用可在 macOS Finder 的精简环境以及 Windows 用户环境中识别 `uvx`。
 
 ```bash
 pnpm install
@@ -80,7 +88,7 @@ ninecli 0.1.7 自带的行程文本格式将 `ec` 标注为能耗（Wh），将 
 
 为减少重复调用，设备快照、月度列表和行程详情只在当前 Electron 会话的主进程内缓存解析后的领域对象，默认有效期分别为 15 秒、2 分钟和 10 分钟；相同并发请求会合并。缓存不写磁盘、不保留 ninecli 原始响应，退出登录、成功刷新车辆列表或退出应用后失效；页面中的手动刷新会绕过已完成缓存并重新查询。轨迹指标卡上的刷新按钮只重取当前 `travel --detail`，不会重拉整月；成功后保持当前行程和相对回放位置，失败时保留上次成功数据。演示数据不会伪装成真实刷新，因此按钮保持禁用。
 
-macOS Apple Silicon 本地打包、ASAR 完整性校验、安全熔断、崩溃恢复、产物校验和成品启动冒烟已经接通。当前本地包采用 ad-hoc 签名，仅供本机测试；正式公开发布仍需 Developer ID 签名、公证，以及 ninecli 再分发许可证证据闭环。完整说明见 [发布说明](docs/RELEASE.md)。
+macOS Apple Silicon 与 Windows x64 的打包、ASAR 完整性校验、安全熔断、崩溃恢复、产物校验和成品启动冒烟已经接通。Windows 还会静默安装到临时目录，从安装结果再次启动验收并确认卸载程序存在。当前 macOS 包采用 ad-hoc 签名，Windows 包未签名；稳定公开发布仍需相应平台签名、公证/信誉，以及 ninecli 再分发许可证证据闭环。完整说明见 [发布说明](docs/RELEASE.md)。
 
 项目不包含遥测或分析上报；账号、令牌、车辆、位置、轨迹和第三方网络请求的具体边界见 [隐私说明](PRIVACY.md)。
 
@@ -91,9 +99,10 @@ pnpm check
 pnpm build
 pnpm package:mac:dir
 pnpm package:mac:local
+pnpm package:win:local
 ```
 
-`package:mac:local` 会生成 DMG、ZIP 和 `SHA256SUMS.txt`，并从成品 `.app` 启动一次自动化冒烟。它不是可公开分发的正式签名包。
+`package:mac:local` 会生成 DMG 和 ZIP，`package:win:local` 会生成 NSIS 安装程序和 ZIP；两者都会从成品启动自动化冒烟，但都不是正式签名包。Windows 打包与验收必须在 Windows x64 上运行。
 
 ## 源码许可
 
@@ -102,7 +111,7 @@ pnpm package:mac:local
 ## 安全边界
 
 - 渲染层只能调用版本化、面向领域的桥接：登录、退出、运行时诊断、车辆列表、脱敏后的车辆/电池状态、行程列表、行程详情和用户主动触发的文件导出；不能传入任意 ninecli 命令或文件保存路径。
-- 应用先定位 `ninecli==0.1.7` 包内二进制并核对固定 SHA-256，再直接执行。当前校验基线覆盖 macOS Apple Silicon；未知平台或哈希不一致时阻止业务命令。
+- 应用先定位 `ninecli==0.1.7` 包内二进制并核对固定 SHA-256，再直接执行。当前校验基线覆盖 macOS Apple Silicon 和 Windows x64；未知平台或哈希不一致时阻止业务命令。
 - ninecli 子进程只继承运行所需的路径、语言、代理和证书变量，不继承项目密钥等无关环境变量；VPN/代理变量仍会保留。
 - `status` / `battery` 仅对普通上游临时错误做分区降级；认证、人机验证、二进制缺失、平台不支持或完整性失败继续按安全错误中止，不会用部分结果掩盖。
 - ninecli 配置目录权限固定为 `0700`，已知配置和令牌文件固定为 `0600`；设置页可退出账号并按文件名清除令牌和车辆缓存。
