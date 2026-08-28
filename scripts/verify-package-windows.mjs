@@ -59,7 +59,7 @@ await Promise.all([access(executablePath), access(asarPath)]);
 assert((await readPeMachine(executablePath)) === 0x8664, "Windows executable is not x64");
 
 const versionResult = await run(
-  "powershell.exe",
+  "pwsh.exe",
   [
     "-NoProfile",
     "-NonInteractive",
@@ -74,7 +74,7 @@ assert(
 );
 
 const signatureResult = await run(
-  "powershell.exe",
+  "pwsh.exe",
   [
     "-NoProfile",
     "-NonInteractive",
