@@ -44,7 +44,7 @@ const createWindow = async () => {
     minHeight: 680,
     show: false,
     backgroundColor: "#edf1f5",
-    title: "骑迹",
+    title: "韭号出行",
     ...macWindowOptions,
     webPreferences: {
       preload: join(import.meta.dirname, "../preload/index.cjs"),
@@ -78,7 +78,7 @@ const createWindow = async () => {
     void dialog
       .showMessageBox(mainWindow, {
         type: "warning",
-        title: "骑迹暂时没有响应",
+        title: "韭号出行暂时没有响应",
         message: "页面暂时没有响应。要重新加载本地界面吗？",
         buttons: ["重新加载", "继续等待"],
         defaultId: 0,

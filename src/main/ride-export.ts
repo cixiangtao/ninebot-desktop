@@ -29,24 +29,24 @@ export const sanitizeExportBaseName = (value: string) => {
     .replace(/[. ]+$/g, "")
     .trim()
     .slice(0, 80);
-  return normalized || "骑迹行程";
+  return normalized || "韭号出行行程";
 };
 
 const createExportBaseName = (vehicleName: string, detail: RideDetail) =>
-  sanitizeExportBaseName(`骑迹-${vehicleName}-${formatTimestampForFileName(detail.startTime)}`);
+  sanitizeExportBaseName(`韭号出行-${vehicleName}-${formatTimestampForFileName(detail.startTime)}`);
 
 const createGpx = (vehicleName: string, detail: RideDetail) => {
   const name = escapeXml(`${vehicleName} 骑行轨迹`);
   const rideExtensions = [
     detail.energyWh === null
       ? null
-      : `      <qiji:energy unit="Wh">${detail.energyWh}</qiji:energy>`,
+      : `      <ninebot-desktop:energy unit="Wh">${detail.energyWh}</ninebot-desktop:energy>`,
     detail.batteryUsedPercent === null
       ? null
-      : `      <qiji:battery-used unit="percent">${detail.batteryUsedPercent}</qiji:battery-used>`,
+      : `      <ninebot-desktop:battery-used unit="percent">${detail.batteryUsedPercent}</ninebot-desktop:battery-used>`,
     detail.dayMileageKm === null
       ? null
-      : `      <qiji:day-mileage unit="km">${detail.dayMileageKm}</qiji:day-mileage>`,
+      : `      <ninebot-desktop:day-mileage unit="km">${detail.dayMileageKm}</ninebot-desktop:day-mileage>`,
   ].filter((line): line is string => line !== null);
   const points = detail.track
     .map(({ latitude, longitude, offsetSeconds, speed }) => {
@@ -55,7 +55,7 @@ const createGpx = (vehicleName: string, detail: RideDetail) => {
         `      <trkpt lat="${latitude}" lon="${longitude}">`,
         `        <time>${timestamp}</time>`,
         "        <extensions>",
-        `          <qiji:speed unit="km/h">${speed}</qiji:speed>`,
+        `          <ninebot-desktop:speed unit="km/h">${speed}</ninebot-desktop:speed>`,
         "        </extensions>",
         "      </trkpt>",
       ].join("\n");
@@ -64,7 +64,7 @@ const createGpx = (vehicleName: string, detail: RideDetail) => {
 
   return [
     '<?xml version="1.0" encoding="UTF-8"?>',
-    '<gpx version="1.1" creator="Qiji" xmlns="http://www.topografix.com/GPX/1/1" xmlns:qiji="https://github.com/anys/qiji">',
+    '<gpx version="1.1" creator="NinebotDesktop" xmlns="http://www.topografix.com/GPX/1/1" xmlns:ninebot-desktop="https://github.com/cixiangtao/ninebot-desktop">',
     "  <metadata>",
     `    <name>${name}</name>`,
     `    <time>${new Date(detail.startTime * 1_000).toISOString()}</time>`,
@@ -103,7 +103,7 @@ const createJson = (vehicleName: string, detail: RideDetail) =>
   `${JSON.stringify(
     {
       schemaVersion: 2,
-      exportedBy: "骑迹",
+      exportedBy: "韭号出行",
       vehicleName,
       ride: {
         startTime: detail.startTime,

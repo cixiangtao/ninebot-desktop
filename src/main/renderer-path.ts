@@ -1,6 +1,6 @@
 import { isAbsolute, relative, resolve, sep } from "node:path";
 
-export const appProtocolScheme = "qiji";
+export const appProtocolScheme = "ninebot-desktop";
 export const appProtocolEntryUrl = `${appProtocolScheme}://app/index.html`;
 export const appProtocolRecoveryUrl = `${appProtocolScheme}://app/recovery.html`;
 

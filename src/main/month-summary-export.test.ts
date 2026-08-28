@@ -60,7 +60,7 @@ describe("month summary export", () => {
       rides: Array<Record<string, unknown>>;
     };
 
-    expect(document.fileName).toBe("骑迹-F90-202607月度清单.json");
+    expect(document.fileName).toBe("韭号出行-F90-202607月度清单.json");
     expect(payload.schemaVersion).toBe(1);
     expect(payload.coverage).toMatchObject({
       rideCount: 31,
@@ -90,7 +90,7 @@ describe("month summary export", () => {
     const lines = document.content.trim().split("\r\n");
     const header = lines[0]?.slice(1).split(",") ?? [];
 
-    expect(document.fileName).toBe("骑迹-F90-202607月度清单.csv");
+    expect(document.fileName).toBe("韭号出行-F90-202607月度清单.csv");
     expect(header).toContain("sampled_max_speed_kmh");
     expect(header).toContain("maximum_speed_source");
     expect(lines.some((line) => line.startsWith("day,F90,202607,1,"))).toBe(true);

@@ -64,8 +64,8 @@
   },
   "packageManager": "pnpm@10.17.1",
   "build": {
-    "appId": "dev.anys.qiji",
-    "productName": "骑迹",
+    "appId": "dev.anys.ninebot-desktop",
+    "productName": "韭号出行",
     "asar": true,
     "compression": "normal",
     "directories": {
@@ -114,10 +114,10 @@
       "deleteAppDataOnUninstall": false,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "骑迹"
+      "shortcutName": "韭号出行"
     },
     "dmg": {
-      "title": "骑迹 ${version}",
+      "title": "韭号出行 ${version}",
       "backgroundColor": "#edf1f5",
       "window": {
         "width": 540,

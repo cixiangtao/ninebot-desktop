@@ -24,13 +24,13 @@ describe("ride export", () => {
   it("creates GPX with escaped metadata, timestamps, coordinates, and sampled speed", () => {
     const document = createRideExportDocument("F90 & <测试>", ride, "gpx");
 
-    expect(document.fileName).toMatch(/^骑迹-F90 & -测试--2024-09-01-04-30\.gpx$/);
+    expect(document.fileName).toMatch(/^韭号出行-F90 & -测试--2024-09-01-04-30\.gpx$/);
     expect(document.content).toContain("F90 &amp; &lt;测试&gt; 骑行轨迹");
     expect(document.content).toContain('<trkpt lat="39.92" lon="116.32">');
-    expect(document.content).toContain('<qiji:speed unit="km/h">42</qiji:speed>');
-    expect(document.content).toContain('<qiji:energy unit="Wh">345</qiji:energy>');
-    expect(document.content).toContain('<qiji:battery-used unit="percent">6</qiji:battery-used>');
-    expect(document.content).toContain('<qiji:day-mileage unit="km">9.8</qiji:day-mileage>');
+    expect(document.content).toContain('<ninebot-desktop:speed unit="km/h">42</ninebot-desktop:speed>');
+    expect(document.content).toContain('<ninebot-desktop:energy unit="Wh">345</ninebot-desktop:energy>');
+    expect(document.content).toContain('<ninebot-desktop:battery-used unit="percent">6</ninebot-desktop:battery-used>');
+    expect(document.content).toContain('<ninebot-desktop:day-mileage unit="km">9.8</ninebot-desktop:day-mileage>');
     expect(document.content).toContain("2024-09-01T04:32:00.000Z");
   });
 
@@ -45,7 +45,7 @@ describe("ride export", () => {
     const document = createRideExportDocument("F90", ride, "json");
     const payload = JSON.parse(document.content) as Record<string, unknown>;
 
-    expect(payload).toMatchObject({ schemaVersion: 2, exportedBy: "骑迹", vehicleName: "F90" });
+    expect(payload).toMatchObject({ schemaVersion: 2, exportedBy: "韭号出行", vehicleName: "F90" });
     expect(document.content).not.toContain('"id"');
     expect(document.content).toContain('"sampledMaxSpeedKmh": 42');
     expect(document.content).toContain('"energyWh": 345');
@@ -55,6 +55,6 @@ describe("ride export", () => {
 
   it("removes path separators and control characters from suggested names", () => {
     expect(sanitizeExportBaseName(" ../F90:\n轨迹?. ")).toBe("-F90--轨迹-");
-    expect(sanitizeExportBaseName("   ")).toBe("骑迹行程");
+    expect(sanitizeExportBaseName("   ")).toBe("韭号出行行程");
   });
 });

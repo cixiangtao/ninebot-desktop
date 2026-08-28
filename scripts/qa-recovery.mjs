@@ -4,7 +4,7 @@ import { resolve } from "node:path";
 import { _electron as electron } from "playwright";
 
 const projectRoot = resolve(import.meta.dirname, "..");
-const qaRoot = await mkdtemp(resolve(tmpdir(), "qiji-recovery-qa-"));
+const qaRoot = await mkdtemp(resolve(tmpdir(), "ninebot-desktop-recovery-qa-"));
 const app = await electron.launch({
   args: [".", `--user-data-dir=${resolve(qaRoot, "user-data")}`],
   cwd: projectRoot,
@@ -35,7 +35,7 @@ try {
   // End the renderer after the Playwright command has returned. Calling
   // forcefullyCrashRenderer() inside the CDP request can crash that request itself.
   process.kill(rendererPid, "SIGKILL");
-  await waitForMainWindowUrl(/^qiji:\/\/app\/recovery\.html/);
+  await waitForMainWindowUrl(/^ninebot-desktop:\/\/app\/recovery\.html/);
   const recoveryState = await app.evaluate(async ({ BrowserWindow }) => {
     const webContents = BrowserWindow.getAllWindows()[0]?.webContents;
     return webContents?.executeJavaScript(`({
@@ -47,7 +47,7 @@ try {
     const webContents = BrowserWindow.getAllWindows()[0]?.webContents;
     await webContents?.executeJavaScript(`document.querySelector('#reload')?.click()`);
   });
-  await waitForMainWindowUrl(/^qiji:\/\/app\/index\.html$/);
+  await waitForMainWindowUrl(/^ninebot-desktop:\/\/app\/index\.html$/);
   const reloadSucceeded = await app.evaluate(async ({ BrowserWindow }) => {
     const webContents = BrowserWindow.getAllWindows()[0]?.webContents;
     return webContents?.executeJavaScript(`document.querySelector('.playback-panel') !== null`);

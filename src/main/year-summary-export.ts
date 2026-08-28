@@ -169,7 +169,7 @@ const createJson = (input: YearSummaryExportInput) => {
   return `${JSON.stringify(
     {
       schemaVersion: 2,
-      exportedBy: "骑迹",
+      exportedBy: "韭号出行",
       exportedAt: new Date().toISOString(),
       vehicleName: input.vehicleName,
       year: input.year,
@@ -211,6 +211,6 @@ export const createYearSummaryExportDocument = (
   input: YearSummaryExportInput,
 ): YearSummaryExportDocument => ({
   content: input.format === "csv" ? createCsv(input) : createJson(input),
-  fileName: `${sanitizeExportBaseName(`骑迹-${input.vehicleName}-${input.year}年度摘要`)}.${input.format}`,
+  fileName: `${sanitizeExportBaseName(`韭号出行-${input.vehicleName}-${input.year}年度摘要`)}.${input.format}`,
   format: input.format,
 });

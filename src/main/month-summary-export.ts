@@ -211,7 +211,7 @@ const createJson = (input: MonthSummaryExportInput) => {
   return `${JSON.stringify(
     {
       schemaVersion: 1,
-      exportedBy: "骑迹",
+      exportedBy: "韭号出行",
       exportedAt: new Date().toISOString(),
       vehicleName: input.vehicleName,
       month: input.month.summary.month,
@@ -260,6 +260,6 @@ export const createMonthSummaryExportDocument = (
   input: MonthSummaryExportInput,
 ): MonthSummaryExportDocument => ({
   content: input.format === "csv" ? createCsv(input) : createJson(input),
-  fileName: `${sanitizeExportBaseName(`骑迹-${input.vehicleName}-${input.month.summary.month}月度清单`)}.${input.format}`,
+  fileName: `${sanitizeExportBaseName(`韭号出行-${input.vehicleName}-${input.month.summary.month}月度清单`)}.${input.format}`,
   format: input.format,
 });

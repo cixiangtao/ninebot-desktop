@@ -9,9 +9,9 @@ const projectRoot = resolve(import.meta.dirname, "..");
 const executablePath =
   process.env.QIJI_EXECUTABLE_PATH ??
   (process.platform === "win32"
-    ? resolve(projectRoot, "release/win-unpacked/骑迹.exe")
-    : resolve(projectRoot, "release/mac-arm64/骑迹.app/Contents/MacOS/骑迹"));
-const qaRoot = await mkdtemp(resolve(tmpdir(), "qiji-packaged-qa-"));
+    ? resolve(projectRoot, "release/win-unpacked/韭号出行.exe")
+    : resolve(projectRoot, "release/mac-arm64/韭号出行.app/Contents/MacOS/韭号出行"));
+const qaRoot = await mkdtemp(resolve(tmpdir(), "ninebot-desktop-packaged-qa-"));
 const userDataDirectory = resolve(qaRoot, "user-data");
 const configDirectory = resolve(qaRoot, "ninecli");
 
@@ -100,7 +100,7 @@ try {
   const context = browser.contexts()[0];
   if (!context) throw new Error("Packaged renderer context was not found");
   const page = context.pages()[0] ?? (await context.waitForEvent("page"));
-  await page.waitForURL("qiji://app/**");
+  await page.waitForURL("ninebot-desktop://app/**");
   await page.locator(".playback-panel").waitFor();
   const runtimeStatus = await page.evaluate(() => window.ninebot.runtime.security());
   if (

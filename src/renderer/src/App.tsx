@@ -1388,7 +1388,7 @@ export default function App() {
             <div className="brand-mark">
               <Route size={21} strokeWidth={2.5} />
             </div>
-            <strong>骑迹</strong>
+            <strong>韭号出行</strong>
           </div>
 
           <section className="mt-8">
@@ -1605,7 +1605,7 @@ export default function App() {
                   ? "统计"
                   : view === "comparison"
                     ? "行程对比"
-                    : "骑迹"}
+                    : "韭号出行"}
           </span>
           <div className="no-drag absolute right-5 flex items-center gap-2">
             {loading ||

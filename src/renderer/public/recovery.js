@@ -13,5 +13,5 @@ if (reasonElement) {
 }
 
 document.querySelector("#reload")?.addEventListener("click", () => {
-  window.location.replace("qiji://app/index.html");
+  window.location.replace("ninebot-desktop://app/index.html");
 });

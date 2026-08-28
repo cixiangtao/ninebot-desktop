@@ -35,10 +35,10 @@ describe("year summary export", () => {
     const document = createYearSummaryExportDocument(input);
     const payload = JSON.parse(document.content) as Record<string, unknown>;
 
-    expect(document.fileName).toBe("骑迹-F90-2026年度摘要.json");
+    expect(document.fileName).toBe("韭号出行-F90-2026年度摘要.json");
     expect(payload).toMatchObject({
       schemaVersion: 2,
-      exportedBy: "骑迹",
+      exportedBy: "韭号出行",
       vehicleName: "F90",
       year: 2026,
       coverage: {
@@ -70,7 +70,7 @@ describe("year summary export", () => {
     const yearRow = lines[1]?.split(",") ?? [];
     const monthRow = lines[2]?.split(",") ?? [];
 
-    expect(document.fileName).toBe("骑迹-F90-2026年度摘要.csv");
+    expect(document.fileName).toBe("韭号出行-F90-2026年度摘要.csv");
     expect(header).toContain("average_ride_km");
     expect(header).toContain("average_energy_wh_per_km");
     expect(yearRow[0]).toBe("year");
