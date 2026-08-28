@@ -21,11 +21,22 @@ type AllowedCommand = (typeof allowedCommands)[number];
 
 const expectedBinaryHashes: Readonly<Record<string, string>> = {
   "darwin-arm64": "2d8aef91a74275528c995217fc7a56e5e2507d069acbd28f340e0aa573908f0a",
+  "win32-x64": "94338e423b1d5219a2f6bfeda9af34271b83814ef725220c2598676ac18d650e",
 };
 
 const environmentKeys = [
   "PATH",
   "HOME",
+  "USERPROFILE",
+  "APPDATA",
+  "LOCALAPPDATA",
+  "PROGRAMDATA",
+  "SYSTEMROOT",
+  "WINDIR",
+  "COMSPEC",
+  "PATHEXT",
+  "TEMP",
+  "TMP",
   "TMPDIR",
   "LANG",
   "LC_ALL",
@@ -59,7 +70,7 @@ export interface RuntimeSecurityStatus {
   storage: {
     directoryName: string;
     tokensPresent: boolean;
-    permissions: "restricted" | "needs-attention" | "unavailable";
+    permissions: "restricted" | "platform-default" | "needs-attention" | "unavailable";
   };
   policy: {
     allowedCommands: readonly AllowedCommand[];
@@ -141,20 +152,24 @@ export const classifyNineCliFailure = (stdout: string, stderr: string) => {
 
 const getUvxCandidates = (source: NodeJS.ProcessEnv, platform: NodeJS.Platform): string[] => {
   const executableName = platform === "win32" ? "uvx.exe" : "uvx";
+  const pathDelimiter = platform === "win32" ? ";" : delimiter;
   const pathCandidates = (source.PATH ?? "")
-    .split(delimiter)
+    .split(pathDelimiter)
     .filter(Boolean)
     .map((directory) => join(directory, executableName));
-  const homeCandidates = source.HOME
+  const homeDirectory = platform === "win32" ? (source.USERPROFILE ?? source.HOME) : source.HOME;
+  const homeCandidates = homeDirectory
     ? [
-        join(source.HOME, ".local", "bin", executableName),
-        join(source.HOME, ".cargo", "bin", executableName),
+        join(homeDirectory, ".local", "bin", executableName),
+        join(homeDirectory, ".cargo", "bin", executableName),
       ]
     : [];
   const systemCandidates =
     platform === "darwin"
       ? [join("/opt/homebrew/bin", executableName), join("/usr/local/bin", executableName)]
-      : [];
+      : platform === "win32" && source.LOCALAPPDATA
+        ? [join(source.LOCALAPPDATA, "Microsoft", "WindowsApps", executableName)]
+        : [];
 
   return [...new Set([...pathCandidates, ...homeCandidates, ...systemCandidates])];
 };
@@ -317,6 +332,8 @@ export class NineCliClient {
 
   private async prepareConfigDirectory() {
     await mkdir(this.configDirectory, { recursive: true, mode: 0o700 });
+    // Windows userData inherits the current user's ACL; POSIX mode bits are not meaningful there.
+    if (process.platform === "win32") return;
     await chmod(this.configDirectory, 0o700);
     await Promise.all(
       restrictedFiles.map(async (file) => {
@@ -340,6 +357,7 @@ export class NineCliClient {
   }
 
   private async getStoragePermissions(): Promise<RuntimeSecurityStatus["storage"]["permissions"]> {
+    if (process.platform === "win32") return "platform-default";
     try {
       const directory = await stat(this.configDirectory);
       if ((directory.mode & 0o077) !== 0) return "needs-attention";
