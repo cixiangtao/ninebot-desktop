@@ -28,6 +28,11 @@ jobs:
         uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           version: 0.12.5
+      - name: Expose uvx at its standard user path
+        shell: bash
+        run: |
+          mkdir -p "${HOME}/.local/bin"
+          ln -sf "$(command -v uvx)" "${HOME}/.local/bin/uvx"
       - name: Install pnpm
         run: npm install --global pnpm@10.17.1
       - name: Validate release ref
