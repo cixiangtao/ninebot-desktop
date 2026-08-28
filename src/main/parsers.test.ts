@@ -47,7 +47,7 @@ describe("Ninebot response parsers", () => {
       passwordConfigured: null,
     });
     expect(parseAccountProfile({ username: "韭号出行用户" })).toEqual({
-      maskedIdentifier: "骑***户",
+      maskedIdentifier: "韭***户",
       identifierKind: "username",
       passwordConfigured: null,
     });
