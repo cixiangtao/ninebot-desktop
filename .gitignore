@@ -1,0 +1,13 @@
+node_modules
+out
+dist
+release
+.DS_Store
+*.log
+*.tsbuildinfo
+.env
+.env.*
+!.env.example
+.ninebot-private
+.impeccable
+build/icon.iconset
