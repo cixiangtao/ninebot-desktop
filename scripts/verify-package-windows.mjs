@@ -14,7 +14,7 @@ const run = promisify(execFile);
 const projectRoot = resolve(import.meta.dirname, "..");
 const packageJson = JSON.parse(await readFile(resolve(projectRoot, "package.json"), "utf8"));
 const appDirectory = resolve(projectRoot, "release/win-unpacked");
-const executablePath = resolve(appDirectory, "骑迹.exe");
+const executablePath = resolve(appDirectory, "韭号出行.exe");
 const resourcesPath = resolve(appDirectory, "resources");
 const asarPath = resolve(resourcesPath, "app.asar");
 const verifyArtifacts = process.argv.includes("--artifacts");
@@ -124,8 +124,8 @@ const summary = {
 
 if (verifyArtifacts) {
   const artifacts = [
-    resolve(projectRoot, `release/qiji-${packageJson.version}-win-x64.exe`),
-    resolve(projectRoot, `release/qiji-${packageJson.version}-win-x64.zip`),
+    resolve(projectRoot, `release/ninebot-desktop-${packageJson.version}-win-x64.exe`),
+    resolve(projectRoot, `release/ninebot-desktop-${packageJson.version}-win-x64.zip`),
   ];
   await Promise.all(artifacts.map((path) => access(path)));
   await run("tar.exe", ["-tf", artifacts[1]]);

@@ -9,8 +9,8 @@ import { execFile } from "node:child_process";
 const run = promisify(execFile);
 const projectRoot = resolve(import.meta.dirname, "..");
 const packageJson = JSON.parse(await readFile(resolve(projectRoot, "package.json"), "utf8"));
-const appPath = resolve(projectRoot, "release/mac-arm64/骑迹.app");
-const executablePath = resolve(appPath, "Contents/MacOS/骑迹");
+const appPath = resolve(projectRoot, "release/mac-arm64/韭号出行.app");
+const executablePath = resolve(appPath, "Contents/MacOS/韭号出行");
 const resourcesPath = resolve(appPath, "Contents/Resources");
 const asarPath = resolve(resourcesPath, "app.asar");
 const verifyArtifacts = process.argv.includes("--artifacts") || process.argv.includes("--release");
@@ -47,8 +47,11 @@ const sha256 = (path) =>
   });
 
 await Promise.all([access(executablePath), access(asarPath)]);
-assert((await readPlistValue("CFBundleIdentifier")) === "dev.anys.qiji", "Unexpected bundle ID");
-assert((await readPlistValue("CFBundleName")) === "骑迹", "Unexpected bundle name");
+assert(
+  (await readPlistValue("CFBundleIdentifier")) === "dev.anys.ninebot-desktop",
+  "Unexpected bundle ID",
+);
+assert((await readPlistValue("CFBundleName")) === "韭号出行", "Unexpected bundle name");
 assert(
   (await readPlistValue("CFBundleShortVersionString")) === packageJson.version,
   "Bundle version does not match package.json",
@@ -112,8 +115,8 @@ const summary = {
 
 if (verifyArtifacts) {
   const artifacts = [
-    resolve(projectRoot, `release/qiji-${packageJson.version}-mac-arm64.dmg`),
-    resolve(projectRoot, `release/qiji-${packageJson.version}-mac-arm64.zip`),
+    resolve(projectRoot, `release/ninebot-desktop-${packageJson.version}-mac-arm64.dmg`),
+    resolve(projectRoot, `release/ninebot-desktop-${packageJson.version}-mac-arm64.zip`),
   ];
   await Promise.all(artifacts.map((path) => access(path)));
   await Promise.all([

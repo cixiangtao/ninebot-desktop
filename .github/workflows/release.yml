@@ -47,10 +47,10 @@ jobs:
       - name: Upload macOS packages
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: qiji-macos-${{ github.ref_name }}
+          name: ninebot-desktop-macos-${{ github.ref_name }}
           path: |
-            release/qiji-*-mac-arm64.dmg
-            release/qiji-*-mac-arm64.zip
+            release/ninebot-desktop-*-mac-arm64.dmg
+            release/ninebot-desktop-*-mac-arm64.zip
           if-no-files-found: error
           retention-days: 7
 
@@ -83,10 +83,10 @@ jobs:
       - name: Upload Windows packages
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: qiji-windows-${{ github.ref_name }}
+          name: ninebot-desktop-windows-${{ github.ref_name }}
           path: |
-            release/qiji-*-win-x64.exe
-            release/qiji-*-win-x64.zip
+            release/ninebot-desktop-*-win-x64.exe
+            release/ninebot-desktop-*-win-x64.zip
           if-no-files-found: error
           retention-days: 7
 
@@ -108,7 +108,7 @@ jobs:
       - name: Download verified packages
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          pattern: qiji-*-${{ github.ref_name }}
+          pattern: ninebot-desktop-*-${{ github.ref_name }}
           path: release-assets
           merge-multiple: true
       - name: Create combined checksum manifest
@@ -116,10 +116,10 @@ jobs:
         run: |
           cd release-assets
           expected=(
-            "qiji-${GITHUB_REF_NAME#v}-mac-arm64.dmg"
-            "qiji-${GITHUB_REF_NAME#v}-mac-arm64.zip"
-            "qiji-${GITHUB_REF_NAME#v}-win-x64.exe"
-            "qiji-${GITHUB_REF_NAME#v}-win-x64.zip"
+            "ninebot-desktop-${GITHUB_REF_NAME#v}-mac-arm64.dmg"
+            "ninebot-desktop-${GITHUB_REF_NAME#v}-mac-arm64.zip"
+            "ninebot-desktop-${GITHUB_REF_NAME#v}-win-x64.exe"
+            "ninebot-desktop-${GITHUB_REF_NAME#v}-win-x64.zip"
           )
           for asset in "${expected[@]}"; do
             if [[ ! -f "${asset}" ]]; then
@@ -136,13 +136,13 @@ jobs:
           if gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
             gh release upload "${GITHUB_REF_NAME}" "${assets[@]}" --clobber
             gh release edit "${GITHUB_REF_NAME}" \
-              --title "骑迹 ${GITHUB_REF_NAME}" \
+              --title "韭号出行 ${GITHUB_REF_NAME}" \
               --notes-file "${notes}" \
               --prerelease
           else
             gh release create "${GITHUB_REF_NAME}" "${assets[@]}" \
               --verify-tag \
-              --title "骑迹 ${GITHUB_REF_NAME}" \
+              --title "韭号出行 ${GITHUB_REF_NAME}" \
               --notes-file "${notes}" \
               --prerelease
           fi
@@ -154,10 +154,10 @@ jobs:
           const release = JSON.parse(process.env.RELEASE_JSON);
           const version = release.tagName.slice(1);
           const expectedAssets = new Set([
-            `qiji-${version}-mac-arm64.dmg`,
-            `qiji-${version}-mac-arm64.zip`,
-            `qiji-${version}-win-x64.exe`,
-            `qiji-${version}-win-x64.zip`,
+            `ninebot-desktop-${version}-mac-arm64.dmg`,
+            `ninebot-desktop-${version}-mac-arm64.zip`,
+            `ninebot-desktop-${version}-win-x64.exe`,
+            `ninebot-desktop-${version}-win-x64.zip`,
             "SHA256SUMS.txt",
           ]);
           if (release.isDraft || !release.isPrerelease) throw new Error("Unexpected release state");

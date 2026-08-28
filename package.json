@@ -87,7 +87,7 @@
       "grantFileProtocolExtraPrivileges": false
     },
     "mac": {
-      "artifactName": "qiji-${version}-mac-${arch}.${ext}",
+      "artifactName": "ninebot-desktop-${version}-mac-${arch}.${ext}",
       "category": "public.app-category.utilities",
       "icon": "build/icon.icns",
       "hardenedRuntime": true,
@@ -100,7 +100,7 @@
       ]
     },
     "win": {
-      "artifactName": "qiji-${version}-win-${arch}.${ext}",
+      "artifactName": "ninebot-desktop-${version}-win-${arch}.${ext}",
       "icon": "build/icon.png",
       "target": [
         "nsis",
