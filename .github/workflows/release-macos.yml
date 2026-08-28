@@ -1,0 +1,99 @@
+name: Release macOS prerelease
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: macos-15
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Check out release tag
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24.18.0
+      - name: Install pnpm
+        run: npm install --global pnpm@10.17.1
+      - name: Validate release ref
+        run: |
+          manifest_version="$(node -p "require('./package.json').version")"
+          expected_tag="v${manifest_version}"
+          if [[ "${GITHUB_REF_NAME}" != "${expected_tag}" ]]; then
+            echo "Tag ${GITHUB_REF_NAME} does not match package version ${manifest_version}" >&2
+            exit 1
+          fi
+          git fetch origin main --no-tags
+          if [[ "$(git rev-parse HEAD)" != "$(git rev-parse origin/main)" ]]; then
+            echo "Release tag must point to the current main commit" >&2
+            exit 1
+          fi
+          notes="docs/releases/${GITHUB_REF_NAME}.md"
+          if [[ ! -f "${notes}" ]]; then
+            echo "Missing release notes: ${notes}" >&2
+            exit 1
+          fi
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Check source
+        run: pnpm check
+      - name: Install uv
+        run: |
+          if ! command -v uvx >/dev/null; then
+            brew install uv
+          fi
+          uvx --version
+      - name: Build and verify Apple Silicon package
+        run: pnpm package:mac:local
+      - name: Publish GitHub prerelease
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          notes="docs/releases/${GITHUB_REF_NAME}.md"
+          assets=(
+            "release/qiji-${version}-mac-arm64.dmg"
+            "release/qiji-${version}-mac-arm64.zip"
+            "release/SHA256SUMS.txt"
+          )
+          if gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
+            gh release upload "${GITHUB_REF_NAME}" "${assets[@]}" --clobber
+            gh release edit "${GITHUB_REF_NAME}" \
+              --title "骑迹 ${GITHUB_REF_NAME}" \
+              --notes-file "${notes}" \
+              --prerelease
+          else
+            gh release create "${GITHUB_REF_NAME}" "${assets[@]}" \
+              --verify-tag \
+              --title "骑迹 ${GITHUB_REF_NAME}" \
+              --notes-file "${notes}" \
+              --prerelease
+          fi
+      - name: Verify release metadata
+        run: |
+          release_json="$(gh release view "${GITHUB_REF_NAME}" --json tagName,isDraft,isPrerelease,assets,url)"
+          RELEASE_JSON="${release_json}" node --input-type=module <<'NODE'
+          const release = JSON.parse(process.env.RELEASE_JSON);
+          const expectedAssets = new Set([
+            `qiji-${release.tagName.slice(1)}-mac-arm64.dmg`,
+            `qiji-${release.tagName.slice(1)}-mac-arm64.zip`,
+            "SHA256SUMS.txt",
+          ]);
+          if (release.isDraft || !release.isPrerelease) throw new Error("Unexpected release state");
+          for (const asset of release.assets) expectedAssets.delete(asset.name);
+          if (expectedAssets.size > 0) {
+            throw new Error(`Missing release assets: ${[...expectedAssets].join(", ")}`);
+          }
+          console.log(release.url);
+          NODE
