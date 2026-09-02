@@ -15,6 +15,10 @@ import type {
 } from "./crypto-envelope.ts";
 
 const textEncoder = new TextEncoder();
+const KEY_DATA_ONE_PATTERN = /^[0-9a-f]{11}$/;
+const KEY_DATA_TWO_PATTERN = /^[0-9a-f]{11}$/;
+const KEY_DATA_THREE_PATTERN = /^[0-9a-f]{10}$/;
+const KEY_DATA_FOUR_PATTERN = /^[/a-zA-Z0-9;_.,+\\-]{8}$/;
 
 export interface NinebotCandidateKeyData {
   keyDataOne: string;
@@ -69,22 +73,40 @@ const assertSafeInteger = (value: number, name: string) => {
   if (!Number.isSafeInteger(value)) throw new Error(`Ninebot ${name} must be a safe integer`);
 };
 
+const assertKeyData = (keyData: NinebotCandidateKeyData) => {
+  if (!KEY_DATA_ONE_PATTERN.test(keyData.keyDataOne)) {
+    throw new Error("Ninebot candidate keyDataOne must be 11 lowercase hexadecimal characters");
+  }
+  if (!KEY_DATA_TWO_PATTERN.test(keyData.keyDataTwo)) {
+    throw new Error("Ninebot candidate keyDataTwo must be 11 lowercase hexadecimal characters");
+  }
+  if (!KEY_DATA_THREE_PATTERN.test(keyData.keyDataThree)) {
+    throw new Error("Ninebot candidate keyDataThree must be 10 lowercase hexadecimal characters");
+  }
+  if (!KEY_DATA_FOUR_PATTERN.test(keyData.keyDataFour)) {
+    throw new Error("Ninebot candidate keyDataFour must be 8 allowed characters");
+  }
+};
+
 const encodeWrapper = (plaintextBody: Uint8Array, material: NinebotCandidateRequestMaterial) => {
   assertSafeInteger(material.platform, "platform");
   assertSafeInteger(material.timeStamp, "timeStamp");
+  assertKeyData(material.keyData);
   if (material.kReq.length !== 16) throw new Error("Ninebot candidate kReq must be 16 bytes");
   return textEncoder.encode(
     `{\n\t"data" : "${encodeNinebotBase64(plaintextBody)}",\n\t"keyDataFour" : "${material.keyData.keyDataFour}",\n\t"keyDataOne" : "${material.keyData.keyDataOne}",\n\t"keyDataTwo" : "${material.keyData.keyDataTwo}",\n\t"keyDataThree" : "${material.keyData.keyDataThree}",\n\t"platform" : ${material.platform},\n\t"timeStamp" : ${material.timeStamp}\n}\n`,
   );
 };
 
-const deriveCandidateKey = (keyData: NinebotCandidateKeyData) =>
-  deriveNinebotKeyCandidate([
+const deriveCandidateKey = (keyData: NinebotCandidateKeyData) => {
+  assertKeyData(keyData);
+  return deriveNinebotKeyCandidate([
     textEncoder.encode(keyData.keyDataOne),
     textEncoder.encode(keyData.keyDataTwo),
     textEncoder.encode(keyData.keyDataThree),
     textEncoder.encode(keyData.keyDataFour),
   ]);
+};
 
 /**
  * Builds the encrypted request shape reconstructed from ninecli's crypto package.

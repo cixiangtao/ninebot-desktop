@@ -122,4 +122,17 @@ describe("Ninebot crypto codec candidate", () => {
       }),
     ).toEqual(plaintext);
   });
+
+  it("rejects key-data values outside the observed shapes", () => {
+    expect(() =>
+      decryptNinebotResponseCandidate({
+        envelope: {
+          v: 1,
+          s: encodeNinebotBase64(new Uint8Array(128)),
+          r: encodeNinebotBase64(new Uint8Array(16)),
+        },
+        keyData: { ...keyData, keyDataOne: "0123456789A" },
+      }),
+    ).toThrow("keyDataOne must be 11 lowercase hexadecimal characters");
+  });
 });
