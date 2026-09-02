@@ -1,0 +1,24 @@
+{
+  "name": "@jiuhao/ninebot-client",
+  "version": "0.0.0",
+  "private": true,
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./protocol-lab": {
+      "types": "./dist/protocol-lab.d.ts",
+      "import": "./dist/protocol-lab.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json"
+  }
+}

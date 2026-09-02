@@ -76,6 +76,8 @@ importers:
         specifier: 4.1.11
         version: 4.1.11(@types/node@26.3.0)(vite@7.3.6(@types/node@26.3.0)(jiti@2.7.0)(lightningcss@1.33.0))
 
+  packages/ninebot-client: {}
+
 packages:
 
   '@babel/code-frame@7.29.7':

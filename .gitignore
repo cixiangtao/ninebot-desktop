@@ -12,3 +12,4 @@ release
 .impeccable
 build/icon.iconset
 build/generated
+packages/*/dist

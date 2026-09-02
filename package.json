@@ -19,9 +19,11 @@
   "main": "./out/main/index.js",
   "scripts": {
     "dev": "pnpm run prepare:ninecli-runtime && electron-vite dev",
-    "build": "pnpm run typecheck && electron-vite build",
+    "build": "pnpm run build:sdk && pnpm run typecheck && electron-vite build",
+    "build:sdk": "pnpm --filter @jiuhao/ninebot-client build",
     "preview": "pnpm run prepare:ninecli-runtime && electron-vite preview",
     "prepare:ninecli-runtime": "node scripts/prepare-ninecli-runtime.mjs",
+    "protocol:record": "node scripts/protocol-recorder.ts",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
     "lint": "oxlint .",
     "format": "oxfmt . --write",
