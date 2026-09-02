@@ -2,7 +2,7 @@ import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import { constants } from "node:fs";
 import { access, chmod, mkdir, readFile, rm, stat } from "node:fs/promises";
-import { basename, delimiter, join } from "node:path";
+import { basename, join } from "node:path";
 
 export const ninecliVersion = "0.1.7";
 const commandTimeoutMs = 45_000;
@@ -20,7 +20,7 @@ const allowedCommands = [
 type AllowedCommand = (typeof allowedCommands)[number];
 
 const expectedBinaryHashes: Readonly<Record<string, string>> = {
-  "darwin-arm64": "2d8aef91a74275528c995217fc7a56e5e2507d069acbd28f340e0aa573908f0a",
+  "darwin-arm64": "70ba65c63a09373a6eab63cf96b80cd06fff2fd107dff63e884efafb9b31352c",
   "win32-x64": "94338e423b1d5219a2f6bfeda9af34271b83814ef725220c2598676ac18d650e",
 };
 
@@ -51,9 +51,6 @@ const environmentKeys = [
   "no_proxy",
   "SSL_CERT_FILE",
   "SSL_CERT_DIR",
-  "UV_CACHE_DIR",
-  "UV_PYTHON_INSTALL_DIR",
-  "XDG_CACHE_HOME",
 ] as const;
 
 const tokenFiles = ["tokens.json", "vehicles.json"] as const;
@@ -133,8 +130,75 @@ export const getExpectedBinarySha256 = (
   architecture = process.arch,
 ) => expectedBinaryHashes[`${platform}-${architecture}`] ?? null;
 
+interface BundledNineCliLocation {
+  appPath: string;
+  isPackaged: boolean;
+  resourcesPath: string;
+  platform?: NodeJS.Platform;
+}
+
+/** Resolves the immutable runtime location used in development and packaged applications. */
+export const getBundledNineCliBinaryPath = ({
+  appPath,
+  isPackaged,
+  resourcesPath,
+  platform = process.platform,
+}: BundledNineCliLocation) =>
+  join(
+    isPackaged ? resourcesPath : join(appPath, "build/generated"),
+    "runtime",
+    "ninecli",
+    platform === "win32" ? "ninecli.exe" : "ninecli",
+  );
+
 export const isAllowedNineCliCommand = (command: string): command is AllowedCommand =>
   allowedCommands.includes(command as AllowedCommand);
+
+const normalizeMacOsCodeSignature = (content: Buffer) => {
+  const machO64LittleEndianMagic = 0xfeedfacf;
+  const segment64Command = 0x19;
+  const codeSignatureCommand = 0x1d;
+  if (content.length < 32 || content.readUInt32LE(0) !== machO64LittleEndianMagic) {
+    throw new NineCliError("内置数据组件格式无效，已阻止执行。", "integrity");
+  }
+
+  const normalized = Buffer.from(content);
+  const commandCount = normalized.readUInt32LE(16);
+  let commandOffset = 32;
+  let signatureOffset: number | null = null;
+
+  for (let index = 0; index < commandCount; index += 1) {
+    if (commandOffset + 8 > normalized.length) {
+      throw new NineCliError("内置数据组件格式无效，已阻止执行。", "integrity");
+    }
+    const command = normalized.readUInt32LE(commandOffset);
+    const commandSize = normalized.readUInt32LE(commandOffset + 4);
+    if (commandSize < 8 || commandOffset + commandSize > normalized.length) {
+      throw new NineCliError("内置数据组件格式无效，已阻止执行。", "integrity");
+    }
+
+    if (command === segment64Command && commandSize >= 72) {
+      const segmentName = normalized
+        .subarray(commandOffset + 8, commandOffset + 24)
+        .toString("ascii")
+        .replaceAll("\0", "");
+      if (segmentName === "__LINKEDIT") {
+        normalized.fill(0, commandOffset + 32, commandOffset + 40);
+        normalized.fill(0, commandOffset + 48, commandOffset + 56);
+      }
+    }
+    if (command === codeSignatureCommand && commandSize >= 16) {
+      signatureOffset = normalized.readUInt32LE(commandOffset + 8);
+      normalized.fill(0, commandOffset + 8, commandOffset + 16);
+    }
+    commandOffset += commandSize;
+  }
+
+  if (signatureOffset === null || signatureOffset > normalized.length) {
+    throw new NineCliError("内置数据组件签名结构无效，已阻止执行。", "integrity");
+  }
+  return normalized.subarray(0, signatureOffset);
+};
 
 /** Maps known ninecli failures to stable, renderer-safe application errors. */
 export const classifyNineCliFailure = (stdout: string, stderr: string) => {
@@ -149,53 +213,6 @@ export const classifyNineCliFailure = (stdout: string, stderr: string) => {
     return new NineCliError("登录状态无效，请重新连接九号账号。", "auth");
   }
   return new NineCliError("ninecli 请求失败，请稍后重试。", "upstream");
-};
-
-const getUvxCandidates = (source: NodeJS.ProcessEnv, platform: NodeJS.Platform): string[] => {
-  const executableName = platform === "win32" ? "uvx.exe" : "uvx";
-  const pathDelimiter = platform === "win32" ? ";" : delimiter;
-  const pathCandidates = (source.PATH ?? "")
-    .split(pathDelimiter)
-    .filter(Boolean)
-    .map((directory) => join(directory, executableName));
-  const homeDirectory = platform === "win32" ? (source.USERPROFILE ?? source.HOME) : source.HOME;
-  const homeCandidates = homeDirectory
-    ? [
-        join(homeDirectory, ".local", "bin", executableName),
-        join(homeDirectory, ".cargo", "bin", executableName),
-      ]
-    : [];
-  const systemCandidates =
-    platform === "darwin"
-      ? [join("/opt/homebrew/bin", executableName), join("/usr/local/bin", executableName)]
-      : platform === "win32" && source.LOCALAPPDATA
-        ? [join(source.LOCALAPPDATA, "Microsoft", "WindowsApps", executableName)]
-        : [];
-
-  return [...new Set([...pathCandidates, ...homeCandidates, ...systemCandidates])];
-};
-
-/**
- * Locates uvx even when Electron was opened from Finder with a minimal PATH.
- *
- * @returns An absolute executable path, or null when uv is not installed in a known location.
- */
-export const resolveUvxExecutable = async (
-  source: NodeJS.ProcessEnv = process.env,
-  platform: NodeJS.Platform = process.platform,
-) => {
-  const candidates = getUvxCandidates(source, platform);
-  const executableCandidates = await Promise.all(
-    candidates.map(async (candidate) => {
-      try {
-        await access(candidate, constants.X_OK);
-        return candidate;
-      } catch {
-        return null;
-      }
-    }),
-  );
-  return executableCandidates.find((candidate) => candidate !== null) ?? null;
 };
 
 const collectProcess = (
@@ -250,7 +267,10 @@ const collectProcess = (
 export class NineCliClient {
   private binaryPathPromise: Promise<string> | null = null;
 
-  constructor(private readonly configDirectory: string) {}
+  constructor(
+    private readonly configDirectory: string,
+    private readonly bundledBinaryPath: string,
+  ) {}
 
   async login(user: string, areaCode: string, password: string) {
     await this.run("login", ["--area", areaCode, "--user", user, "--password", password], false);
@@ -305,7 +325,7 @@ export class NineCliClient {
 
     if (expectedSha256) {
       try {
-        const binaryPath = await this.resolvePackagedBinaryPath();
+        const binaryPath = await this.resolveBundledBinaryPath();
         sha256 = await this.hashFile(binaryPath);
         binaryStatus = sha256 === expectedSha256 ? "verified" : "mismatch";
       } catch {
@@ -387,7 +407,7 @@ export class NineCliClient {
         "unsupported",
       );
     }
-    const binaryPath = await this.resolvePackagedBinaryPath();
+    const binaryPath = await this.resolveBundledBinaryPath();
     const actualSha256 = await this.hashFile(binaryPath);
     if (actualSha256 !== expectedSha256) {
       this.binaryPathPromise = null;
@@ -396,9 +416,9 @@ export class NineCliClient {
     return binaryPath;
   }
 
-  private async resolvePackagedBinaryPath() {
+  private async resolveBundledBinaryPath() {
     if (!this.binaryPathPromise) {
-      this.binaryPathPromise = this.locatePackagedBinary().catch((error) => {
+      this.binaryPathPromise = this.locateBundledBinary().catch((error) => {
         this.binaryPathPromise = null;
         throw error;
       });
@@ -406,32 +426,20 @@ export class NineCliClient {
     return this.binaryPathPromise;
   }
 
-  private async locatePackagedBinary() {
-    const binaryName = process.platform === "win32" ? "ninecli.exe" : "ninecli";
-    const script = [
-      "from importlib.metadata import distribution",
-      "from pathlib import Path",
-      `print(Path(distribution('ninecli').locate_file('ninecli/bin/${binaryName}')).resolve())`,
-    ].join("; ");
-    const uvxExecutable = await resolveUvxExecutable();
-    if (!uvxExecutable) {
-      throw new NineCliError("未找到 uvx，请先安装 uv 后再连接九号账号。", "missing");
+  private async locateBundledBinary() {
+    try {
+      await access(this.bundledBinaryPath, constants.X_OK);
+      return this.bundledBinaryPath;
+    } catch {
+      throw new NineCliError("内置数据组件不可用，请重新安装韭号出行。", "missing");
     }
-    const result = await collectProcess(
-      uvxExecutable,
-      ["--from", `ninecli==${ninecliVersion}`, "python", "-c", script],
-      createNineCliEnvironment(),
-      "未找到 uvx，请先安装 uv 后再连接九号账号。",
-    );
-    if (result.code !== 0 || !result.stdout) {
-      throw new NineCliError("无法定位固定版本的 ninecli 二进制。");
-    }
-    return result.stdout.split(/\r?\n/).at(-1) ?? result.stdout;
   }
 
   private async hashFile(path: string) {
     const content = await readFile(path);
-    return createHash("sha256").update(content).digest("hex");
+    const verifiableContent =
+      process.platform === "darwin" ? normalizeMacOsCodeSignature(content) : content;
+    return createHash("sha256").update(verifiableContent).digest("hex");
   }
 
   private async runJson(command: AllowedCommand, args: string[] = []) {
@@ -458,7 +466,7 @@ export class NineCliClient {
         executable,
         commandArgs,
         createNineCliEnvironment(),
-        "固定版本的 ninecli 二进制不可用。",
+        "内置数据组件不可用，请重新安装韭号出行。",
       );
     } finally {
       // Login may create token files, so close their permissions before returning control.

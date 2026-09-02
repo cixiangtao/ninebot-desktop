@@ -11,3 +11,4 @@ release
 .ninebot-private
 .impeccable
 build/icon.iconset
+build/generated

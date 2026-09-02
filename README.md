@@ -4,37 +4,17 @@
 
 ## 下载
 
-[GitHub Releases](https://github.com/cixiangtao/ninebot-desktop/releases) 提供 macOS Apple Silicon 的 DMG/ZIP、Windows x64 的 NSIS 安装程序/ZIP，以及统一的 SHA-256 校验清单。当前 macOS 包采用 ad-hoc 签名且尚未经过 Apple 公证，Windows 包尚未进行 Authenticode 签名，因此 Release 会标记为 prerelease；Gatekeeper 或 Microsoft Defender SmartScreen 可能阻止直接打开，请只在理解并接受风险时安装。
-
-安装前先准备 `uv`，应用不会把 uv 或 ninecli 打进安装包：
-
-macOS：
-
-```bash
-brew install uv
-```
-
-Windows PowerShell：
-
-```powershell
-winget install --id=astral-sh.uv -e
-```
+[GitHub Releases](https://github.com/cixiangtao/ninebot-desktop/releases) 提供 macOS Apple Silicon 的 DMG/ZIP、Windows x64 的 NSIS 安装程序/ZIP，以及统一的 SHA-256 校验清单。安装包已经内置对应平台的固定版数据组件，普通使用者无需另装 Python、uv 或 ninecli。当前 macOS 包采用 ad-hoc 签名且尚未经过 Apple 公证，Windows 包尚未进行 Authenticode 签名，因此 Release 会标记为 prerelease；Gatekeeper 或 Microsoft Defender SmartScreen 可能阻止直接打开，请只在理解并接受风险时安装。
 
 本项目不是九号官方产品，也未获得九号品牌或商业背书。
 
 ## 开发
 
-源码开发需要 Node.js 24、pnpm 10、`uvx`。本地安装包的普通使用者只需安装 `uv`；应用可在 macOS Finder 的精简环境以及 Windows 用户环境中识别 `uvx`。
+源码开发只需要 Node.js 24 和 pnpm 10。`pnpm dev` 会下载当前平台的固定版 ninecli wheel，先校验 wheel，再只提取并校验原生可执行文件；生成目录不会进入 Git。
 
 ```bash
 pnpm install
 pnpm dev
-```
-
-推荐通过 Homebrew 安装 uv：
-
-```bash
-brew install uv
 ```
 
 默认登录信息保存在 Electron `userData/ninecli` 目录。开发时可以显式复用已有的 ninecli 配置目录：
@@ -42,6 +22,8 @@ brew install uv
 ```bash
 NINEBOT_CONFIG_DIR=/absolute/path/to/ninecli-config pnpm dev
 ```
+
+仓库正在把现有只读能力逐步迁移为 Node.js/TypeScript SDK。当前已经加入仅监听本机、默认不保存 Body 原文的协议记录器，以 ninecli 作为迁移期行为对照；使用方式、私有样本边界和实现顺序见[九号协议研究计划](docs/PROTOCOL_RESEARCH.md)。
 
 轨迹页使用 MapLibre GL JS 渲染，并加载 OpenFreeMap 的 Positron 在线底图。路线按照逐点速度从蓝色、青色、黄色、橙色到红色分段着色，回放支持 0.5×、1×、2×、4× 连续倍速；速度曲线支持点击、拖动以及方向键、Home、End 精确定位，并与地图位置、当前速度和时间共享同一回放状态。页面还会在本地按 GPS 轨迹段距离汇总五档速度区间，点击任一区间可定位到该区间最快轨迹段。侧栏保留整月次数、里程与能耗汇总，并明确显示当前可选择的行程条数；详情卡会展示本次能耗（Wh）和电量消耗（%）。同月行程对比会按需再读取一条详情，并排展示轨迹实测极速、平均速度、里程、用时、能耗、电量消耗及五档速度里程占比。差值只描述数据变化，不判断骑行好坏，返回后保留原行程的回放位置。无需 API Key，断网、VPN 或底图服务异常时会在 10 秒内回退到使用同一套速度颜色的本地轨迹画布，速度曲线和回放仍可使用。`status` 原始响应可能包含位置；普通设备读取会在 Electron 主进程解析时丢弃坐标，不把它交给页面。用户在车辆位置页明确确认后，客户端才把新读取的坐标交给页面并加载位置区域瓦片；停止显示或切换车辆会立即清除页面中的坐标。共享车辆若通过 `permissions.see_location` 明确拒绝位置访问，客户端会剥离坐标、不创建地图、不请求瓦片，并提示让车主调整共享权限后重新检查。
 
@@ -88,7 +70,7 @@ ninecli 0.1.7 自带的行程文本格式将 `ec` 标注为能耗（Wh），将 
 
 为减少重复调用，设备快照、月度列表和行程详情只在当前 Electron 会话的主进程内缓存解析后的领域对象，默认有效期分别为 15 秒、2 分钟和 10 分钟；相同并发请求会合并。缓存不写磁盘、不保留 ninecli 原始响应，退出登录、成功刷新车辆列表或退出应用后失效；页面中的手动刷新会绕过已完成缓存并重新查询。轨迹指标卡上的刷新按钮只重取当前 `travel --detail`，不会重拉整月；成功后保持当前行程和相对回放位置，失败时保留上次成功数据。演示数据不会伪装成真实刷新，因此按钮保持禁用。
 
-macOS Apple Silicon 与 Windows x64 的打包、ASAR 完整性校验、安全熔断、崩溃恢复、产物校验和成品启动冒烟已经接通。Windows 还会静默安装到临时目录，从安装结果再次启动验收并确认卸载程序存在。当前 macOS 包采用 ad-hoc 签名，Windows 包未签名；稳定公开发布仍需相应平台签名、公证/信誉，以及 ninecli 再分发许可证证据闭环。完整说明见 [发布说明](docs/RELEASE.md)。
+macOS Apple Silicon 与 Windows x64 的打包、内置运行时双重哈希校验、ASAR 完整性校验、安全熔断、崩溃恢复、产物校验和成品启动冒烟已经接通。Windows 还会静默安装到临时目录，从安装结果再次启动验收并确认卸载程序存在。当前 macOS 包采用 ad-hoc 签名，Windows 包未签名；稳定公开发布仍需相应平台签名、公证/信誉，以及 ninecli 再分发许可证证据闭环。完整说明见 [发布说明](docs/RELEASE.md)。
 
 项目不包含遥测或分析上报；账号、令牌、车辆、位置、轨迹和第三方网络请求的具体边界见 [隐私说明](PRIVACY.md)。
 
@@ -111,7 +93,7 @@ pnpm package:win:local
 ## 安全边界
 
 - 渲染层只能调用版本化、面向领域的桥接：登录、退出、运行时诊断、车辆列表、脱敏后的车辆/电池状态、行程列表、行程详情和用户主动触发的文件导出；不能传入任意 ninecli 命令或文件保存路径。
-- 应用先定位 `ninecli==0.1.7` 包内二进制并核对固定 SHA-256，再直接执行。当前校验基线覆盖 macOS Apple Silicon 和 Windows x64；未知平台或哈希不一致时阻止业务命令。
+- 构建时只从固定 URL 下载 `ninecli==0.1.7` 的平台 wheel，依次核对 wheel 与其中原生可执行文件的固定 SHA-256；运行时只执行安装包资源目录内的那一份，并在每次业务命令前再次校验。macOS 会排除签名容器和 `__LINKEDIT` 签名尺寸字段后核对固定代码摘要，同时由系统校验代码签名，以兼容 ad-hoc 与 Developer ID 对同一程序的不同签名。当前基线覆盖 macOS Apple Silicon 和 Windows x64；文件缺失、未知平台或哈希不一致时阻止业务命令。
 - ninecli 子进程只继承运行所需的路径、语言、代理和证书变量，不继承项目密钥等无关环境变量；VPN/代理变量仍会保留。
 - `status` / `battery` 仅对普通上游临时错误做分区降级；认证、人机验证、二进制缺失、平台不支持或完整性失败继续按安全错误中止，不会用部分结果掩盖。
 - ninecli 配置目录权限固定为 `0700`，已知配置和令牌文件固定为 `0600`；设置页可退出账号并按文件名清除令牌和车辆缓存。
@@ -120,8 +102,8 @@ pnpm package:win:local
 - `status` 原始响应可能包含 `loc`。普通设备读取只在主进程解析所需状态并丢弃坐标，不把原始响应或经纬度交给页面；位置授权前不创建车辆地图，也不发起位置区域瓦片请求。授权后独立桥接会重新查询状态，页面只接收共享位置权限，以及允许情况下的坐标、锁车和 ACC 状态。显式拒绝时主进程剥离坐标，授权只保留在当前会话和当前车辆中。
 - 设备快照、月度列表和行程详情缓存仅存在于主进程内存，保存的是解析后的领域对象而不是 ninecli 原始响应；手动刷新绕过已完成缓存，退出登录、成功刷新车辆列表或应用退出后清空。
 - 不实现鸣笛、开座桶、启动或熄火能力。
-- `ninecli` 是非官方且未完整开源的工具；哈希校验只能确认“正在执行已审核过的那一份”，不能证明二进制内部安全。公开发布前仍需解决其许可证、二进制分发、签名、公证和隐私说明。
-- 当前安装包不内置 ninecli 或 uv：应用通过本机 `uvx` 获取固定的 `ninecli==0.1.7`，然后核对二进制 SHA-256。PyPI 元数据声明 MIT，但 wheel 中没有许可证正文或项目链接，因此在获得更强证据前不随包再分发该二进制。
+- `ninecli` 是非官方且未完整开源的工具；哈希校验只能确认“正在执行固定的那一份”，不能证明二进制内部安全。公开发布仍需完成平台签名、公证和隐私说明。
+- 安装包内置 ninecli 原生可执行文件，不内置 Python 或 uv，也不会在用户设备上联网安装依赖。PyPI 元数据声明 MIT，但 wheel 中没有独立许可证正文、版权声明或项目链接；当前再分发依据和证据缺口会在 `THIRD_PARTY_NOTICES.md` 中如实保留。
 - 密码和短信验证码登录仍受 ninecli CLI 限制：凭据在登录瞬间作为本机子进程参数传递，可能被本机同权限的进程查看；项目不记录这些参数，也不把凭据写入渲染层日志。
 - 短信登录不会绕过九号的网易易盾人机验证。若服务端返回 `90202 / send code need verify`，客户端会给出受控提示并停止，密码登录仍是默认且更稳定的入口。
 - 在线底图会向 OpenFreeMap 请求当前视野的样式、瓦片、字体和图标，因此服务方能推断正在查看的大致区域；应用不会把完整轨迹 JSON、九号账号、令牌或车辆 SN 作为地图请求参数发送。

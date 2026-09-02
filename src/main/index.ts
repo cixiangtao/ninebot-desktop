@@ -7,7 +7,7 @@ import {
   registerAppProtocol,
 } from "./app-protocol.js";
 import { registerIpcHandlers } from "./ipc.js";
-import { NineCliClient } from "./ninecli.js";
+import { getBundledNineCliBinaryPath, NineCliClient } from "./ninecli.js";
 
 protocol.registerSchemesAsPrivileged([
   {
@@ -107,7 +107,12 @@ app.whenReady().then(async () => {
   registerAppProtocol(join(import.meta.dirname, "../renderer"));
   const configDirectory =
     process.env.NINEBOT_CONFIG_DIR ?? join(app.getPath("userData"), "ninecli");
-  registerIpcHandlers(new NineCliClient(configDirectory));
+  const bundledBinaryPath = getBundledNineCliBinaryPath({
+    appPath: app.getAppPath(),
+    isPackaged: app.isPackaged,
+    resourcesPath: process.resourcesPath,
+  });
+  registerIpcHandlers(new NineCliClient(configDirectory, bundledBinaryPath));
   await createWindow();
 
   app.on("activate", () => {

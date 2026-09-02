@@ -1,14 +1,14 @@
-import { access, chmod, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { access, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
   classifyNineCliFailure,
   createNineCliEnvironment,
+  getBundledNineCliBinaryPath,
   getExpectedBinarySha256,
   isAllowedNineCliCommand,
   NineCliClient,
-  resolveUvxExecutable,
   runtimePolicy,
 } from "./ninecli.js";
 
@@ -43,7 +43,6 @@ describe("ninecli runtime policy", () => {
       SYSTEMROOT: "C:\\Windows",
       TEMP: "C:\\Temp",
       HTTPS_PROXY: "http://127.0.0.1:7890",
-      UV_PYTHON_INSTALL_DIR: "/tmp/uv-python-dir",
     });
   });
 
@@ -81,7 +80,7 @@ describe("ninecli runtime policy", () => {
 
   it("pins the verified macOS arm64 and Windows x64 binary digests", () => {
     expect(getExpectedBinarySha256("darwin", "arm64")).toBe(
-      "2d8aef91a74275528c995217fc7a56e5e2507d069acbd28f340e0aa573908f0a",
+      "70ba65c63a09373a6eab63cf96b80cd06fff2fd107dff63e884efafb9b31352c",
     );
     expect(getExpectedBinarySha256("win32", "x64")).toBe(
       "94338e423b1d5219a2f6bfeda9af34271b83814ef725220c2598676ac18d650e",
@@ -90,32 +89,23 @@ describe("ninecli runtime policy", () => {
     expect(getExpectedBinarySha256("linux", "x64")).toBeNull();
   });
 
-  it("finds uvx in a Finder-safe user installation directory", async () => {
-    const directory = await mkdtemp(join(tmpdir(), "ninecli-uvx-test-"));
-    temporaryDirectories.push(directory);
-    const executableDirectory = join(directory, ".local", "bin");
-    const executable = join(executableDirectory, "uvx");
-    await mkdir(executableDirectory, { recursive: true });
-    await writeFile(executable, "#!/bin/sh\n");
-    await chmod(executable, 0o755);
-
-    await expect(resolveUvxExecutable({ HOME: directory, PATH: "" }, "darwin")).resolves.toBe(
-      executable,
-    );
-  });
-
-  it("finds uvx in the Windows user installation directory", async () => {
-    const directory = await mkdtemp(join(tmpdir(), "ninecli-uvx-windows-test-"));
-    temporaryDirectories.push(directory);
-    const executableDirectory = join(directory, ".local", "bin");
-    const executable = join(executableDirectory, "uvx.exe");
-    await mkdir(executableDirectory, { recursive: true });
-    await writeFile(executable, "windows executable placeholder");
-    await chmod(executable, 0o755);
-
-    await expect(
-      resolveUvxExecutable({ USERPROFILE: directory, PATH: "C:\\missing;D:\\missing" }, "win32"),
-    ).resolves.toBe(executable);
+  it("resolves only the generated or packaged runtime location", () => {
+    expect(
+      getBundledNineCliBinaryPath({
+        appPath: "/workspace",
+        isPackaged: false,
+        resourcesPath: "/ignored",
+        platform: "darwin",
+      }),
+    ).toBe(join("/workspace", "build", "generated", "runtime", "ninecli", "ninecli"));
+    expect(
+      getBundledNineCliBinaryPath({
+        appPath: "C:\\workspace",
+        isPackaged: true,
+        resourcesPath: "C:\\app\\resources",
+        platform: "win32",
+      }),
+    ).toBe(join("C:\\app\\resources", "runtime", "ninecli", "ninecli.exe"));
   });
 
   it("clears session artifacts but preserves non-token configuration", async () => {
@@ -124,7 +114,7 @@ describe("ninecli runtime policy", () => {
     await writeFile(join(directory, "config.json"), "configuration");
     await writeFile(join(directory, "tokens.json"), "token");
     await writeFile(join(directory, "vehicles.json"), "vehicle-cache");
-    const client = new NineCliClient(directory);
+    const client = new NineCliClient(directory, join(directory, "ninecli"));
 
     await client.logout();
 

@@ -53,7 +53,7 @@ const compactEnvironment = Object.fromEntries(
   Object.entries(
     process.platform === "win32"
       ? {
-          PATH: process.env.PATH,
+          PATH: resolve(process.env.SYSTEMROOT ?? "C:\\Windows", "System32"),
           USERPROFILE: process.env.USERPROFILE,
           APPDATA: process.env.APPDATA,
           LOCALAPPDATA: process.env.LOCALAPPDATA,
@@ -64,14 +64,12 @@ const compactEnvironment = Object.fromEntries(
           PATHEXT: process.env.PATHEXT,
           TEMP: process.env.TEMP,
           TMP: process.env.TMP,
-          UV_PYTHON_INSTALL_DIR: process.env.UV_PYTHON_INSTALL_DIR,
         }
       : {
           HOME: process.env.HOME,
           LANG: process.env.LANG ?? "zh_CN.UTF-8",
-          PATH: process.env.PATH ?? "/usr/bin:/bin:/usr/sbin:/sbin",
+          PATH: "/usr/bin:/bin:/usr/sbin:/sbin",
           TMPDIR: process.env.TMPDIR,
-          UV_PYTHON_INSTALL_DIR: process.env.UV_PYTHON_INSTALL_DIR,
         },
   ).filter((entry) => entry[1] !== undefined),
 );
@@ -129,7 +127,7 @@ try {
       platform: process.platform,
       demoReady: true,
       bridgeReady: true,
-      platformUvxLookup: true,
+      bundledRuntime: true,
       binaryVerified: true,
       sessionCacheMemoryOnly: true,
       monthSummaryExportReady,
