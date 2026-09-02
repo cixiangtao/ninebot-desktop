@@ -24,6 +24,7 @@
     "preview": "pnpm run prepare:ninecli-runtime && electron-vite preview",
     "prepare:ninecli-runtime": "node scripts/prepare-ninecli-runtime.mjs",
     "protocol:record": "node scripts/protocol-recorder.ts",
+    "protocol:report": "node scripts/protocol-capture-report.ts",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
     "lint": "oxlint .",
     "format": "oxfmt . --write",
