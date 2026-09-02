@@ -9,6 +9,7 @@ packages/ninebot-client
 ├── 九号服务域配置
 ├── 只读能力范围
 ├── 协议记录契约
+├── whoami 请求边界与传输抽象
 └── 本地反向代理记录器
 
 scripts/protocol-recorder.ts
@@ -16,6 +17,13 @@ scripts/protocol-recorder.ts
 ```
 
 `pnpm build:sdk` 会把 `@jiuhao/ninebot-client` 编译为可供 Node.js 导入的 ESM JavaScript 和 `.d.ts` 类型声明。当前包保持 `private`，避免协议尚未稳定时被误发布。
+
+当前已落地的核心边界：
+
+- `buildWhoamiRequest` 固化已验证的 `POST /v5/user`、空 JSON Body 和请求 Header 形状。
+- `NinebotTransport` 让 Node、浏览器、React Native 和测试替身可以共用请求模型；`createFetchNinebotTransport` 是默认 Fetch 实现。
+- `decodeJsonEnvelope` 与 `decodeGzipJsonEnvelope` 解析 `data`、`resultCode`、`resultDesc` 包装。
+- 签名通过 `NinebotRequestSigner` 注入，当前不假定 canonical string、密钥或字段顺序。
 
 首批只研究以下只读能力：
 
@@ -75,3 +83,5 @@ pnpm protocol:record -- --include-bodies --include-signing-headers
 - 上游返回 HTTP 200，ninecli 能透过本地代理正常解析响应。
 
 本次只保存元数据和 Body 摘要，没有保存账号响应正文。下一步需要在私有 Body 捕获模式下取得一组 `whoami` 样本，确定响应包装和签名输入，再开始实现 TypeScript 请求生成器。
+
+当前阶段已取得私有原始样本用于本地分析：响应为 gzip 编码，解压后是上述 JSON 包装；`timestamp` 为 13 位十进制毫秒时间戳，`sign` 为 64 字符十六进制值。样本不会进入仓库，签名算法仍待多组受控样本和二进制实现对照后确认。
