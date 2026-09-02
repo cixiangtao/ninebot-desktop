@@ -66,9 +66,9 @@ describe("Node crypto candidates", () => {
   it("generates the binary-compatible random material shapes", () => {
     expect(generateNinebotKReq()).toMatch(/^[\x21-\x7e]{16}$/);
     const keyData = generateNinebotKeyData();
-    expect(keyData.keyDataOne).toMatch(/^[0-9a-f]{22}$/);
-    expect(keyData.keyDataTwo).toMatch(/^[0-9a-f]{22}$/);
-    expect(keyData.keyDataThree).toMatch(/^[0-9a-f]{20}$/);
+    expect(keyData.keyDataOne).toMatch(/^[0-9a-f]{11}$/);
+    expect(keyData.keyDataTwo).toMatch(/^[0-9a-f]{11}$/);
+    expect(keyData.keyDataThree).toMatch(/^[0-9a-f]{10}$/);
     expect(keyData.keyDataFour).toMatch(/^[a-zA-Z0-9;\-_.,+/]{8}$/);
   });
 
