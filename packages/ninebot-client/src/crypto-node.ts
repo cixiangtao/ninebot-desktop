@@ -9,6 +9,9 @@ import {
 
 const AES_BLOCK_BYTES = 16;
 const BASE64_PATTERN = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/;
+const PRINTABLE_ASCII =
+  "!\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~";
+const KEY_DATA_ALPHABET = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789;-_.,+/";
 
 /** Decodes a canonical Base64 field from a Ninebot encrypted envelope. */
 export const decodeNinebotBase64 = (value: string, fieldName: string) => {
@@ -133,6 +136,35 @@ export const deriveNinebotKeyCandidate = (
 
 /** Generates the 32-character lowercase hexadecimal nonce emitted by ninecli. */
 export const generateNinebotNonce = () => randomBytes(16).toString("hex");
+
+const randomFromAlphabet = (length: number, alphabet: string) => {
+  if (!Number.isSafeInteger(length) || length < 0)
+    throw new Error("Ninebot random length is invalid");
+  if (alphabet.length === 0) throw new Error("Ninebot random alphabet is empty");
+  const output = new Uint8Array(length);
+  const limit = Math.floor(256 / alphabet.length) * alphabet.length;
+  let offset = 0;
+  while (offset < length) {
+    for (const byte of randomBytes(Math.max(1, length - offset))) {
+      if (byte >= limit) continue;
+      output[offset] = alphabet.charCodeAt(byte % alphabet.length);
+      offset += 1;
+      if (offset === length) break;
+    }
+  }
+  return new TextDecoder().decode(output);
+};
+
+/** Generates the 16-character RSA input material used by ninecli's `GenKReq`. */
+export const generateNinebotKReq = () => randomFromAlphabet(16, PRINTABLE_ASCII);
+
+/** Generates the four random key-data strings used by ninecli's business wrapper. */
+export const generateNinebotKeyData = () => ({
+  keyDataOne: randomBytes(11).toString("hex"),
+  keyDataTwo: randomBytes(11).toString("hex"),
+  keyDataThree: randomBytes(10).toString("hex"),
+  keyDataFour: randomFromAlphabet(8, KEY_DATA_ALPHABET),
+});
 
 /** Encrypts a short payload with an RSA public key using PKCS#1 v1.5 padding. */
 export const encryptRsaPkcs1v15 = (payload: Uint8Array, publicKey: Uint8Array | string) =>

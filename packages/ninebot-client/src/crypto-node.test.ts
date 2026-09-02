@@ -8,6 +8,8 @@ import {
   encodeNinebotBase64,
   encryptAesCbcPkcs7,
   encryptRsaPkcs1v15,
+  generateNinebotKReq,
+  generateNinebotKeyData,
   generateNinebotNonce,
 } from "./crypto-node.ts";
 
@@ -59,6 +61,15 @@ describe("Node crypto candidates", () => {
 
   it("generates a 16-byte nonce rendered as lowercase hexadecimal", () => {
     expect(generateNinebotNonce()).toMatch(/^[0-9a-f]{32}$/);
+  });
+
+  it("generates the binary-compatible random material shapes", () => {
+    expect(generateNinebotKReq()).toMatch(/^[\x21-\x7e]{16}$/);
+    const keyData = generateNinebotKeyData();
+    expect(keyData.keyDataOne).toMatch(/^[0-9a-f]{22}$/);
+    expect(keyData.keyDataTwo).toMatch(/^[0-9a-f]{22}$/);
+    expect(keyData.keyDataThree).toMatch(/^[0-9a-f]{20}$/);
+    expect(keyData.keyDataFour).toMatch(/^[a-zA-Z0-9;\-_.,+/]{8}$/);
   });
 
   it("uses RSA PKCS#1 v1.5 public-key encryption", () => {
