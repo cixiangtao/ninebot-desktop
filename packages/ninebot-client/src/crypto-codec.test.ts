@@ -2,6 +2,7 @@ import { constants, generateKeyPairSync, privateDecrypt } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import {
   buildNinebotEncryptedRequestCandidate,
+  decryptNinebotResponsePayloadCandidate,
   decryptNinebotResponseCandidate,
   type NinebotCandidateKeyData,
 } from "./crypto-codec.ts";
@@ -62,6 +63,24 @@ describe("Ninebot crypto codec candidate", () => {
     const ciphertext = encryptAesCbcPkcs7({ plaintext, key: deriveKey() });
     expect(
       decryptNinebotResponseCandidate({
+        envelope: {
+          v: 1,
+          s: encodeNinebotBase64(new Uint8Array(128)),
+          r: encodeNinebotBase64(ciphertext),
+        },
+        keyData,
+      }),
+    ).toEqual(plaintext);
+  });
+
+  it("decodes the escaped Base64 payload after response AES decryption", () => {
+    const plaintext = textEncoder.encode('{"vehicles":[{"id":"demo"}]}');
+    const encodedPayload = encodeNinebotBase64(plaintext);
+    const escapedPayload = textEncoder.encode(JSON.stringify(encodedPayload));
+    const ciphertext = encryptAesCbcPkcs7({ plaintext: escapedPayload, key: deriveKey() });
+
+    expect(
+      decryptNinebotResponsePayloadCandidate({
         envelope: {
           v: 1,
           s: encodeNinebotBase64(new Uint8Array(128)),

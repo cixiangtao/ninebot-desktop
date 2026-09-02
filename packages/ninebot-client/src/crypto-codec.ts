@@ -94,3 +94,52 @@ export const decryptNinebotResponseCandidate = ({
   const ciphertext = decodeNinebotBase64(envelope.r, "response r");
   return decryptAesCbcPkcs7({ ciphertext, key: deriveCandidateKey(keyData) });
 };
+
+const unescapeJsonStringCandidate = (value: string) => {
+  const trimmed = value.trim();
+  if (trimmed.startsWith('"') && trimmed.endsWith('"')) {
+    try {
+      const parsed: unknown = JSON.parse(trimmed);
+      if (typeof parsed === "string") return parsed;
+    } catch {
+      // Fall through to the byte-wise candidate for partially escaped payloads.
+    }
+  }
+
+  return trimmed
+    .replace(/\\(["\\/bfnrt])/g, (_, escaped: string) => {
+      const replacements: Record<string, string> = {
+        '"': '"',
+        "\\": "\\",
+        "/": "/",
+        b: "\b",
+        f: "\f",
+        n: "\n",
+        r: "\r",
+        t: "\t",
+      };
+      return replacements[escaped] ?? escaped;
+    })
+    .replace(/\\u([0-9a-fA-F]{4})/g, (_, codePoint: string) =>
+      String.fromCharCode(Number.parseInt(codePoint, 16)),
+    );
+};
+
+/**
+ * Decodes the post-AES response payload observed in ninecli.
+ *
+ * The binary first AES-decrypts `r`, then unescapes the resulting JSON string
+ * and Base64-decodes it again. This remains a candidate boundary until a
+ * server-backed TypeScript request is validated against the ninecli oracle.
+ */
+export const decodeNinebotResponsePayloadCandidate = (plaintext: Uint8Array) => {
+  const encodedPayload = unescapeJsonStringCandidate(new TextDecoder().decode(plaintext));
+  return decodeNinebotBase64(encodedPayload, "response payload");
+};
+
+/** Decrypts `r` and applies ninecli's observed unescape-plus-Base64 stage. */
+export const decryptNinebotResponsePayloadCandidate = ({
+  envelope,
+  keyData,
+}: DecryptNinebotResponseCandidateOptions) =>
+  decodeNinebotResponsePayloadCandidate(decryptNinebotResponseCandidate({ envelope, keyData }));
