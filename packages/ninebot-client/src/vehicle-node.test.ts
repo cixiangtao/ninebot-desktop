@@ -3,7 +3,14 @@ import { describe, expect, it } from "vitest";
 import {
   buildVehicleListEncryptedRequestCandidate,
   buildVehicleListPlaintextBody,
+  decodeVehicleListResponseCandidate,
+  parseVehicleListResponseCandidate,
 } from "./vehicle-node.ts";
+import {
+  deriveNinebotKeyCandidate,
+  encodeNinebotBase64,
+  encryptAesCbcPkcs7,
+} from "./crypto-node.ts";
 
 const fields = {
   sys_language: "zh_CN",
@@ -55,5 +62,50 @@ describe("Node vehicle request body candidate", () => {
     expect(result.keyData.keyDataTwo).toMatch(/^[0-9a-f]{11}$/);
     expect(result.keyData.keyDataThree).toMatch(/^[0-9a-f]{10}$/);
     expect(result.keyData.keyDataFour).toHaveLength(8);
+  });
+
+  it("parses the decrypted business response envelope", () => {
+    const payload = new TextEncoder().encode(
+      '{"code":1,"data":[{"wnumber":"demo"}],"desc":"ok","time_cost":78}',
+    );
+    const parsed = parseVehicleListResponseCandidate(payload);
+    expect(parsed).toEqual({
+      code: 1,
+      data: [{ wnumber: "demo" }],
+      desc: "ok",
+      time_cost: 78,
+      extra: null,
+    });
+  });
+
+  it("decrypts and parses a candidate response with its key context", () => {
+    const keyData = {
+      keyDataOne: "0123456789a",
+      keyDataTwo: "fedcba98765",
+      keyDataThree: "0011223344",
+      keyDataFour: "Ab3;_+x/",
+    };
+    const key = deriveNinebotKeyCandidate([
+      new TextEncoder().encode(keyData.keyDataOne),
+      new TextEncoder().encode(keyData.keyDataTwo),
+      new TextEncoder().encode(keyData.keyDataThree),
+      new TextEncoder().encode(keyData.keyDataFour),
+    ]);
+    const business = new TextEncoder().encode('{"code":1,"data":[],"desc":"ok","time_cost":1}');
+    const responseJson = new TextEncoder().encode(
+      JSON.stringify({ data: encodeNinebotBase64(business), timeStamp: 1_725_000_000 }),
+    );
+    const ciphertext = encryptAesCbcPkcs7({ plaintext: responseJson, key });
+
+    expect(
+      decodeVehicleListResponseCandidate({
+        envelope: {
+          v: 1,
+          s: encodeNinebotBase64(new Uint8Array(128)),
+          r: encodeNinebotBase64(ciphertext),
+        },
+        keyData,
+      }),
+    ).toMatchObject({ code: 1, data: [], desc: "ok", time_cost: 1 });
   });
 });

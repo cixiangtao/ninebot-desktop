@@ -134,3 +134,5 @@ pnpm protocol:record -- --include-bodies --include-signing-headers
 Node 专用 `@jiuhao/ninebot-client/vehicle-node` 子路径现在还提供车辆列表明文候选构造器：按 ninecli 观察到的固定字段顺序生成 JSON，并对不含 `checkcode` 的 JSON 计算大写 MD5。它只负责明文和校验字段，不持有令牌、不自动加密或发送请求。
 
 同一路径的 `buildVehicleListEncryptedRequestCandidate` 会一次性生成明文、临时 `kReq`、四段 keyData 和加密外壳，并返回本次请求专属的 keyData 上下文；调用方可将该上下文绑定到对应响应 decoder，避免并发请求互相覆盖。
+
+`decodeVehicleListResponseCandidate` 和 `parseVehicleListResponseCandidate` 负责把解密后的业务 JSON 校验为 `{ code, data, desc, time_cost, extra }` 候选包装，再由上层把 `data` 交给现有车辆领域解析器；它们不会把原始密文或账号字段写入磁盘。

@@ -1,9 +1,13 @@
 import { computeNinebotBodyCheckcode } from "./crypto-node.ts";
 import {
   buildNinebotEncryptedRequestCandidate,
+  decryptNinebotResponsePayloadCandidate,
   generateNinebotCandidateRequestMaterial,
 } from "./crypto-codec.ts";
-import type { NinebotEncryptedRequestEnvelope } from "./crypto-envelope.ts";
+import type {
+  NinebotEncryptedRequestEnvelope,
+  NinebotEncryptedResponseEnvelope,
+} from "./crypto-envelope.ts";
 
 /** Fields observed in the plaintext JSON sent before vehicle-list encryption. */
 export interface VehicleListPlaintextFields {
@@ -108,3 +112,59 @@ export const buildVehicleListEncryptedRequestCandidate = ({
     keyData: material.keyData,
   };
 };
+
+export interface NinebotVehicleResponseCandidate<T = unknown> {
+  code: number | string | null;
+  data: T;
+  desc: string | null;
+  time_cost: number | null;
+  extra: unknown;
+}
+
+/** Parses the business JSON produced after vehicle-list response decryption. */
+export const parseVehicleListResponseCandidate = <T = unknown>(
+  plaintext: Uint8Array,
+): NinebotVehicleResponseCandidate<T> => {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(new TextDecoder().decode(plaintext));
+  } catch {
+    throw new Error("Ninebot vehicle response payload is not valid JSON");
+  }
+  if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error("Ninebot vehicle response payload is not a JSON object");
+  }
+  const record = parsed as Record<string, unknown>;
+  const code = record.code;
+  if (code !== null && code !== undefined && typeof code !== "number" && typeof code !== "string") {
+    throw new Error("Ninebot vehicle response field code is invalid");
+  }
+  const desc = record.desc;
+  if (desc !== null && desc !== undefined && typeof desc !== "string") {
+    throw new Error("Ninebot vehicle response field desc is invalid");
+  }
+  const timeCost = record.time_cost;
+  if (timeCost !== null && timeCost !== undefined && typeof timeCost !== "number") {
+    throw new Error("Ninebot vehicle response field time_cost is invalid");
+  }
+  if (!("data" in record)) throw new Error("Ninebot vehicle response field data is missing");
+  return {
+    code: code === undefined ? null : code,
+    data: record.data as T,
+    desc: desc === undefined ? null : desc,
+    time_cost: timeCost === undefined ? null : timeCost,
+    extra: record.extra ?? null,
+  };
+};
+
+/** Decrypts and parses one vehicle-list response while retaining the key context boundary. */
+export const decodeVehicleListResponseCandidate = <T = unknown>({
+  envelope,
+  keyData,
+}: {
+  envelope: NinebotEncryptedResponseEnvelope;
+  keyData: Parameters<typeof decryptNinebotResponsePayloadCandidate>[0]["keyData"];
+}) =>
+  parseVehicleListResponseCandidate<T>(
+    decryptNinebotResponsePayloadCandidate({ envelope, keyData }),
+  );
