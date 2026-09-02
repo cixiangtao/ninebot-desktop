@@ -11,7 +11,6 @@ const AES_BLOCK_BYTES = 16;
 const BASE64_PATTERN = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/;
 const PRINTABLE_ASCII =
   "!\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~";
-const HEX_ALPHABET = "0123456789abcdef";
 const KEY_DATA_ALPHABET = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789;-_.,+/";
 
 /** Decodes a canonical Base64 field from a Ninebot encrypted envelope. */
@@ -161,9 +160,9 @@ export const generateNinebotKReq = () => randomFromAlphabet(16, PRINTABLE_ASCII)
 
 /** Generates the four random key-data strings used by ninecli's business wrapper. */
 export const generateNinebotKeyData = () => ({
-  keyDataOne: randomFromAlphabet(11, HEX_ALPHABET),
-  keyDataTwo: randomFromAlphabet(11, HEX_ALPHABET),
-  keyDataThree: randomFromAlphabet(10, HEX_ALPHABET),
+  keyDataOne: randomBytes(11).toString("hex"),
+  keyDataTwo: randomBytes(11).toString("hex"),
+  keyDataThree: randomBytes(10).toString("hex"),
   keyDataFour: randomFromAlphabet(8, KEY_DATA_ALPHABET),
 });
 

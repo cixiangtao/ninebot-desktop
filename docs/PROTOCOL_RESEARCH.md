@@ -111,12 +111,13 @@ pnpm protocol:record -- --include-bodies --include-signing-headers
 对随应用分发的 macOS ninecli 二进制读取 Go `pclntab` 后，已经能恢复出 `gitea.com/ninebot/cli/internal/crypto` 的函数边界。这个结果只用于本地行为对照，不会把账号数据、密文或私钥写入仓库。
 
 - `GenKReq` 生成 16 字节字符材料；`GenNonce` 生成 16 字节随机值并转为 32 个小写十六进制字符。
-- `GenKeyData` 调用 `randHex(11)`、`randHex(11)`、`randHex(10)`，返回长度分别为 11/11/10 的小写十六进制字符，再调用一次长度为 8 的字符集随机函数；随后由 `BuildWrapper` 按 `keyDataOne`、`keyDataTwo`、`keyDataThree`、`keyDataFour` 写入 JSON。
+- `GenKeyData` 调用 `randHex(11)`、`randHex(11)`、`randHex(10)`，先生成长度为 11/11/10 的 ASCII hex 原始材料；`BuildWrapper` 将前三段按十六进制文本写入 wrapper，因此 JSON 字段长度为 22/22/20，再写入长度为 8 的 `keyDataFour`。
 - `BuildWrapper` 的字段顺序可从常量确认：`data`、四个 `keyData` 字段、`platform`、`timeStamp`；`data` 在进入包装前经过标准 Base64 编码和 JSON 字符串转义。
 - `EncryptRequest` 的参数布局已通过断点确认：包装明文、16 字节 `kReq`、四段 keyData、`platform` 和 `timeStamp`。它直接使用 `kReq` 做 AES-CBC，再对同一个 `kReq` 调用 RSA PKCS#1 v1.5 形成 `k`；随后对包装明文调用 `md5.Sum` 并转成 32 位小写十六进制，这与请求外壳中的 `h` 长度相符。AES 输出再经过 Base64，形成 `d`。
-- `DeriveKey` 对四段输入（断点观测长度为 11/11/10/8）分别执行“左旋 8 位后与下一个字节异或”的滚动字，然后做固定的位运算混合并输出 16 字节。它出现在响应解密路径；Node 候选实现位于 `crypto-node` 子路径，尚未接入默认车辆 codec。
+- `DeriveKey` 对四段原始输入（断点观测长度为 11/11/10/8）分别执行“左旋 8 位后与下一个字节异或”的滚动字，然后做固定的位运算混合并输出 16 字节。它出现在响应解密路径；Node 候选实现位于 `crypto-node` 子路径，尚未接入默认车辆 codec。
 - `BuildWrapper` 和 `EncryptRequest` 的动态断点都显示 `timeStamp` 使用 Unix epoch 秒（例如 `0x6a97f656` 对应十位数量级），不是用户界面常见的毫秒时间戳。Node 候选的 `NinebotCandidateRequestMaterial.timeStamp` 因此按秒建模。
-- `DecryptResponse` 的动态入口参数包含四段 keyData，长度仍为 11/11/10/8；后续对外层 `r` 字段执行 Base64 解码时，输入长度与捕获响应的 `r` 长度相符（本次样本为 3008 和 364）。AES 解密后的内容还会经过 `unescapeJSONString`，随后在另一个调用点再次执行 Base64 解码（对应输入长度 2208 和 228）。这说明响应至少存在“外层 Base64 → AES → JSON 反转义 → 内层 Base64”的候选链路。
+- `DecryptResponse` 的动态入口参数包含四段原始 keyData，长度仍为 11/11/10/8；后续对外层 `r` 字段执行 Base64 解码时，输入长度与捕获响应的 `r` 长度相符（本次样本为 3008 和 364）。AES 解密后的内容还会经过 `unescapeJSONString`，随后在另一个调用点再次执行 Base64 解码（对应输入长度 2208 和 228）。这说明响应至少存在“外层 Base64 → AES → JSON 反转义 → 内层 Base64”的候选链路。
+- 一次新的私有 oracle 回放中，直接取 `BuildWrapper` 返回的 1602 字节明文和同次调用的 16 字节 `kReq`，Node 侧 AES-CBC 输出 1616 字节的 `d` 与 motor 捕获逐字节一致，MD5 生成的 `h` 也一致。该回放确认了 wrapper 内容、`AndroidB64` 结果、AES 直接使用 `kReq` 及 MD5 输入边界；原始材料到 JSON 字段的 22/22/20 字符转换也由此得到交叉验证。
 - 当前动态证据只证明成功路径使用了 `r`，尚未证明外层 `s` 在该路径中的用途；因此 Node 实现将两者继续视为外壳字段，并把二次解码放在显式候选函数中。
 - RSA 调用点明确使用 `crypto/rsa.EncryptPKCS1v15`，`k`/`s` 的 128 字节解码长度与 RSA-1024 输出一致；具体输入材料和公钥用途仍需用同一会话做端到端回放确认。
 

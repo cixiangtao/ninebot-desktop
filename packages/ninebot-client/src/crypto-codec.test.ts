@@ -19,9 +19,9 @@ import {
 
 const textEncoder = new TextEncoder();
 const keyData: NinebotCandidateKeyData = {
-  keyDataOne: "0123456789a",
-  keyDataTwo: "fedcba98765",
-  keyDataThree: "0011223344",
+  keyDataOne: "0123456789abcdef012345",
+  keyDataTwo: "fedcba9876543210fedcba",
+  keyDataThree: "00112233445566778899",
   keyDataFour: "Ab3;_+x/",
 };
 
@@ -49,7 +49,7 @@ describe("Ninebot crypto codec candidate", () => {
     });
     const wrapperText = new TextDecoder().decode(wrapper);
     expect(wrapperText).toBe(
-      '{\n\t"data" : "eyJzZXJ2aWNlIjoidmVoaWNsZXMifQ==",\n\t"keyDataFour" : "Ab3;_+x/",\n\t"keyDataOne" : "0123456789a",\n\t"keyDataTwo" : "fedcba98765",\n\t"keyDataThree" : "0011223344",\n\t"platform" : 2,\n\t"timeStamp" : 1725000000\n}\n',
+      '{\n\t"data" : "eyJzZXJ2aWNlIjoidmVoaWNsZXMifQ==",\n\t"keyDataFour" : "Ab3;_+x/",\n\t"keyDataOne" : "0123456789abcdef012345",\n\t"keyDataTwo" : "fedcba9876543210fedcba",\n\t"keyDataThree" : "00112233445566778899",\n\t"platform" : 2,\n\t"timeStamp" : 1725000000\n}\n',
     );
     expect(envelope.h).toBe(computeNinebotCheckcode(wrapper));
     expect(
@@ -102,9 +102,9 @@ describe("Ninebot crypto codec candidate", () => {
     });
 
     expect(material.kReq).toHaveLength(16);
-    expect(material.keyData.keyDataOne).toHaveLength(11);
-    expect(material.keyData.keyDataTwo).toHaveLength(11);
-    expect(material.keyData.keyDataThree).toHaveLength(10);
+    expect(material.keyData.keyDataOne).toHaveLength(22);
+    expect(material.keyData.keyDataTwo).toHaveLength(22);
+    expect(material.keyData.keyDataThree).toHaveLength(20);
     expect(material.keyData.keyDataFour).toHaveLength(8);
     expect(material.timeStamp).toBe(1_725_000_000);
   });
@@ -131,8 +131,8 @@ describe("Ninebot crypto codec candidate", () => {
           s: encodeNinebotBase64(new Uint8Array(128)),
           r: encodeNinebotBase64(new Uint8Array(16)),
         },
-        keyData: { ...keyData, keyDataOne: "0123456789A" },
+        keyData: { ...keyData, keyDataOne: "0123456789abcdef01234A" },
       }),
-    ).toThrow("keyDataOne must be 11 lowercase hexadecimal characters");
+    ).toThrow("keyDataOne must be 22 lowercase hexadecimal characters");
   });
 });
