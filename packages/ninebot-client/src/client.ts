@@ -1,10 +1,13 @@
-import { decodeGzipJsonEnvelope, type NinebotResponseEnvelope } from "./response.ts";
+import { decodeJsonEnvelope, type NinebotResponseEnvelope } from "./response.ts";
 import { buildWhoamiRequest, type BuildWhoamiRequestOptions } from "./whoami.ts";
-import type { NinebotTransport } from "./transport.ts";
+import type { NinebotResponse, NinebotTransport } from "./transport.ts";
 
 export interface NinebotClientOptions extends BuildWhoamiRequestOptions {
   transport: NinebotTransport;
+  responseDecoder?: NinebotResponseDecoder;
 }
+
+export type NinebotResponseDecoder = <T>(response: NinebotResponse) => NinebotResponseEnvelope<T>;
 
 export class NinebotHttpError extends Error {
   readonly status: number;
@@ -24,7 +27,7 @@ export const createNinebotClient = (options: NinebotClientOptions) => ({
     if (response.status < 200 || response.status >= 300) {
       throw new NinebotHttpError(response.status);
     }
-    return decodeGzipJsonEnvelope<T>(response);
+    return (options.responseDecoder ?? decodeJsonEnvelope)<T>(response);
   },
 });
 

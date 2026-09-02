@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { buildWhoamiRequest, whoamiRequestBody } from "./whoami.ts";
-import { decodeGzipJsonEnvelope, decodeJsonEnvelope } from "./response.ts";
+import { decodeGzipJsonEnvelope } from "./response-node.ts";
+import { decodeJsonEnvelope } from "./response.ts";
 
 describe("whoami protocol boundary", () => {
   it("builds the observed request shape and delegates signing", async () => {

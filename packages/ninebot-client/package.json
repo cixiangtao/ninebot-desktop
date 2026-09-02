@@ -16,6 +16,10 @@
     "./protocol-lab": {
       "types": "./dist/protocol-lab.d.ts",
       "import": "./dist/protocol-lab.js"
+    },
+    "./response-node": {
+      "types": "./dist/response-node.d.ts",
+      "import": "./dist/response-node.js"
     }
   },
   "scripts": {

@@ -1,4 +1,3 @@
-import { gunzipSync } from "node:zlib";
 import type { NinebotResponse } from "./transport.ts";
 
 export interface NinebotResponseEnvelope<T> {
@@ -29,12 +28,3 @@ const decodeEnvelope = <T>(body: Uint8Array): NinebotResponseEnvelope<T> => {
 
 export const decodeJsonEnvelope = <T>(response: NinebotResponse): NinebotResponseEnvelope<T> =>
   decodeEnvelope<T>(response.body);
-
-/** Decodes the gzip response observed from the passport endpoint before parsing its envelope. */
-export const decodeGzipJsonEnvelope = <T>(
-  response: NinebotResponse,
-): NinebotResponseEnvelope<T> => {
-  const encoding = response.headers["content-encoding"]?.toLowerCase();
-  const body = encoding?.includes("gzip") ? gunzipSync(response.body) : response.body;
-  return decodeEnvelope<T>(body);
-};

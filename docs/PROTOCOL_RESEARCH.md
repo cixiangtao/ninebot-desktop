@@ -22,7 +22,7 @@ scripts/protocol-recorder.ts
 
 - `buildWhoamiRequest` 固化已验证的 `POST /v5/user`、空 JSON Body 和请求 Header 形状。
 - `NinebotTransport` 让 Node、浏览器、React Native 和测试替身可以共用请求模型；`createFetchNinebotTransport` 是默认 Fetch 实现。
-- `decodeJsonEnvelope` 与 `decodeGzipJsonEnvelope` 解析 `data`、`resultCode`、`resultDesc` 包装。
+- `decodeJsonEnvelope` 在核心层解析 `data`、`resultCode`、`resultDesc` 包装；Node/Electron 可从 `response-node` 子路径使用 gzip 解码器，移动端可注入自己的 decoder。
 - 签名通过 `NinebotRequestSigner` 注入，当前不假定 canonical string、密钥或字段顺序。
 - `createNinebotClient().whoami()` 已将请求、transport 和响应解码串起来；非 2xx 响应只抛出状态错误，不暴露响应正文。
 
