@@ -14,6 +14,7 @@ const help = `Usage: pnpm protocol:record [options]
 
 Options:
   --include-bodies             Store request and response bodies as base64.
+  --include-signing-headers    Store clientid, sign, and timestamp values privately.
   --session=<name>             Private capture directory name (default: timestamp).
   --upstream-<service>=<url>   Override an upstream for local recorder testing.
   --help                       Show this help.
@@ -30,6 +31,7 @@ if (argumentsList.includes("--help")) {
 }
 
 const includeBodies = argumentsList.includes("--include-bodies");
+const includeSigningHeaders = argumentsList.includes("--include-signing-headers");
 const readNamedArgument = (name: string) => {
   const prefix = `--${name}=`;
   return argumentsList.find((argument) => argument.startsWith(prefix))?.slice(prefix.length);
@@ -41,7 +43,7 @@ if (!/^[a-zA-Z0-9._-]+$/.test(sessionName)) {
   );
 }
 
-const allowedArguments = new Set(["--include-bodies"]);
+const allowedArguments = new Set(["--include-bodies", "--include-signing-headers"]);
 for (const argument of argumentsList) {
   const namedArgument = argument.split("=", 1)[0];
   if (
@@ -61,17 +63,26 @@ const endpoints = defaultNinebotServiceEndpoints.map((endpoint) => {
   return override ? { ...endpoint, upstreamOrigin: new URL(override).origin } : endpoint;
 });
 const captureDirectory = resolve(privateCaptureRoot, sessionName);
-const recorder = await startProtocolRecorder({ captureDirectory, endpoints, includeBodies });
+const recorder = await startProtocolRecorder({
+  captureDirectory,
+  endpoints,
+  includeBodies,
+  includeSigningHeaders,
+});
 const overrideArguments = createOracleOverrideArguments(recorder.listeners);
 
 if (includeBodies) {
   console.warn("Raw protocol bodies are enabled. Treat this capture as account-sensitive data.");
+}
+if (includeSigningHeaders) {
+  console.warn("Signing headers are enabled. Treat this capture as account-sensitive data.");
 }
 console.log(
   JSON.stringify(
     {
       captureDirectory,
       includeBodies,
+      includeSigningHeaders,
       listeners: recorder.listeners.map(({ service, upstreamOrigin, boundPort, overrideFlag }) => ({
         service,
         upstreamOrigin,

@@ -38,6 +38,14 @@ describe("protocol lab", () => {
     expect(JSON.stringify(headers)).not.toContain("private-device");
     expect(JSON.stringify(headers)).not.toContain("private-client");
     expect(JSON.stringify(headers)).not.toContain("private-signature");
+
+    const signingHeaders = redactHeaders(
+      { ClientId: "private-client", Sign: "private-signature", Timestamp: "123" },
+      { includeSigningHeaders: true },
+    );
+    expect(signingHeaders.clientid).toBe("private-client");
+    expect(signingHeaders.sign).toBe("private-signature");
+    expect(signingHeaders.timestamp).toBe("123");
   });
 
   it("captures bodies only after explicit opt-in", () => {

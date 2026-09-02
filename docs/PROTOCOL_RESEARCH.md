@@ -46,13 +46,13 @@ pnpm protocol:record
 
 所有结果写入 `.ninebot-private/protocol-captures/<session>`，不会进入 Git。认证、Cookie、令牌、设备标识、用户标识、UUID 和 IMEI 类 Header 无条件脱敏，但保留长度和哈希以便比较请求是否发生变化。
 
-只有明确执行下面的命令才会保存请求体和响应体的 Base64 原文：
+只有明确执行下面的命令才会保存请求体和响应体的 Base64 原文；如果要比较签名输出，还要额外显式打开签名 Header：
 
 ```bash
-pnpm protocol:record -- --include-bodies
+pnpm protocol:record -- --include-bodies --include-signing-headers
 ```
 
-原始 Body 可能包含账号、令牌、车辆、位置和轨迹，应始终视为账号敏感数据。任何进入公开测试夹具的样本都必须先单独归一化和脱敏，不能直接复制私有捕获文件。
+签名 Header 模式只保留 `clientid`、`sign` 和 `timestamp`，仍然会继续隐藏 `authorization`、Cookie 与其他令牌。原始 Body 可能包含账号、令牌、车辆、位置和轨迹，应始终视为账号敏感数据。任何进入公开测试夹具的样本都必须先单独归一化和脱敏，不能直接复制私有捕获文件。
 
 ## 迁移顺序
 

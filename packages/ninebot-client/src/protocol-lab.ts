@@ -94,6 +94,8 @@ export interface ProtocolRecorderOptions {
   captureDirectory: string;
   endpoints?: readonly NinebotServiceEndpoint[];
   includeBodies?: boolean;
+  /** Private-only opt-in to retain headers needed to compare request signatures. */
+  includeSigningHeaders?: boolean;
   bindAddress?: string;
   maxBodyBytes?: number;
 }
@@ -111,6 +113,7 @@ export interface ProtocolRecorder {
 
 const sensitiveHeaderPattern =
   /authorization|cookie|token|secret|session|credential|password|device[-_]?id|user[-_]?id|client[-_]?id|uuid|imei|^sign(?:ature)?$/i;
+const signingHeaderPattern = /^(?:client[-_]?id|sign|signature|timestamp)$/i;
 const hopByHopHeaders = new Set([
   "connection",
   "keep-alive",
@@ -136,6 +139,7 @@ const redactHeaderValue = (value: string) =>
 /** Redacts credential-like header values while retaining fingerprints for protocol comparison. */
 export const redactHeaders = (
   headers: Readonly<Record<string, string | readonly string[] | undefined>>,
+  { includeSigningHeaders = false }: { includeSigningHeaders?: boolean } = {},
 ) =>
   Object.fromEntries(
     Object.entries(headers)
@@ -145,6 +149,9 @@ export const redactHeaders = (
         const normalizedName = name.toLowerCase();
         const values = typeof value === "string" ? value : [...value];
         if (!sensitiveHeaderPattern.test(normalizedName)) return [normalizedName, values];
+        if (includeSigningHeaders && signingHeaderPattern.test(normalizedName)) {
+          return [normalizedName, values];
+        }
         return [
           normalizedName,
           typeof values === "string" ? redactHeaderValue(values) : values.map(redactHeaderValue),
@@ -227,6 +234,7 @@ export const startProtocolRecorder = async ({
   captureDirectory,
   endpoints = defaultNinebotServiceEndpoints,
   includeBodies = false,
+  includeSigningHeaders = false,
   bindAddress = "127.0.0.1",
   maxBodyBytes = 32 * 1024 * 1024,
 }: ProtocolRecorderOptions): Promise<ProtocolRecorder> => {
@@ -253,12 +261,12 @@ export const startProtocolRecorder = async ({
           method: incomingRequest.method ?? "GET",
           path: incomingRequest.url ?? "/",
           request: {
-            headers: redactHeaders(incomingRequest.headers),
+            headers: redactHeaders(incomingRequest.headers, { includeSigningHeaders }),
             body: captureBody(requestBody, includeBodies),
           },
           response: {
             status: result.status,
-            headers: redactHeaders(result.headers),
+            headers: redactHeaders(result.headers, { includeSigningHeaders }),
             body: captureBody(result.body, includeBodies),
           },
         };
