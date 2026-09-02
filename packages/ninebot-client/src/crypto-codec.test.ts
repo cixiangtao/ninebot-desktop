@@ -2,8 +2,10 @@ import { constants, generateKeyPairSync, privateDecrypt } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import {
   buildNinebotEncryptedRequestCandidate,
+  createNinebotResponseCandidateDecoder,
   decryptNinebotResponsePayloadCandidate,
   decryptNinebotResponseCandidate,
+  generateNinebotCandidateRequestMaterial,
   type NinebotCandidateKeyData,
 } from "./crypto-codec.ts";
 import {
@@ -87,6 +89,36 @@ describe("Ninebot crypto codec candidate", () => {
           r: encodeNinebotBase64(ciphertext),
         },
         keyData,
+      }),
+    ).toEqual(plaintext);
+  });
+
+  it("generates fresh request material with ninecli-compatible lengths", () => {
+    const material = generateNinebotCandidateRequestMaterial({
+      platform: 2,
+      p: "100",
+      t: "1",
+      timeStamp: 1_725_000_000,
+    });
+
+    expect(material.kReq).toHaveLength(16);
+    expect(material.keyData.keyDataOne).toHaveLength(22);
+    expect(material.keyData.keyDataTwo).toHaveLength(22);
+    expect(material.keyData.keyDataThree).toHaveLength(20);
+    expect(material.keyData.keyDataFour).toHaveLength(8);
+    expect(material.timeStamp).toBe(1_725_000_000);
+  });
+
+  it("binds response decoding to one request key-data set", () => {
+    const plaintext = textEncoder.encode('{"vehicles":[]}');
+    const ciphertext = encryptAesCbcPkcs7({ plaintext, key: deriveKey() });
+    const decoder = createNinebotResponseCandidateDecoder(keyData);
+
+    expect(
+      decoder.decrypt({
+        v: 1,
+        s: encodeNinebotBase64(new Uint8Array(128)),
+        r: encodeNinebotBase64(ciphertext),
       }),
     ).toEqual(plaintext);
   });

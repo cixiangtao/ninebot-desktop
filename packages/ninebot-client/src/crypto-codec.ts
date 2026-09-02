@@ -6,6 +6,8 @@ import {
   encodeNinebotBase64,
   encryptAesCbcPkcs7,
   encryptRsaPkcs1v15,
+  generateNinebotKReq,
+  generateNinebotKeyData,
 } from "./crypto-node.ts";
 import type {
   NinebotEncryptedRequestEnvelope,
@@ -30,6 +32,32 @@ export interface NinebotCandidateRequestMaterial {
   p: string;
   t: string;
 }
+
+export interface GenerateNinebotCandidateRequestMaterialOptions {
+  platform: number;
+  p: string;
+  t: string;
+  timeStamp?: number;
+}
+
+/**
+ * Generates fresh request material using the lengths and timestamp unit
+ * observed in ninecli. The result is intentionally a candidate, not a proof
+ * that any particular service accepts the generated values.
+ */
+export const generateNinebotCandidateRequestMaterial = ({
+  platform,
+  p,
+  t,
+  timeStamp = Math.floor(Date.now() / 1000),
+}: GenerateNinebotCandidateRequestMaterialOptions): NinebotCandidateRequestMaterial => ({
+  keyData: generateNinebotKeyData(),
+  kReq: textEncoder.encode(generateNinebotKReq()),
+  platform,
+  timeStamp,
+  p,
+  t,
+});
 
 export interface BuildNinebotEncryptedRequestCandidateOptions {
   plaintextBody: Uint8Array;
@@ -144,3 +172,19 @@ export const decryptNinebotResponsePayloadCandidate = ({
   keyData,
 }: DecryptNinebotResponseCandidateOptions) =>
   decodeNinebotResponsePayloadCandidate(decryptNinebotResponseCandidate({ envelope, keyData }));
+
+export interface NinebotResponseCandidateDecoder {
+  decrypt(envelope: NinebotEncryptedResponseEnvelope): Uint8Array;
+  decode(envelope: NinebotEncryptedResponseEnvelope): Uint8Array;
+}
+
+/**
+ * Binds response decoding to one request's keyData so concurrent requests do
+ * not depend on shared mutable codec state.
+ */
+export const createNinebotResponseCandidateDecoder = (
+  keyData: NinebotCandidateKeyData,
+): NinebotResponseCandidateDecoder => ({
+  decrypt: (envelope) => decryptNinebotResponseCandidate({ envelope, keyData }),
+  decode: (envelope) => decryptNinebotResponsePayloadCandidate({ envelope, keyData }),
+});
