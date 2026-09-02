@@ -113,8 +113,8 @@ pnpm protocol:record -- --include-bodies --include-signing-headers
 - `GenKReq` 生成 16 字节字符材料；`GenNonce` 生成 16 字节随机值并转为 32 个小写十六进制字符。
 - `GenKeyData` 调用 `randHex(11)`、`randHex(11)`、`randHex(10)`，并调用一次长度为 8 的字符集随机函数，随后由 `BuildWrapper` 按 `keyDataOne`、`keyDataTwo`、`keyDataThree`、`keyDataFour` 写入 JSON。
 - `BuildWrapper` 的字段顺序可从常量确认：`data`、四个 `keyData` 字段、`platform`、`timeStamp`；`data` 在进入包装前经过标准 Base64 编码和 JSON 字符串转义。
-- `EncryptRequest` 先构造包装明文，再调用 AES-CBC；随后对包装明文调用 `md5.Sum` 并转成 32 位小写十六进制，这与请求外壳中的 `h` 长度相符。AES 输出再经过 Base64，形成 `d` 的候选来源。
-- `DeriveKey` 对四段输入分别执行“左旋 8 位后与下一个字节异或”的滚动字，然后做固定的位运算混合并输出 16 字节。Node 候选实现位于 `crypto-node` 子路径，尚未接入默认车辆 codec。
+- `EncryptRequest` 的参数布局已通过断点确认：包装明文、16 字节 `kReq`、四段 keyData、`platform` 和 `timeStamp`。它直接使用 `kReq` 做 AES-CBC，再对同一个 `kReq` 调用 RSA PKCS#1 v1.5 形成 `k`；随后对包装明文调用 `md5.Sum` 并转成 32 位小写十六进制，这与请求外壳中的 `h` 长度相符。AES 输出再经过 Base64，形成 `d`。
+- `DeriveKey` 对四段输入（断点观测长度为 11/11/10/8）分别执行“左旋 8 位后与下一个字节异或”的滚动字，然后做固定的位运算混合并输出 16 字节。它出现在响应解密路径；Node 候选实现位于 `crypto-node` 子路径，尚未接入默认车辆 codec。
 - RSA 调用点明确使用 `crypto/rsa.EncryptPKCS1v15`，`k`/`s` 的 128 字节解码长度与 RSA-1024 输出一致；具体输入材料和公钥用途仍需用同一会话做端到端回放确认。
 
 因此当前迁移边界保持不变：Node 层可以安全复用 AES、Base64、MD5、RSA-PKCS#1 v1.5 和四输入 key mixer 候选，但只有在候选请求经 ninecli oracle 与服务端成功验证后，才允许把它提升为车辆列表的默认 codec。
