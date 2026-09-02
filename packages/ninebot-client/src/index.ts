@@ -24,3 +24,5 @@ export type {
 } from "./transport.ts";
 export { decodeGzipJsonEnvelope, decodeJsonEnvelope } from "./response.ts";
 export type { NinebotResponseEnvelope } from "./response.ts";
+export { createNinebotClient, NinebotHttpError } from "./client.ts";
+export type { NinebotClient, NinebotClientOptions } from "./client.ts";
