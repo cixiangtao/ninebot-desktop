@@ -47,9 +47,6 @@ const identifierKindLabels: Record<AccountProfile["identifierKind"], string> = {
   unknown: "九号账号",
 };
 
-const shortenHash = (hash: string | null) =>
-  hash ? `${hash.slice(0, 16)}…${hash.slice(-8)}` : "未取得";
-
 export const SecuritySheet = ({
   open,
   busy,
@@ -103,10 +100,10 @@ export const SecuritySheet = ({
                 id="security-title"
                 className="text-[24px] font-[720] tracking-[-0.025em] text-[#182230]"
               >
-                运行时安全
+                隐私与安全
               </h2>
               <p className="mt-1 text-sm leading-6 text-slate-600">
-                检查 ninecli 的执行来源、权限和客户端开放边界。
+                检查本地登录会话、数据权限和客户端开放边界。
               </p>
             </div>
           </div>
@@ -119,7 +116,7 @@ export const SecuritySheet = ({
           {busy && !status ? (
             <div className="security-loading" role="status">
               <LoaderCircle size={19} className="animate-spin text-[#0a9f92]" />
-              正在核对本机 ninecli…
+              正在核对本地运行环境…
             </div>
           ) : null}
 
@@ -166,21 +163,21 @@ export const SecuritySheet = ({
             <div className="security-group">
               <SecurityRow
                 icon={<Binary size={18} />}
-                label={`ninecli ${status.version}`}
+                label="本地数据运行环境"
                 value={binaryStatusLabels[status.binary.status]}
-                hint={`${status.binary.platform} · ${status.binary.architecture} · ${shortenHash(status.binary.sha256)}`}
+                hint="固定版本运行，连接前会校验文件完整性"
                 tone={binaryTone}
               />
               <SecurityRow
                 icon={<TerminalSquare size={18} />}
-                label="命令边界"
-                value="固定白名单"
-                hint={`${status.policy.allowedCommands.join(" · ")}；不接受渲染层自由命令`}
+                label="数据读取边界"
+                value="只读白名单"
+                hint="仅允许读取账号、车辆状态、电池和骑行记录；页面不能执行任意命令"
                 tone="good"
               />
               <SecurityRow
                 icon={<FolderLock size={18} />}
-                label={`本地存储 · ${status.storage.directoryName}`}
+                label="本地存储"
                 value={permissionLabels[status.storage.permissions]}
                 hint={status.storage.tokensPresent ? "检测到本地登录令牌" : "当前没有本地登录令牌"}
                 tone={
@@ -201,7 +198,7 @@ export const SecuritySheet = ({
                 icon={<Database size={18} />}
                 label="会话读取缓存"
                 value="仅内存"
-                hint="只缓存解析后的领域数据，不保存 ninecli 原始响应；手动刷新会绕过缓存"
+                hint="只缓存解析后的展示数据，不保存上游原始响应；手动刷新会绕过缓存"
                 tone={
                   status.policy.sessionCache.storage === "memory-only" &&
                   !status.policy.sessionCache.rawResponsesStored &&
@@ -229,7 +226,7 @@ export const SecuritySheet = ({
           <div className="security-session">
             <div>
               <strong>本地登录会话</strong>
-              <p>退出后清除 ninecli 令牌与车辆缓存，保留非敏感配置。</p>
+              <p>退出后清除本地登录令牌与车辆缓存，保留非敏感配置。</p>
             </div>
             {confirmingLogout ? (
               <div className="flex flex-none items-center gap-2">
