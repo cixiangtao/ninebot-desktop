@@ -112,3 +112,5 @@ pnpm protocol:record -- --include-bodies --include-signing-headers
 - RSA 调用点明确使用 `crypto/rsa.EncryptPKCS1v15`，`k`/`s` 的 128 字节解码长度与 RSA-1024 输出一致；具体输入材料和公钥用途仍需用同一会话做端到端回放确认。
 
 因此当前迁移边界保持不变：Node 层可以安全复用 AES、Base64、MD5、RSA-PKCS#1 v1.5 和四输入 key mixer 候选，但只有在候选请求经 ninecli oracle 与服务端成功验证后，才允许把它提升为车辆列表的默认 codec。
+
+当前已新增 `@jiuhao/ninebot-client/crypto-codec` Node 子路径：它按上述顺序生成包装 JSON，输出候选 `d`、`h`、`k`、`p`、`t`，并能使用同一组 keyData 解密响应 `r`。该模块保留显式 `material` 参数，方便用固定 fixture 做差分测试；它不会自动接管 `createNinebotVehicleClient`，也不会在没有 oracle 成功证据时生成真实请求。
