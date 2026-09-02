@@ -1,6 +1,15 @@
 import { createCipheriv, generateKeyPairSync, privateDecrypt, constants } from "node:crypto";
 import { describe, expect, it } from "vitest";
-import { decodeNinebotBase64, decryptAesCbcPkcs7, encryptRsaPkcs1v15 } from "./crypto-node.ts";
+import {
+  computeNinebotCheckcode,
+  decodeNinebotBase64,
+  decryptAesCbcPkcs7,
+  deriveNinebotKeyCandidate,
+  encodeNinebotBase64,
+  encryptAesCbcPkcs7,
+  encryptRsaPkcs1v15,
+  generateNinebotNonce,
+} from "./crypto-node.ts";
 
 describe("Node crypto candidates", () => {
   it("decodes only canonical Base64 fields", () => {
@@ -19,6 +28,37 @@ describe("Node crypto candidates", () => {
     expect(() => decryptAesCbcPkcs7({ ciphertext: ciphertext.subarray(1), key, iv })).toThrow(
       "invalid length",
     );
+  });
+
+  it("round-trips the zero-IV AES-CBC candidate", () => {
+    const key = Buffer.alloc(16, 3);
+    const plaintext = new TextEncoder().encode("fixture payload");
+    const ciphertext = encryptAesCbcPkcs7({ plaintext, key });
+    expect(decryptAesCbcPkcs7({ ciphertext, key, iv: new Uint8Array(16) })).toEqual(plaintext);
+  });
+
+  it("computes the lowercase MD5 checkcode and canonical Base64", () => {
+    expect(computeNinebotCheckcode("fixture payload")).toBe("0b672a81b2a6b29c522404de433c0d68");
+    const encoded = encodeNinebotBase64(new Uint8Array([1, 2, 3, 4]));
+    expect(encoded).toBe("AQIDBA==");
+    expect(decodeNinebotBase64(encoded, "cipher")).toEqual(new Uint8Array([1, 2, 3, 4]));
+  });
+
+  it("reproduces the binary's four-input key mixer candidate", () => {
+    expect(
+      Buffer.from(
+        deriveNinebotKeyCandidate([
+          new TextEncoder().encode("a"),
+          new TextEncoder().encode("bc"),
+          new TextEncoder().encode("def"),
+          new TextEncoder().encode("ghij"),
+        ]),
+      ).toString("hex"),
+    ).toBe("f99ffb9cf5f5f6f9fbfa9a9c056e0404");
+  });
+
+  it("generates a 16-byte nonce rendered as lowercase hexadecimal", () => {
+    expect(generateNinebotNonce()).toMatch(/^[0-9a-f]{32}$/);
   });
 
   it("uses RSA PKCS#1 v1.5 public-key encryption", () => {
