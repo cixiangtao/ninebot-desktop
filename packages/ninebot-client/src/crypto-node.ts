@@ -41,11 +41,11 @@ const removePkcs7 = (plaintext: Uint8Array) => {
 export const decryptAesCbcPkcs7 = ({
   ciphertext,
   key,
-  iv,
+  iv = new Uint8Array(AES_BLOCK_BYTES),
 }: {
   ciphertext: Uint8Array;
   key: Uint8Array;
-  iv: Uint8Array;
+  iv?: Uint8Array;
 }) => {
   if (ciphertext.length === 0 || ciphertext.length % AES_BLOCK_BYTES !== 0) {
     throw new Error("Ninebot AES ciphertext has an invalid length");
