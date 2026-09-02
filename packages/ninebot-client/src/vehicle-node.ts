@@ -4,10 +4,12 @@ import {
   decryptNinebotResponsePayloadCandidate,
   generateNinebotCandidateRequestMaterial,
 } from "./crypto-codec.ts";
+import type { NinebotCandidateKeyData } from "./crypto-codec.ts";
 import type {
   NinebotEncryptedRequestEnvelope,
   NinebotEncryptedResponseEnvelope,
 } from "./crypto-envelope.ts";
+import type { NinebotVehicleCodec } from "./vehicle-codec.ts";
 
 /** Fields observed in the plaintext JSON sent before vehicle-list encryption. */
 export interface VehicleListPlaintextFields {
@@ -168,3 +170,62 @@ export const decodeVehicleListResponseCandidate = <T = unknown>({
   parseVehicleListResponseCandidate<T>(
     decryptNinebotResponsePayloadCandidate({ envelope, keyData }),
   );
+
+export interface CreateNinebotVehicleCandidateCodecOptions {
+  platform: number;
+  p: string;
+  t: string;
+  timeStamp?: number;
+  rsaPublicKey: Uint8Array | string;
+}
+
+const readResponseKeyData = (context: unknown) => {
+  if (context === null || typeof context !== "object") {
+    throw new Error("Ninebot vehicle response context is missing");
+  }
+  const record = context as Record<string, unknown>;
+  const keyData = {
+    keyDataOne: record.keyDataOne,
+    keyDataTwo: record.keyDataTwo,
+    keyDataThree: record.keyDataThree,
+    keyDataFour: record.keyDataFour,
+  };
+  if (
+    typeof keyData.keyDataOne !== "string" ||
+    typeof keyData.keyDataTwo !== "string" ||
+    typeof keyData.keyDataThree !== "string" ||
+    typeof keyData.keyDataFour !== "string"
+  ) {
+    throw new Error("Ninebot vehicle response context is invalid");
+  }
+  return keyData as NinebotCandidateKeyData;
+};
+
+/** Creates a context-safe Node candidate codec for the high-level vehicle client. */
+export const createNinebotVehicleCandidateCodec = ({
+  platform,
+  p,
+  t,
+  timeStamp,
+  rsaPublicKey,
+}: CreateNinebotVehicleCandidateCodecOptions): NinebotVehicleCodec => ({
+  async encodeRequest({ plaintextBody }) {
+    const material = generateNinebotCandidateRequestMaterial(
+      timeStamp === undefined ? { platform, p, t } : { platform, p, t, timeStamp },
+    );
+    return {
+      envelope: buildNinebotEncryptedRequestCandidate({
+        plaintextBody,
+        material,
+        rsaPublicKey,
+      }),
+      responseContext: material.keyData,
+    };
+  },
+  async decodeResponse({ envelope, responseContext }) {
+    return decryptNinebotResponsePayloadCandidate({
+      envelope,
+      keyData: readResponseKeyData(responseContext),
+    });
+  },
+});

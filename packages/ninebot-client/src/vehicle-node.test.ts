@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildVehicleListEncryptedRequestCandidate,
   buildVehicleListPlaintextBody,
+  createNinebotVehicleCandidateCodec,
   decodeVehicleListResponseCandidate,
   parseVehicleListResponseCandidate,
 } from "./vehicle-node.ts";
@@ -107,5 +108,53 @@ describe("Node vehicle request body candidate", () => {
         keyData,
       }),
     ).toMatchObject({ code: 1, data: [], desc: "ok", time_cost: 1 });
+  });
+
+  it("implements the context-aware vehicle codec contract", async () => {
+    const { publicKey } = generateKeyPairSync("rsa", { modulusLength: 1024 });
+    const codec = createNinebotVehicleCandidateCodec({
+      platform: 2,
+      p: "100",
+      t: "1",
+      timeStamp: 1_725_000_000,
+      rsaPublicKey: publicKey.export({ type: "spki", format: "pem" }),
+    });
+    const encoded = await codec.encodeRequest({
+      service: "motor",
+      path: "/vehicle/binding/my-vehicle",
+      headers: {},
+      plaintextBody: new TextEncoder().encode("private"),
+    });
+    expect("envelope" in encoded).toBe(true);
+    if (!("envelope" in encoded) || !encoded.responseContext) throw new Error("missing context");
+    const keyData = encoded.responseContext as {
+      keyDataOne: string;
+      keyDataTwo: string;
+      keyDataThree: string;
+      keyDataFour: string;
+    };
+    const key = deriveNinebotKeyCandidate([
+      new TextEncoder().encode(keyData.keyDataOne),
+      new TextEncoder().encode(keyData.keyDataTwo),
+      new TextEncoder().encode(keyData.keyDataThree),
+      new TextEncoder().encode(keyData.keyDataFour),
+    ]);
+    const business = new TextEncoder().encode('{"code":1,"data":[],"desc":"ok","time_cost":1}');
+    const responseJson = new TextEncoder().encode(
+      JSON.stringify({ data: encodeNinebotBase64(business), timeStamp: 1_725_000_000 }),
+    );
+    const ciphertext = encryptAesCbcPkcs7({ plaintext: responseJson, key });
+    await expect(
+      codec.decodeResponse({
+        service: "motor",
+        path: "/vehicle/binding/my-vehicle",
+        envelope: {
+          v: 1,
+          s: encodeNinebotBase64(new Uint8Array(128)),
+          r: encodeNinebotBase64(ciphertext),
+        },
+        responseContext: encoded.responseContext,
+      }),
+    ).resolves.toEqual(business);
   });
 });

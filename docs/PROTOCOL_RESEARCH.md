@@ -137,3 +137,5 @@ Node 专用 `@jiuhao/ninebot-client/vehicle-node` 子路径现在还提供车辆
 同一路径的 `buildVehicleListEncryptedRequestCandidate` 会一次性生成明文、临时 `kReq`、四段 keyData 和加密外壳，并返回本次请求专属的 keyData 上下文；调用方可将该上下文绑定到对应响应 decoder，避免并发请求互相覆盖。
 
 `decodeVehicleListResponseCandidate` 和 `parseVehicleListResponseCandidate` 负责把解密后的业务 JSON 校验为 `{ code, data, desc, time_cost, extra }` 候选包装，再由上层把 `data` 交给现有车辆领域解析器；它们不会把原始密文或账号字段写入磁盘。
+
+`createNinebotVehicleCandidateCodec` 已实现带上下文的 `NinebotVehicleCodec` 合同：每次编码返回独立 keyData 上下文，响应解码只使用传回的对应上下文；它仍属于 Node 候选路径，尚未替换 Electron 默认 ninecli。
