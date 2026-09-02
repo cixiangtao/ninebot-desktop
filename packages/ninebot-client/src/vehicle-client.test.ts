@@ -53,4 +53,37 @@ describe("Ninebot vehicle client", () => {
       status: 503,
     });
   });
+
+  it("passes codec response context through the high-level client", async () => {
+    let receivedContext: unknown;
+    const contextualCodec: NinebotVehicleCodec = {
+      async encodeRequest() {
+        return {
+          envelope: { d: "cipher", h: "hash", k: "key", p: "001", t: "1" },
+          responseContext: { requestId: "vehicle-list" },
+        };
+      },
+      async decodeResponse({ responseContext }) {
+        receivedContext = responseContext;
+        return new TextEncoder().encode("decoded");
+      },
+    };
+    const client = createNinebotVehicleClient({
+      codec: contextualCodec,
+      transport: {
+        async send() {
+          return {
+            status: 200,
+            headers: {},
+            body: new TextEncoder().encode('{"v":1,"s":"session","r":"cipher"}'),
+          };
+        },
+      },
+    });
+
+    await expect(
+      client.list({ service: "motor", plaintextBody: new TextEncoder().encode("private") }),
+    ).resolves.toEqual(new TextEncoder().encode("decoded"));
+    expect(receivedContext).toEqual({ requestId: "vehicle-list" });
+  });
 });

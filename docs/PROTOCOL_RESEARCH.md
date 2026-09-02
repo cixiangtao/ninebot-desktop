@@ -28,6 +28,7 @@ scripts/protocol-recorder.ts
 - `parseNinebotEncryptedRequest` 和 `parseNinebotEncryptedResponse` 只校验已观察到的 `d/h/k/p/t` 与 `v/s/r` 外壳，不对密文做未经证实的解释。
 - `buildVehicleListRequest` 已能生成 `ebike`/`motor` 的 `POST /vehicle/binding/my-vehicle` 外壳请求；调用方负责提供密文 envelope 和动态 Header，后续 codec 再接入真正的加密实现。
 - `NinebotVehicleCodec`、`buildVehicleListRequestWithCodec` 和 `decodeVehicleListResponseWithCodec` 已提供加密实现的注入点；请求明文和响应密文都只在内存中交给 codec，HTTP 层不解释其内容。
+- codec 合同支持可选的 `responseContext`：请求编码器可返回本次请求专属上下文，高层车辆客户端会原样传给对应响应解码器，从而支持临时 keyData 而不依赖全局队列；旧的只返回 envelope 的 codec 仍兼容。
 - `createNinebotVehicleClient().list()` 已串起 codec、transport、HTTP 状态检查和响应体 decoder；Node/Electron 可注入 `response-node` 的 gzip body decoder，其他平台可使用自己的实现。
 - Node 专用 `crypto-node` 子路径已提供严格 Base64、AES-CBC/PKCS7 解密和 RSA-PKCS#1 v1.5 公钥加密原语；这些原语仅用于候选 codec 验证，尚未绑定 Ninebot 的字段派生规则。
 

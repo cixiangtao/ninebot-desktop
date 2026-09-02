@@ -39,11 +39,14 @@ export type { BuildVehicleListRequestOptions, VehicleServiceName } from "./vehic
 export {
   buildVehicleListRequestWithCodec,
   decodeVehicleListResponseWithCodec,
+  prepareVehicleListRequestWithCodec,
 } from "./vehicle-codec.ts";
 export type {
   BuildVehicleListRequestWithCodecOptions,
   DecodeVehicleListResponseWithCodecOptions,
   NinebotVehicleCodec,
+  PreparedVehicleListRequest,
+  VehicleCodecRequestResult,
   VehicleCodecRequestInput,
   VehicleCodecResponseInput,
 } from "./vehicle-codec.ts";

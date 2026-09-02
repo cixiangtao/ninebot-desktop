@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildVehicleListRequestWithCodec,
   decodeVehicleListResponseWithCodec,
+  prepareVehicleListRequestWithCodec,
   type NinebotVehicleCodec,
 } from "./vehicle-codec.ts";
 
@@ -34,5 +35,34 @@ describe("vehicle codec boundary", () => {
     await expect(
       decodeVehicleListResponseWithCodec({ service: "motor", responseBody: body, codec }),
     ).resolves.toEqual(new TextEncoder().encode("1:session:cipher"));
+  });
+
+  it("preserves per-request response context without changing legacy codecs", async () => {
+    let receivedContext: unknown;
+    const contextualCodec: NinebotVehicleCodec = {
+      async encodeRequest() {
+        return {
+          envelope: { d: "cipher", h: "hash", k: "key", p: "001", t: "1" },
+          responseContext: { requestId: "one" },
+        };
+      },
+      async decodeResponse({ responseContext }) {
+        receivedContext = responseContext;
+        return new TextEncoder().encode("decoded");
+      },
+    };
+    const prepared = await prepareVehicleListRequestWithCodec({
+      service: "motor",
+      plaintextBody: new TextEncoder().encode("private payload"),
+      codec: contextualCodec,
+    });
+    await decodeVehicleListResponseWithCodec({
+      service: "motor",
+      responseBody: '{"v":1,"s":"session","r":"cipher"}',
+      codec: contextualCodec,
+      responseContext: prepared.responseContext,
+    });
+
+    expect(receivedContext).toEqual({ requestId: "one" });
   });
 });

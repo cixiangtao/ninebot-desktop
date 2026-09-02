@@ -1,6 +1,6 @@
 import { NinebotHttpError } from "./client.ts";
 import {
-  buildVehicleListRequestWithCodec,
+  prepareVehicleListRequestWithCodec,
   decodeVehicleListResponseWithCodec,
   type NinebotVehicleCodec,
 } from "./vehicle-codec.ts";
@@ -26,13 +26,13 @@ export const createNinebotVehicleClient = ({
   responseBodyDecoder = (response) => response.body,
 }: NinebotVehicleClientOptions) => ({
   async list({ service, plaintextBody, headers = {} }: ListVehiclesOptions) {
-    const request = await buildVehicleListRequestWithCodec({
+    const prepared = await prepareVehicleListRequestWithCodec({
       service,
       plaintextBody,
       headers,
       codec,
     });
-    const response = await transport.send(request);
+    const response = await transport.send(prepared.request);
     if (response.status < 200 || response.status >= 300) {
       throw new NinebotHttpError(response.status);
     }
@@ -41,6 +41,7 @@ export const createNinebotVehicleClient = ({
       service,
       responseBody: body,
       codec,
+      responseContext: prepared.responseContext,
     });
   },
 });
