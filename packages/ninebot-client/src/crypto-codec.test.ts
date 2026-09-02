@@ -42,7 +42,7 @@ describe("Ninebot crypto codec candidate", () => {
 
     const wrapper = decryptAesCbcPkcs7({
       ciphertext: decodeNinebotBase64(envelope.d, "request d"),
-      key: deriveKey(),
+      key: kReq,
     });
     const wrapperText = new TextDecoder().decode(wrapper);
     expect(wrapperText).toBe(

@@ -43,6 +43,7 @@ const assertSafeInteger = (value: number, name: string) => {
 const encodeWrapper = (plaintextBody: Uint8Array, material: NinebotCandidateRequestMaterial) => {
   assertSafeInteger(material.platform, "platform");
   assertSafeInteger(material.timeStamp, "timeStamp");
+  if (material.kReq.length !== 16) throw new Error("Ninebot candidate kReq must be 16 bytes");
   return textEncoder.encode(
     `{\n\t"data" : "${encodeNinebotBase64(plaintextBody)}",\n\t"keyDataFour" : "${material.keyData.keyDataFour}",\n\t"keyDataOne" : "${material.keyData.keyDataOne}",\n\t"keyDataTwo" : "${material.keyData.keyDataTwo}",\n\t"keyDataThree" : "${material.keyData.keyDataThree}",\n\t"platform" : ${material.platform},\n\t"timeStamp" : ${material.timeStamp}\n}\n`,
   );
@@ -69,8 +70,7 @@ export const buildNinebotEncryptedRequestCandidate = ({
   rsaPublicKey,
 }: BuildNinebotEncryptedRequestCandidateOptions): NinebotEncryptedRequestEnvelope => {
   const wrapper = encodeWrapper(plaintextBody, material);
-  const key = deriveCandidateKey(material.keyData);
-  const encryptedBody = encryptAesCbcPkcs7({ plaintext: wrapper, key });
+  const encryptedBody = encryptAesCbcPkcs7({ plaintext: wrapper, key: material.kReq });
   const encryptedKReq = encryptRsaPkcs1v15(material.kReq, rsaPublicKey);
   return {
     d: encodeNinebotBase64(encryptedBody),
