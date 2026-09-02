@@ -27,6 +27,7 @@ scripts/protocol-recorder.ts
 - `createNinebotClient().whoami()` 已将请求、transport 和响应解码串起来；非 2xx 响应只抛出状态错误，不暴露响应正文。
 - `parseNinebotEncryptedRequest` 和 `parseNinebotEncryptedResponse` 只校验已观察到的 `d/h/k/p/t` 与 `v/s/r` 外壳，不对密文做未经证实的解释。
 - `buildVehicleListRequest` 已能生成 `ebike`/`motor` 的 `POST /vehicle/binding/my-vehicle` 外壳请求；调用方负责提供密文 envelope 和动态 Header，后续 codec 再接入真正的加密实现。
+- `NinebotVehicleCodec`、`buildVehicleListRequestWithCodec` 和 `decodeVehicleListResponseWithCodec` 已提供加密实现的注入点；请求明文和响应密文都只在内存中交给 codec，HTTP 层不解释其内容。
 
 首批只研究以下只读能力：
 

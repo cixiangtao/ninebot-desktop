@@ -36,5 +36,16 @@ export {
 } from "./crypto-envelope.ts";
 export { buildVehicleListRequest, vehicleListPath, vehicleServiceNames } from "./vehicle.ts";
 export type { BuildVehicleListRequestOptions, VehicleServiceName } from "./vehicle.ts";
+export {
+  buildVehicleListRequestWithCodec,
+  decodeVehicleListResponseWithCodec,
+} from "./vehicle-codec.ts";
+export type {
+  BuildVehicleListRequestWithCodecOptions,
+  DecodeVehicleListResponseWithCodecOptions,
+  NinebotVehicleCodec,
+  VehicleCodecRequestInput,
+  VehicleCodecResponseInput,
+} from "./vehicle-codec.ts";
 export { createNinebotClient, NinebotHttpError } from "./client.ts";
 export type { NinebotClient, NinebotClientOptions } from "./client.ts";
