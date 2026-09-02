@@ -115,8 +115,11 @@ pnpm protocol:record -- --include-bodies --include-signing-headers
 - `BuildWrapper` 的字段顺序可从常量确认：`data`、四个 `keyData` 字段、`platform`、`timeStamp`；`data` 在进入包装前经过标准 Base64 编码和 JSON 字符串转义。
 - `EncryptRequest` 的参数布局已通过断点确认：包装明文、16 字节 `kReq`、四段 keyData、`platform` 和 `timeStamp`。它直接使用 `kReq` 做 AES-CBC，再对同一个 `kReq` 调用 RSA PKCS#1 v1.5 形成 `k`；随后对包装明文调用 `md5.Sum` 并转成 32 位小写十六进制，这与请求外壳中的 `h` 长度相符。AES 输出再经过 Base64，形成 `d`。
 - `DeriveKey` 对四段输入（断点观测长度为 11/11/10/8）分别执行“左旋 8 位后与下一个字节异或”的滚动字，然后做固定的位运算混合并输出 16 字节。它出现在响应解密路径；Node 候选实现位于 `crypto-node` 子路径，尚未接入默认车辆 codec。
+- `BuildWrapper` 和 `EncryptRequest` 的动态断点都显示 `timeStamp` 使用 Unix epoch 秒（例如 `0x6a97f656` 对应十位数量级），不是用户界面常见的毫秒时间戳。Node 候选的 `NinebotCandidateRequestMaterial.timeStamp` 因此按秒建模。
+- `DecryptResponse` 的动态入口参数包含四段 keyData，长度仍为 11/11/10/8；后续对外层 `r` 字段执行 Base64 解码时，输入长度与捕获响应的 `r` 长度相符（本次样本为 3008 和 364）。AES 解密后的内容还会经过 `unescapeJSONString`，随后在另一个调用点再次执行 Base64 解码（对应输入长度 2208 和 228）。这说明响应至少存在“外层 Base64 → AES → JSON 反转义 → 内层 Base64”的候选链路。
+- 当前动态证据只证明成功路径使用了 `r`，尚未证明外层 `s` 在该路径中的用途；因此 Node 实现将两者继续视为外壳字段，并把二次解码放在显式候选函数中。
 - RSA 调用点明确使用 `crypto/rsa.EncryptPKCS1v15`，`k`/`s` 的 128 字节解码长度与 RSA-1024 输出一致；具体输入材料和公钥用途仍需用同一会话做端到端回放确认。
 
 因此当前迁移边界保持不变：Node 层可以安全复用 AES、Base64、MD5、RSA-PKCS#1 v1.5 和四输入 key mixer 候选，但只有在候选请求经 ninecli oracle 与服务端成功验证后，才允许把它提升为车辆列表的默认 codec。
 
-当前已新增 `@jiuhao/ninebot-client/crypto-codec` Node 子路径：它按上述顺序生成包装 JSON，输出候选 `d`、`h`、`k`、`p`、`t`，并能使用同一组 keyData 解密响应 `r`。该模块保留显式 `material` 参数，方便用固定 fixture 做差分测试；它不会自动接管 `createNinebotVehicleClient`，也不会在没有 oracle 成功证据时生成真实请求。
+当前已新增 `@jiuhao/ninebot-client/crypto-codec` Node 子路径：它按上述顺序生成包装 JSON，输出候选 `d`、`h`、`k`、`p`、`t`，并提供两个边界：只解密外层 `r` 的原始函数，以及继续执行反转义和内层 Base64 解码的显式候选函数。该模块保留显式 `material` 参数，方便用固定 fixture 做差分测试；它不会自动接管 `createNinebotVehicleClient`，也不会在没有 oracle 成功证据时生成真实请求。

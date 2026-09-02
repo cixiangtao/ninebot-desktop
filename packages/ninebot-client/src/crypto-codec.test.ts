@@ -37,7 +37,7 @@ describe("Ninebot crypto codec candidate", () => {
     const kReq = textEncoder.encode("0123456789abcdef");
     const envelope = buildNinebotEncryptedRequestCandidate({
       plaintextBody: textEncoder.encode('{"service":"vehicles"}'),
-      material: { keyData, kReq, platform: 2, timeStamp: 1_725_000_000_000, p: "100", t: "1" },
+      material: { keyData, kReq, platform: 2, timeStamp: 1_725_000_000, p: "100", t: "1" },
       rsaPublicKey: publicKey.export({ type: "spki", format: "pem" }),
     });
 
@@ -47,7 +47,7 @@ describe("Ninebot crypto codec candidate", () => {
     });
     const wrapperText = new TextDecoder().decode(wrapper);
     expect(wrapperText).toBe(
-      '{\n\t"data" : "eyJzZXJ2aWNlIjoidmVoaWNsZXMifQ==",\n\t"keyDataFour" : "Ab3;_+x/",\n\t"keyDataOne" : "0123456789abcdef0123456789",\n\t"keyDataTwo" : "fedcba9876543210fedcba987654",\n\t"keyDataThree" : "00112233445566778899",\n\t"platform" : 2,\n\t"timeStamp" : 1725000000000\n}\n',
+      '{\n\t"data" : "eyJzZXJ2aWNlIjoidmVoaWNsZXMifQ==",\n\t"keyDataFour" : "Ab3;_+x/",\n\t"keyDataOne" : "0123456789abcdef0123456789",\n\t"keyDataTwo" : "fedcba9876543210fedcba987654",\n\t"keyDataThree" : "00112233445566778899",\n\t"platform" : 2,\n\t"timeStamp" : 1725000000\n}\n',
     );
     expect(envelope.h).toBe(computeNinebotCheckcode(wrapper));
     expect(

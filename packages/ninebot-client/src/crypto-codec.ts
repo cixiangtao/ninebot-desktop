@@ -25,6 +25,7 @@ export interface NinebotCandidateRequestMaterial {
   keyData: NinebotCandidateKeyData;
   kReq: Uint8Array;
   platform: number;
+  /** Unix epoch timestamp in seconds, as passed to ninecli's wrapper builder. */
   timeStamp: number;
   p: string;
   t: string;
