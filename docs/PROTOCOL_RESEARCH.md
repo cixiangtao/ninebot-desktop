@@ -127,4 +127,6 @@ pnpm protocol:record -- --include-bodies --include-signing-headers
 
 后续私有 oracle 直接解析 `BuildWrapper` 返回的 JSON：前三段 keyData 字段长度为 11/11/10，`keyDataFour` 为 8；`data` 是 76 字符换行且末尾带 LF 的 Android 风格 Base64（JSON 中以转义换行保存）。因此上文关于 22/22/20 字段长度和标准 Base64 的描述已被这次直接导出结果取代，Node 候选实现以本节为准。
 
+同一批私有响应样本进一步确认：`DecryptResponse` 的外层 `r` 解密结果是包含 `data` 和 `timeStamp` 的 JSON 对象，二次 Base64 输入来自该对象的 `data` 字段，而不是整个 JSON 文本。Node 候选解码器现在先提取并反转义 `data`，再执行严格 Base64 解码；真实 motor 响应已成功还原为 JSON 业务数据。
+
 当前已新增 `@jiuhao/ninebot-client/crypto-codec` Node 子路径：它按上述顺序生成包装 JSON，输出候选 `d`、`h`、`k`、`p`、`t`，并提供两个边界：只解密外层 `r` 的原始函数，以及继续执行反转义和内层 Base64 解码的显式候选函数。该模块保留显式 `material` 参数，方便用固定 fixture 做差分测试；它不会自动接管 `createNinebotVehicleClient`，也不会在没有 oracle 成功证据时生成真实请求。

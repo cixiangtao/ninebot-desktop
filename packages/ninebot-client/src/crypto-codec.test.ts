@@ -93,6 +93,26 @@ describe("Ninebot crypto codec candidate", () => {
     ).toEqual(plaintext);
   });
 
+  it("extracts the nested data field from the native response JSON", () => {
+    const plaintext = textEncoder.encode('{"vehicles":[{"id":"oracle"}]}');
+    const encodedPayload = encodeNinebotBase64(plaintext);
+    const responseJson = textEncoder.encode(
+      JSON.stringify({ data: encodedPayload, timeStamp: 1_725_000_000 }),
+    );
+    const ciphertext = encryptAesCbcPkcs7({ plaintext: responseJson, key: deriveKey() });
+
+    expect(
+      decryptNinebotResponsePayloadCandidate({
+        envelope: {
+          v: 1,
+          s: encodeNinebotBase64(new Uint8Array(128)),
+          r: encodeNinebotBase64(ciphertext),
+        },
+        keyData,
+      }),
+    ).toEqual(plaintext);
+  });
+
   it("generates fresh request material with ninecli-compatible lengths", () => {
     const material = generateNinebotCandidateRequestMaterial({
       platform: 2,

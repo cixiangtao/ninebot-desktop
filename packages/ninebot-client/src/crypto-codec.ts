@@ -187,7 +187,21 @@ const unescapeJsonStringCandidate = (value: string) => {
  * server-backed TypeScript request is validated against the ninecli oracle.
  */
 export const decodeNinebotResponsePayloadCandidate = (plaintext: Uint8Array) => {
-  const encodedPayload = unescapeJsonStringCandidate(new TextDecoder().decode(plaintext));
+  const text = new TextDecoder().decode(plaintext);
+  let encodedPayload = unescapeJsonStringCandidate(text);
+  try {
+    const parsed: unknown = JSON.parse(text);
+    if (
+      parsed !== null &&
+      typeof parsed === "object" &&
+      "data" in parsed &&
+      typeof parsed.data === "string"
+    ) {
+      encodedPayload = unescapeJsonStringCandidate(parsed.data);
+    }
+  } catch {
+    // The native response may already be a JSON-quoted string; keep the fallback above.
+  }
   return decodeNinebotBase64(encodedPayload, "response payload");
 };
 
