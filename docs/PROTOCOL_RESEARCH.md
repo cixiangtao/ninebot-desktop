@@ -50,6 +50,12 @@ pnpm protocol:record
 
 命令会打印 `--passport-base`、`--biz-host`、`--ebike-host`、`--motor-host` 和 `--travel-host` 参数。保持记录器运行，在另一个终端把这些参数附加到内置 ninecli，再执行一个只读命令。
 
+已有私有 capture 可用下面的只读报告命令做形状复核。它会自动处理 gzip，只输出字段长度、Base64 合法性和 AES 块对齐，不输出原始 Body 或 Header：
+
+```bash
+pnpm protocol:report -- vehicles-raw
+```
+
 默认记录内容包括：
 
 - 服务族、HTTP 方法和请求路径
