@@ -47,5 +47,11 @@ export type {
   VehicleCodecRequestInput,
   VehicleCodecResponseInput,
 } from "./vehicle-codec.ts";
+export { createNinebotVehicleClient } from "./vehicle-client.ts";
+export type {
+  ListVehiclesOptions,
+  NinebotVehicleClient,
+  NinebotVehicleClientOptions,
+} from "./vehicle-client.ts";
 export { createNinebotClient, NinebotHttpError } from "./client.ts";
 export type { NinebotClient, NinebotClientOptions } from "./client.ts";
