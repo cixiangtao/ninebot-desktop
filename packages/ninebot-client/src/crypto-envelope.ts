@@ -55,3 +55,11 @@ export const parseNinebotEncryptedResponse = (
     r: requiredString(record, "r", "response"),
   };
 };
+
+/** Serializes a validated request envelope for an upstream vehicle endpoint. */
+export const serializeNinebotEncryptedRequest = (envelope: NinebotEncryptedRequestEnvelope) =>
+  JSON.stringify(envelope);
+
+/** Serializes a validated response envelope for fixture and codec tests. */
+export const serializeNinebotEncryptedResponse = (envelope: NinebotEncryptedResponseEnvelope) =>
+  JSON.stringify(envelope);

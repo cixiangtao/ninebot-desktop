@@ -30,5 +30,11 @@ export type {
   NinebotEncryptedRequestEnvelope,
   NinebotEncryptedResponseEnvelope,
 } from "./crypto-envelope.ts";
+export {
+  serializeNinebotEncryptedRequest,
+  serializeNinebotEncryptedResponse,
+} from "./crypto-envelope.ts";
+export { buildVehicleListRequest, vehicleListPath, vehicleServiceNames } from "./vehicle.ts";
+export type { BuildVehicleListRequestOptions, VehicleServiceName } from "./vehicle.ts";
 export { createNinebotClient, NinebotHttpError } from "./client.ts";
 export type { NinebotClient, NinebotClientOptions } from "./client.ts";
