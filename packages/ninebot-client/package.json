@@ -28,6 +28,10 @@
     "./crypto-codec": {
       "types": "./dist/crypto-codec.d.ts",
       "import": "./dist/crypto-codec.js"
+    },
+    "./vehicle-node": {
+      "types": "./dist/vehicle-node.d.ts",
+      "import": "./dist/vehicle-node.js"
     }
   },
   "scripts": {

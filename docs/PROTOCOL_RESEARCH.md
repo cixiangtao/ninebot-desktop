@@ -130,3 +130,5 @@ pnpm protocol:record -- --include-bodies --include-signing-headers
 同一批私有响应样本进一步确认：`DecryptResponse` 的外层 `r` 解密结果是包含 `data` 和 `timeStamp` 的 JSON 对象，二次 Base64 输入来自该对象的 `data` 字段，而不是整个 JSON 文本。Node 候选解码器现在先提取并反转义 `data`，再执行严格 Base64 解码；真实 motor 响应已成功还原为 JSON 业务数据。
 
 当前已新增 `@jiuhao/ninebot-client/crypto-codec` Node 子路径：它按上述顺序生成包装 JSON，输出候选 `d`、`h`、`k`、`p`、`t`，并提供两个边界：只解密外层 `r` 的原始函数，以及继续执行反转义和内层 Base64 解码的显式候选函数。该模块保留显式 `material` 参数，方便用固定 fixture 做差分测试；它不会自动接管 `createNinebotVehicleClient`，也不会在没有 oracle 成功证据时生成真实请求。
+
+Node 专用 `@jiuhao/ninebot-client/vehicle-node` 子路径现在还提供车辆列表明文候选构造器：按 ninecli 观察到的固定字段顺序生成 JSON，并对不含 `checkcode` 的 JSON 计算大写 MD5。它只负责明文和校验字段，不持有令牌、不自动加密或发送请求。
