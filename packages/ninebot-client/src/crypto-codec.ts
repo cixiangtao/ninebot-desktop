@@ -182,8 +182,9 @@ const unescapeJsonStringCandidate = (value: string) => {
 /**
  * Decodes the post-AES response payload observed in ninecli.
  *
- * The binary first AES-decrypts `r`, then unescapes the resulting JSON string
- * and Base64-decodes it again. This remains a candidate boundary until a
+ * The binary first AES-decrypts `r`, then reads the `data` field from the
+ * resulting JSON object (or accepts a JSON-quoted string fallback) and
+ * Base64-decodes it again. This remains a candidate boundary until a
  * server-backed TypeScript request is validated against the ninecli oracle.
  */
 export const decodeNinebotResponsePayloadCandidate = (plaintext: Uint8Array) => {
