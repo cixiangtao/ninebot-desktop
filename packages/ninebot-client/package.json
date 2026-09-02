@@ -20,6 +20,10 @@
     "./response-node": {
       "types": "./dist/response-node.d.ts",
       "import": "./dist/response-node.js"
+    },
+    "./crypto-node": {
+      "types": "./dist/crypto-node.d.ts",
+      "import": "./dist/crypto-node.js"
     }
   },
   "scripts": {

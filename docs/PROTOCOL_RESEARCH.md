@@ -29,6 +29,7 @@ scripts/protocol-recorder.ts
 - `buildVehicleListRequest` 已能生成 `ebike`/`motor` 的 `POST /vehicle/binding/my-vehicle` 外壳请求；调用方负责提供密文 envelope 和动态 Header，后续 codec 再接入真正的加密实现。
 - `NinebotVehicleCodec`、`buildVehicleListRequestWithCodec` 和 `decodeVehicleListResponseWithCodec` 已提供加密实现的注入点；请求明文和响应密文都只在内存中交给 codec，HTTP 层不解释其内容。
 - `createNinebotVehicleClient().list()` 已串起 codec、transport、HTTP 状态检查和响应体 decoder；Node/Electron 可注入 `response-node` 的 gzip body decoder，其他平台可使用自己的实现。
+- Node 专用 `crypto-node` 子路径已提供严格 Base64、AES-CBC/PKCS7 解密和 RSA-PKCS#1 v1.5 公钥加密原语；这些原语仅用于候选 codec 验证，尚未绑定 Ninebot 的字段派生规则。
 
 首批只研究以下只读能力：
 
