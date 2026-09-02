@@ -99,3 +99,16 @@ pnpm protocol:record -- --include-bodies --include-signing-headers
 重复采集已确认请求体 JSON 外壳包含 `d`、`h`、`k`、`p`、`t` 五个字符串字段；gzip 解压后的响应外壳包含数值字段 `v` 和字符串字段 `s`、`r`。`d` 与 `r` 仍视为不透明密文，原始值只留在本机私有捕获目录。
 
 两条同条件私有样本的差分显示：请求 `p`、`t` 和响应 `v` 保持不变，而请求 `d`、`h`、`k` 以及响应 `s`、`r` 每次都变化；`k` 与 `s` 均为 172 字符，`h` 为 32 字符。这个现象支持“每次请求带临时密钥或校验材料”的假设，但还不能推出具体算法、密钥或字段拼接顺序，因此 SDK 仍只解析外壳。
+
+## ninecli 加密函数定位（2026-09-02）
+
+对随应用分发的 macOS ninecli 二进制读取 Go `pclntab` 后，已经能恢复出 `gitea.com/ninebot/cli/internal/crypto` 的函数边界。这个结果只用于本地行为对照，不会把账号数据、密文或私钥写入仓库。
+
+- `GenKReq` 生成 16 字节字符材料；`GenNonce` 生成 16 字节随机值并转为 32 个小写十六进制字符。
+- `GenKeyData` 调用 `randHex(11)`、`randHex(11)`、`randHex(10)`，并调用一次长度为 8 的字符集随机函数，随后由 `BuildWrapper` 按 `keyDataOne`、`keyDataTwo`、`keyDataThree`、`keyDataFour` 写入 JSON。
+- `BuildWrapper` 的字段顺序可从常量确认：`data`、四个 `keyData` 字段、`platform`、`timeStamp`；`data` 在进入包装前经过标准 Base64 编码和 JSON 字符串转义。
+- `EncryptRequest` 先构造包装明文，再调用 AES-CBC；随后对包装明文调用 `md5.Sum` 并转成 32 位小写十六进制，这与请求外壳中的 `h` 长度相符。AES 输出再经过 Base64，形成 `d` 的候选来源。
+- `DeriveKey` 对四段输入分别执行“左旋 8 位后与下一个字节异或”的滚动字，然后做固定的位运算混合并输出 16 字节。Node 候选实现位于 `crypto-node` 子路径，尚未接入默认车辆 codec。
+- RSA 调用点明确使用 `crypto/rsa.EncryptPKCS1v15`，`k`/`s` 的 128 字节解码长度与 RSA-1024 输出一致；具体输入材料和公钥用途仍需用同一会话做端到端回放确认。
+
+因此当前迁移边界保持不变：Node 层可以安全复用 AES、Base64、MD5、RSA-PKCS#1 v1.5 和四输入 key mixer 候选，但只有在候选请求经 ninecli oracle 与服务端成功验证后，才允许把它提升为车辆列表的默认 codec。
