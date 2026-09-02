@@ -132,3 +132,5 @@ pnpm protocol:record -- --include-bodies --include-signing-headers
 当前已新增 `@jiuhao/ninebot-client/crypto-codec` Node 子路径：它按上述顺序生成包装 JSON，输出候选 `d`、`h`、`k`、`p`、`t`，并提供两个边界：只解密外层 `r` 的原始函数，以及继续执行反转义和内层 Base64 解码的显式候选函数。该模块保留显式 `material` 参数，方便用固定 fixture 做差分测试；它不会自动接管 `createNinebotVehicleClient`，也不会在没有 oracle 成功证据时生成真实请求。
 
 Node 专用 `@jiuhao/ninebot-client/vehicle-node` 子路径现在还提供车辆列表明文候选构造器：按 ninecli 观察到的固定字段顺序生成 JSON，并对不含 `checkcode` 的 JSON 计算大写 MD5。它只负责明文和校验字段，不持有令牌、不自动加密或发送请求。
+
+同一路径的 `buildVehicleListEncryptedRequestCandidate` 会一次性生成明文、临时 `kReq`、四段 keyData 和加密外壳，并返回本次请求专属的 keyData 上下文；调用方可将该上下文绑定到对应响应 decoder，避免并发请求互相覆盖。

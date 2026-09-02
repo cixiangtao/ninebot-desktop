@@ -1,5 +1,9 @@
+import { generateKeyPairSync } from "node:crypto";
 import { describe, expect, it } from "vitest";
-import { buildVehicleListPlaintextBody } from "./vehicle-node.ts";
+import {
+  buildVehicleListEncryptedRequestCandidate,
+  buildVehicleListPlaintextBody,
+} from "./vehicle-node.ts";
 
 const fields = {
   sys_language: "zh_CN",
@@ -30,5 +34,26 @@ describe("Node vehicle request body candidate", () => {
     expect(() => buildVehicleListPlaintextBody({ ...fields, nonce: "invalid" })).toThrow(
       "nonce must be 32 lowercase hexadecimal characters",
     );
+  });
+
+  it("returns request envelope and per-request response key context", () => {
+    const { publicKey } = generateKeyPairSync("rsa", { modulusLength: 1024 });
+    const result = buildVehicleListEncryptedRequestCandidate({
+      fields,
+      platform: 2,
+      p: "100",
+      t: "1",
+      timeStamp: 1_725_000_000,
+      rsaPublicKey: publicKey.export({ type: "spki", format: "pem" }),
+    });
+
+    expect(result.envelope).toMatchObject({ p: "100", t: "1" });
+    expect(result.envelope.d).toMatch(/^[A-Za-z0-9+/]+=*$/);
+    expect(result.envelope.k).toMatch(/^[A-Za-z0-9+/]+=*$/);
+    expect(result.envelope.h).toMatch(/^[0-9a-f]{32}$/);
+    expect(result.keyData.keyDataOne).toMatch(/^[0-9a-f]{11}$/);
+    expect(result.keyData.keyDataTwo).toMatch(/^[0-9a-f]{11}$/);
+    expect(result.keyData.keyDataThree).toMatch(/^[0-9a-f]{10}$/);
+    expect(result.keyData.keyDataFour).toHaveLength(8);
   });
 });

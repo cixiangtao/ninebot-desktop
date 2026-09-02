@@ -1,4 +1,9 @@
 import { computeNinebotBodyCheckcode } from "./crypto-node.ts";
+import {
+  buildNinebotEncryptedRequestCandidate,
+  generateNinebotCandidateRequestMaterial,
+} from "./crypto-codec.ts";
+import type { NinebotEncryptedRequestEnvelope } from "./crypto-envelope.ts";
 
 /** Fields observed in the plaintext JSON sent before vehicle-list encryption. */
 export interface VehicleListPlaintextFields {
@@ -66,4 +71,40 @@ export const buildVehicleListPlaintextBody = (fields: VehicleListPlaintextFields
   const unsignedBody = JSON.stringify(unsignedFields);
   const body = { ...unsignedFields, checkcode: computeNinebotBodyCheckcode(unsignedBody) };
   return new TextEncoder().encode(JSON.stringify(body));
+};
+
+export interface BuildVehicleListEncryptedRequestCandidateOptions {
+  fields: VehicleListPlaintextFields;
+  platform: number;
+  p: string;
+  t: string;
+  timeStamp?: number;
+  rsaPublicKey: Uint8Array | string;
+}
+
+export interface VehicleListEncryptedRequestCandidate {
+  envelope: NinebotEncryptedRequestEnvelope;
+  keyData: ReturnType<typeof generateNinebotCandidateRequestMaterial>["keyData"];
+}
+
+/** Builds one encrypted vehicle-list candidate and returns its response key context. */
+export const buildVehicleListEncryptedRequestCandidate = ({
+  fields,
+  platform,
+  p,
+  t,
+  timeStamp,
+  rsaPublicKey,
+}: BuildVehicleListEncryptedRequestCandidateOptions): VehicleListEncryptedRequestCandidate => {
+  const material = generateNinebotCandidateRequestMaterial(
+    timeStamp === undefined ? { platform, p, t } : { platform, p, t, timeStamp },
+  );
+  return {
+    envelope: buildNinebotEncryptedRequestCandidate({
+      plaintextBody: buildVehicleListPlaintextBody(fields),
+      material,
+      rsaPublicKey,
+    }),
+    keyData: material.keyData,
+  };
 };
