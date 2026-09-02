@@ -12,6 +12,7 @@ const BASE64_PATTERN = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/
 const PRINTABLE_ASCII =
   "!\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~";
 const KEY_DATA_ALPHABET = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789;-_.,+/";
+const KEY_DATA_HEX_ALPHABET = "0123456789abcdef";
 
 /** Decodes a canonical Base64 field from a Ninebot encrypted envelope. */
 export const decodeNinebotBase64 = (value: string, fieldName: string) => {
@@ -77,6 +78,21 @@ export const encryptAesCbcPkcs7 = ({
 
 /** Encodes bytes with the canonical standard Base64 alphabet used by ninecli. */
 export const encodeNinebotBase64 = (value: Uint8Array) => Buffer.from(value).toString("base64");
+
+/**
+ * Encodes request-body data using ninecli's Android-style Base64 output.
+ *
+ * The native wrapper emits 76-character lines and a final LF. Envelope fields
+ * (`d`, `k`, and response `r`) remain canonical unwrapped Base64.
+ */
+export const encodeNinebotAndroidBase64 = (value: Uint8Array) => {
+  const encoded = encodeNinebotBase64(value);
+  const lines: string[] = [];
+  for (let offset = 0; offset < encoded.length; offset += 76) {
+    lines.push(encoded.slice(offset, offset + 76));
+  }
+  return `${lines.join("\n")}\n`;
+};
 
 /** Computes the 32-character lowercase MD5 checkcode used by the business wrapper. */
 export const computeNinebotCheckcode = (value: Uint8Array | string) =>
@@ -160,9 +176,9 @@ export const generateNinebotKReq = () => randomFromAlphabet(16, PRINTABLE_ASCII)
 
 /** Generates the four random key-data strings used by ninecli's business wrapper. */
 export const generateNinebotKeyData = () => ({
-  keyDataOne: randomBytes(11).toString("hex"),
-  keyDataTwo: randomBytes(11).toString("hex"),
-  keyDataThree: randomBytes(10).toString("hex"),
+  keyDataOne: randomFromAlphabet(11, KEY_DATA_HEX_ALPHABET),
+  keyDataTwo: randomFromAlphabet(11, KEY_DATA_HEX_ALPHABET),
+  keyDataThree: randomFromAlphabet(10, KEY_DATA_HEX_ALPHABET),
   keyDataFour: randomFromAlphabet(8, KEY_DATA_ALPHABET),
 });
 

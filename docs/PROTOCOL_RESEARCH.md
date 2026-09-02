@@ -123,4 +123,8 @@ pnpm protocol:record -- --include-bodies --include-signing-headers
 
 因此当前迁移边界保持不变：Node 层可以安全复用 AES、Base64、MD5、RSA-PKCS#1 v1.5 和四输入 key mixer 候选，但只有在候选请求经 ninecli oracle 与服务端成功验证后，才允许把它提升为车辆列表的默认 codec。
 
+### 2026-09-02 wrapper 字段形状更正
+
+后续私有 oracle 直接解析 `BuildWrapper` 返回的 JSON：前三段 keyData 字段长度为 11/11/10，`keyDataFour` 为 8；`data` 是 76 字符换行且末尾带 LF 的 Android 风格 Base64（JSON 中以转义换行保存）。因此上文关于 22/22/20 字段长度和标准 Base64 的描述已被这次直接导出结果取代，Node 候选实现以本节为准。
+
 当前已新增 `@jiuhao/ninebot-client/crypto-codec` Node 子路径：它按上述顺序生成包装 JSON，输出候选 `d`、`h`、`k`、`p`、`t`，并提供两个边界：只解密外层 `r` 的原始函数，以及继续执行反转义和内层 Base64 解码的显式候选函数。该模块保留显式 `material` 参数，方便用固定 fixture 做差分测试；它不会自动接管 `createNinebotVehicleClient`，也不会在没有 oracle 成功证据时生成真实请求。

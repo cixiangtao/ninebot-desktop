@@ -5,6 +5,7 @@ import {
   decodeNinebotBase64,
   decryptAesCbcPkcs7,
   deriveNinebotKeyCandidate,
+  encodeNinebotAndroidBase64,
   encodeNinebotBase64,
   encryptAesCbcPkcs7,
   encryptRsaPkcs1v15,
@@ -46,6 +47,14 @@ describe("Node crypto candidates", () => {
     expect(decodeNinebotBase64(encoded, "cipher")).toEqual(new Uint8Array([1, 2, 3, 4]));
   });
 
+  it("wraps request Base64 at 76 characters with a final LF", () => {
+    const encoded = encodeNinebotAndroidBase64(new Uint8Array(1_034));
+    const lines = encoded.split("\n");
+    expect(lines.at(-1)).toBe("");
+    expect(lines.slice(0, -1).every((line) => line.length <= 76)).toBe(true);
+    expect((encoded.match(/\n/g) ?? []).length).toBe(19);
+  });
+
   it("reproduces the binary's four-input key mixer candidate", () => {
     expect(
       Buffer.from(
@@ -66,9 +75,9 @@ describe("Node crypto candidates", () => {
   it("generates the binary-compatible random material shapes", () => {
     expect(generateNinebotKReq()).toMatch(/^[\x21-\x7e]{16}$/);
     const keyData = generateNinebotKeyData();
-    expect(keyData.keyDataOne).toMatch(/^[0-9a-f]{22}$/);
-    expect(keyData.keyDataTwo).toMatch(/^[0-9a-f]{22}$/);
-    expect(keyData.keyDataThree).toMatch(/^[0-9a-f]{20}$/);
+    expect(keyData.keyDataOne).toMatch(/^[0-9a-f]{11}$/);
+    expect(keyData.keyDataTwo).toMatch(/^[0-9a-f]{11}$/);
+    expect(keyData.keyDataThree).toMatch(/^[0-9a-f]{10}$/);
     expect(keyData.keyDataFour).toMatch(/^[a-zA-Z0-9;\-_.,+/]{8}$/);
   });
 

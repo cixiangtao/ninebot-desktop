@@ -3,7 +3,8 @@ import {
   decodeNinebotBase64,
   decryptAesCbcPkcs7,
   deriveNinebotKeyCandidate,
-  encodeNinebotBase64,
+  encodeNinebotAndroidBase64,
+  encodeNinebotBase64 as encodeNinebotCanonicalBase64,
   encryptAesCbcPkcs7,
   encryptRsaPkcs1v15,
   generateNinebotKReq,
@@ -15,9 +16,11 @@ import type {
 } from "./crypto-envelope.ts";
 
 const textEncoder = new TextEncoder();
-const KEY_DATA_ONE_PATTERN = /^[0-9a-f]{22}$/;
-const KEY_DATA_TWO_PATTERN = /^[0-9a-f]{22}$/;
-const KEY_DATA_THREE_PATTERN = /^[0-9a-f]{20}$/;
+const encodeNinebotBase64 = (value: Uint8Array) =>
+  encodeNinebotAndroidBase64(value).replaceAll("\n", "\\n");
+const KEY_DATA_ONE_PATTERN = /^[0-9a-f]{11}$/;
+const KEY_DATA_TWO_PATTERN = /^[0-9a-f]{11}$/;
+const KEY_DATA_THREE_PATTERN = /^[0-9a-f]{10}$/;
 const KEY_DATA_FOUR_PATTERN = /^[/a-zA-Z0-9;_.,+\\-]{8}$/;
 
 export interface NinebotCandidateKeyData {
@@ -75,13 +78,13 @@ const assertSafeInteger = (value: number, name: string) => {
 
 const assertKeyData = (keyData: NinebotCandidateKeyData) => {
   if (!KEY_DATA_ONE_PATTERN.test(keyData.keyDataOne)) {
-    throw new Error("Ninebot candidate keyDataOne must be 22 lowercase hexadecimal characters");
+    throw new Error("Ninebot candidate keyDataOne must be 11 lowercase hexadecimal characters");
   }
   if (!KEY_DATA_TWO_PATTERN.test(keyData.keyDataTwo)) {
-    throw new Error("Ninebot candidate keyDataTwo must be 22 lowercase hexadecimal characters");
+    throw new Error("Ninebot candidate keyDataTwo must be 11 lowercase hexadecimal characters");
   }
   if (!KEY_DATA_THREE_PATTERN.test(keyData.keyDataThree)) {
-    throw new Error("Ninebot candidate keyDataThree must be 20 lowercase hexadecimal characters");
+    throw new Error("Ninebot candidate keyDataThree must be 10 lowercase hexadecimal characters");
   }
   if (!KEY_DATA_FOUR_PATTERN.test(keyData.keyDataFour)) {
     throw new Error("Ninebot candidate keyDataFour must be 8 allowed characters");
@@ -124,9 +127,9 @@ export const buildNinebotEncryptedRequestCandidate = ({
   const encryptedBody = encryptAesCbcPkcs7({ plaintext: wrapper, key: material.kReq });
   const encryptedKReq = encryptRsaPkcs1v15(material.kReq, rsaPublicKey);
   return {
-    d: encodeNinebotBase64(encryptedBody),
+    d: encodeNinebotCanonicalBase64(encryptedBody),
     h: computeNinebotCheckcode(wrapper),
-    k: encodeNinebotBase64(encryptedKReq),
+    k: encodeNinebotCanonicalBase64(encryptedKReq),
     p: material.p,
     t: material.t,
   };
