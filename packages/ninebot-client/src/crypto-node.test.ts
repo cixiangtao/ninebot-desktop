@@ -2,6 +2,7 @@ import { createCipheriv, generateKeyPairSync, privateDecrypt, constants } from "
 import { describe, expect, it } from "vitest";
 import {
   computeNinebotCheckcode,
+  computeNinebotBodyCheckcode,
   decodeNinebotBase64,
   decryptAesCbcPkcs7,
   deriveNinebotKeyCandidate,
@@ -45,6 +46,10 @@ describe("Node crypto candidates", () => {
     const encoded = encodeNinebotBase64(new Uint8Array([1, 2, 3, 4]));
     expect(encoded).toBe("AQIDBA==");
     expect(decodeNinebotBase64(encoded, "cipher")).toEqual(new Uint8Array([1, 2, 3, 4]));
+  });
+
+  it("computes the uppercase vehicle-body MD5 checkcode", () => {
+    expect(computeNinebotBodyCheckcode("fixture payload")).toBe("0B672A81B2A6B29C522404DE433C0D68");
   });
 
   it("wraps request Base64 at 76 characters with a final LF", () => {

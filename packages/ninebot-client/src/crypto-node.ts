@@ -100,6 +100,10 @@ export const computeNinebotCheckcode = (value: Uint8Array | string) =>
     .update(typeof value === "string" ? Buffer.from(value) : value)
     .digest("hex");
 
+/** Computes the uppercase MD5 checkcode used inside the vehicle request body. */
+export const computeNinebotBodyCheckcode = (value: Uint8Array | string) =>
+  computeNinebotCheckcode(value).toUpperCase();
+
 const rotateLeft8 = (value: number) => ((value << 8) | (value >>> 24)) >>> 0;
 
 const rollingWord = (value: Uint8Array) => {
