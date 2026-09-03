@@ -81,6 +81,23 @@ const client = createNinebotFetchCandidateSessionClient({
 The client keeps the session only in an in-memory closure. After `clear()`, all
 operations fail closed until a new client is created.
 
+All five read-only methods also accept an optional `AbortSignal`. Hosts can
+cancel a request when the user switches vehicles or leaves a page:
+
+```ts
+const controller = new AbortController();
+const pending = client.detail({
+  service: "ebike",
+  serialNumber: "YOUR_SERIAL_NUMBER",
+  vehicleType: 14363,
+  travelId: "YOUR_TRAVEL_ID",
+  signal: controller.signal,
+});
+
+controller.abort();
+await pending.catch(() => undefined);
+```
+
 ## Protocol boundary
 
 This package is intended for personal, authorized, read-only data access and
