@@ -5,6 +5,8 @@ import {
   buildVehicleBatteryPlaintextBody,
   buildVehicleStatusPlaintextBody,
   createNinebotTelemetryCandidateClient,
+  decodeVehicleBatteryResponseCandidate,
+  decodeVehicleStatusResponseCandidate,
   parseTelemetryResponseCandidate,
   parseVehicleBatteryResponseCandidate,
   parseVehicleStatusResponseCandidate,
@@ -117,6 +119,11 @@ describe("Node telemetry candidate", () => {
       ),
     );
     expect(battery.data).toMatchObject({ electricity: 74, firmware_only: true });
+  });
+
+  it("exports typed encrypted-response decoder entry points", () => {
+    expect(decodeVehicleStatusResponseCandidate).toBeTypeOf("function");
+    expect(decodeVehicleBatteryResponseCandidate).toBeTypeOf("function");
   });
 
   it("runs the status candidate through a complete local request/response loop", async () => {

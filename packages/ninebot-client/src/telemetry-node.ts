@@ -283,6 +283,30 @@ export const parseVehicleBatteryResponseCandidate = (
   return { ...response, data: data as VehicleBatteryCandidateRecord };
 };
 
+/** Decrypts and parses a status response with its per-request key context. */
+export const decodeVehicleStatusResponseCandidate = ({
+  envelope,
+  keyData,
+}: {
+  envelope: NinebotEncryptedResponseEnvelope;
+  keyData: NinebotCandidateKeyData;
+}) =>
+  parseVehicleStatusResponseCandidate(
+    decryptNinebotResponsePayloadCandidate({ envelope, keyData }),
+  );
+
+/** Decrypts and parses a battery response with its per-request key context. */
+export const decodeVehicleBatteryResponseCandidate = ({
+  envelope,
+  keyData,
+}: {
+  envelope: NinebotEncryptedResponseEnvelope;
+  keyData: NinebotCandidateKeyData;
+}) =>
+  parseVehicleBatteryResponseCandidate(
+    decryptNinebotResponsePayloadCandidate({ envelope, keyData }),
+  );
+
 /** Decrypts one telemetry response while retaining its business wrapper metadata. */
 export const decodeTelemetryResponseCandidate = ({
   envelope,
@@ -320,13 +344,14 @@ export const createNinebotTelemetryCandidateClient = ({
   rsaPublicKey,
   responseBodyDecoder = (response) => response.body,
 }: CreateNinebotTelemetryCandidateClientOptions) => {
-  const send = async (
+  const send = async <TData>(
     service: "ebike" | "motor",
     path: typeof vehicleStatusPath | typeof vehicleBatteryPath,
     fields: TelemetryCandidateHeaderFields,
     plaintextBody: Uint8Array,
     headers: Readonly<Record<string, string>> | undefined,
-  ) => {
+    decode: (plaintext: Uint8Array) => TelemetryResponseCandidate<TData>,
+  ): Promise<TelemetryResponseCandidate<TData>> => {
     const material = generateNinebotCandidateRequestMaterial(
       timeStamp === undefined ? { platform, p, t } : { platform, p, t, timeStamp },
     );
@@ -348,31 +373,35 @@ export const createNinebotTelemetryCandidateClient = ({
     if (response.status < 200 || response.status >= 300)
       throw new NinebotHttpError(response.status);
     const responseBody = await responseBodyDecoder(response);
-    return decodeTelemetryResponseCandidate({
-      envelope: parseNinebotEncryptedResponse(responseBody),
-      keyData: material.keyData,
-    });
+    return decode(
+      decryptNinebotResponsePayloadCandidate({
+        envelope: parseNinebotEncryptedResponse(responseBody),
+        keyData: material.keyData,
+      }),
+    );
   };
   return {
     status: (
       options: VehicleTelemetryCandidateOptions & { fields: VehicleStatusPlaintextFields },
     ) =>
-      send(
+      send<VehicleStatusCandidateRecord[]>(
         options.service,
         vehicleStatusPath,
         options.fields,
         buildVehicleStatusPlaintextBody(options.fields),
         options.headers,
+        parseVehicleStatusResponseCandidate,
       ),
     battery: (
       options: VehicleTelemetryCandidateOptions & { fields: VehicleBatteryPlaintextFields },
     ) =>
-      send(
+      send<VehicleBatteryCandidateRecord>(
         options.service,
         vehicleBatteryPath,
         options.fields,
         buildVehicleBatteryPlaintextBody(options.fields),
         options.headers,
+        parseVehicleBatteryResponseCandidate,
       ),
   };
 };

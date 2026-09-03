@@ -63,6 +63,8 @@ export {
   buildVehicleStatusEncryptedRequestCandidate,
   buildVehicleStatusPlaintextBody,
   createNinebotTelemetryCandidateClient,
+  decodeVehicleBatteryResponseCandidate,
+  decodeVehicleStatusResponseCandidate,
   decodeTelemetryResponseCandidate,
   parseTelemetryResponseCandidate,
   parseVehicleBatteryResponseCandidate,
