@@ -91,6 +91,28 @@ describe("Passport login client", () => {
     );
   });
 
+  it("loads whoami through the verified profile request boundary", async () => {
+    const send = vi.fn().mockResolvedValue({
+      status: 200,
+      headers: {},
+      body: json({ resultCode: 0, data: { username: "user", hasPassword: true } }),
+    });
+    const client = createNinebotPassportLoginClient({
+      transport: { send },
+      signer: () => "login-signature",
+      whoamiSigner: () => "whoami-signature",
+      authorizationFactory: (current) => `Bearer ${current.accessToken}`,
+    });
+
+    await expect(
+      client.whoami({ accessToken: "access", refreshToken: "refresh", businessUid: "business" }),
+    ).resolves.toEqual({ username: "user", hasPassword: true });
+    const request = send.mock.calls[0]?.[0];
+    expect(request?.path).toBe("/v5/user");
+    expect(request?.headers.authorization).toBe("Bearer access");
+    expect(new TextDecoder().decode(request?.body)).toBe("{}");
+  });
+
   it("surfaces non-success business codes without exposing response data", async () => {
     const client = createNinebotPassportLoginClient({
       transport: {

@@ -4,7 +4,7 @@ import type { NinebotAuthSession } from "./auth.ts";
 export interface PassportRequest {
   service: "passport";
   method: "POST";
-  path: "/v6/user/login" | "/v3/user/refresh";
+  path: "/v5/user" | "/v6/user/login" | "/v3/user/refresh";
   headers: Readonly<Record<string, string>>;
   body: Uint8Array;
 }
@@ -29,6 +29,18 @@ export interface PassportRefreshSigningInput {
 
 export type PassportRefreshRequestSigner = (
   input: PassportRefreshSigningInput,
+) => string | Promise<string>;
+
+export interface PassportWhoamiSigningInput {
+  method: "POST";
+  path: "/v5/user";
+  timestamp: string;
+  clientId: string;
+  body: Uint8Array;
+}
+
+export type PassportWhoamiRequestSigner = (
+  input: PassportWhoamiSigningInput,
 ) => string | Promise<string>;
 
 export interface BuildPasswordLoginRequestOptions {
@@ -58,6 +70,18 @@ export interface BuildRefreshRequestOptions {
   device?: string;
   timestampMs?: number;
   signer: PassportRefreshRequestSigner;
+}
+
+export interface BuildPassportWhoamiRequestOptions {
+  authorization: string;
+  clientId?: string;
+  appVersion?: string;
+  os?: string;
+  osLanguage?: string;
+  osVersion?: string;
+  userAgent?: string;
+  timestampMs?: number;
+  signer: PassportWhoamiRequestSigner;
 }
 
 const loginPath = "/v6/user/login" as const;
@@ -137,6 +161,49 @@ export const buildRefreshRequest = async ({
     headers: {
       "accept-encoding": "gzip",
       app_version: appVersion,
+      clientid: clientId,
+      "content-type": "application/json; charset=UTF-8",
+      os,
+      os_language: osLanguage,
+      os_version: osVersion,
+      sign,
+      timestamp,
+      "user-agent": userAgent,
+    },
+    body,
+  };
+};
+
+/** Builds the verified Passport profile request shape observed from ninecli. */
+export const buildWhoamiPassportRequest = async ({
+  authorization,
+  clientId = "vehicle_app_prod",
+  appVersion = "610063322",
+  os = "Android",
+  osLanguage = "zh-hans-cn",
+  osVersion = "13",
+  userAgent = "ninebot-client",
+  timestampMs = Date.now(),
+  signer,
+}: BuildPassportWhoamiRequestOptions): Promise<PassportRequest> => {
+  const body = textEncoder.encode("{}");
+  const timestamp = String(timestampMs);
+  const sign = await signer({
+    method: "POST",
+    path: "/v5/user",
+    timestamp,
+    clientId,
+    body: body.slice(),
+  });
+  return {
+    service: "passport",
+    method: "POST",
+    path: "/v5/user",
+    headers: {
+      accept: "application/json",
+      "accept-encoding": "gzip",
+      app_version: appVersion,
+      authorization,
       clientid: clientId,
       "content-type": "application/json; charset=UTF-8",
       os,

@@ -148,17 +148,21 @@ export type { FileNinebotAuthSessionStoreOptions } from "./session-store-node.ts
 export {
   buildPasswordLoginRequest,
   buildRefreshRequest,
+  buildWhoamiPassportRequest,
   parsePassportLoginSession,
   parsePassportRefreshSession,
 } from "./passport-auth.ts";
 export type {
   BuildPasswordLoginRequestOptions,
   BuildRefreshRequestOptions,
+  BuildPassportWhoamiRequestOptions,
   PassportRequest,
   PassportRefreshRequestSigner,
   PassportRefreshSigningInput,
   PassportRequestSigner,
   PassportSigningInput,
+  PassportWhoamiRequestSigner,
+  PassportWhoamiSigningInput,
 } from "./passport-auth.ts";
 export {
   createNinebotPassportLoginClient,

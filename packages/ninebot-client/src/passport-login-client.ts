@@ -1,10 +1,12 @@
 import {
   buildRefreshRequest,
   buildPasswordLoginRequest,
+  buildWhoamiPassportRequest,
   parsePassportLoginSession,
   parsePassportRefreshSession,
   type BuildPasswordLoginRequestOptions,
   type BuildRefreshRequestOptions,
+  type BuildPassportWhoamiRequestOptions,
   type PassportRequest,
 } from "./passport-auth.ts";
 import type { NinebotAuthSession } from "./auth.ts";
@@ -23,6 +25,8 @@ export interface PassportLoginClientOptions {
   transport: PassportTransport;
   signer: BuildPasswordLoginRequestOptions["signer"];
   refreshSigner?: BuildRefreshRequestOptions["signer"];
+  whoamiSigner?: BuildPassportWhoamiRequestOptions["signer"];
+  authorizationFactory?: (session: NinebotAuthSession) => string;
   responseBodyDecoder?: (response: PassportResponse) => Uint8Array | Promise<Uint8Array>;
 }
 
@@ -41,7 +45,9 @@ export class PassportLoginBusinessError extends Error {
 
   constructor(resultCode: number | string | null, resultDesc: string | null) {
     super(
-      resultDesc ? `Ninebot passport login failed: ${resultDesc}` : "Ninebot passport login failed",
+      resultDesc
+        ? `Ninebot passport request failed: ${resultDesc}`
+        : "Ninebot passport request failed",
     );
     this.name = "PassportLoginBusinessError";
     this.resultCode = resultCode;
@@ -88,6 +94,8 @@ export const createNinebotPassportLoginClient = ({
   transport,
   signer,
   refreshSigner,
+  whoamiSigner,
+  authorizationFactory,
   responseBodyDecoder = (response) => response.body,
 }: PassportLoginClientOptions) => ({
   async loginWithPassword(
@@ -120,6 +128,24 @@ export const createNinebotPassportLoginClient = ({
       throw new PassportLoginBusinessError(envelope.resultCode, envelope.resultDesc);
     }
     return parsePassportRefreshSession(envelope.data, session.businessUid);
+  },
+  async whoami<T = unknown>(session: NinebotAuthSession): Promise<T> {
+    if (!whoamiSigner || !authorizationFactory) {
+      throw new Error("Passport whoami signer and authorization factory are not configured");
+    }
+    const request = await buildWhoamiPassportRequest({
+      authorization: authorizationFactory(session),
+      signer: whoamiSigner,
+    });
+    const response = await transport.send(request);
+    if (response.status < 200 || response.status >= 300) {
+      throw new PassportLoginHttpError(response.status);
+    }
+    const envelope = parseResponseEnvelope(await responseBodyDecoder(response));
+    if (!isSuccessCode(envelope.resultCode)) {
+      throw new PassportLoginBusinessError(envelope.resultCode, envelope.resultDesc);
+    }
+    return envelope.data as T;
   },
 });
 
