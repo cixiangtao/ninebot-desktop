@@ -110,16 +110,43 @@ describe("candidate session client", () => {
     const transport: NinebotTransport = {
       send: async (request) => {
         signals.push(request.signal);
-        return { status: 500, headers: {}, body: new Uint8Array() };
+        return await new Promise<never>((_resolve, reject) => {
+          request.signal?.addEventListener("abort", () => reject(request.signal?.reason), {
+            once: true,
+          });
+        });
       },
     };
     const client = createNinebotCandidateSessionClient({ transport, platform: 2, session });
     const controller = new AbortController();
 
-    await expect(
-      client.status({ service: "ebike", serialNumber: "SN1234567890", signal: controller.signal }),
-    ).rejects.toThrow("Ninebot request failed with HTTP 500");
-    expect(signals).toEqual([controller.signal]);
+    const pending = client.status({
+      service: "ebike",
+      serialNumber: "SN1234567890",
+      signal: controller.signal,
+    });
+    controller.abort(new Error("caller cancelled"));
+
+    await expect(pending).rejects.toThrow("caller cancelled");
+    expect(signals).toHaveLength(1);
+    expect(signals[0]?.aborted).toBe(true);
+  });
+
+  it("cancels in-flight requests when the session is cleared", async () => {
+    const transport: NinebotTransport = {
+      send: async (request) =>
+        await new Promise<never>((_resolve, reject) => {
+          request.signal?.addEventListener("abort", () => reject(request.signal?.reason), {
+            once: true,
+          });
+        }),
+    };
+    const client = createNinebotCandidateSessionClient({ transport, platform: 2, session });
+    const pending = client.status({ service: "ebike", serialNumber: "SN1234567890" });
+
+    client.clear();
+
+    await expect(pending).rejects.toThrow("session client was cleared");
   });
 
   it("uses validated default origins through the fetch convenience factory", async () => {

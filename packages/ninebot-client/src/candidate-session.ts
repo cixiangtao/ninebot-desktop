@@ -167,6 +167,7 @@ export const createNinebotCandidateSessionClient = ({
   ...options
 }: CreateNinebotCandidateSessionClientOptions): NinebotCandidateSessionClient => {
   let activeSession: NinebotCandidateSessionFields | null = session;
+  const sessionAbortController = new AbortController();
   const sharedOptions = protocolOptions(options);
   const telemetry = createNinebotTelemetryCandidateClient(
     sharedOptions as CreateNinebotTelemetryCandidateClientOptions,
@@ -185,6 +186,10 @@ export const createNinebotCandidateSessionClient = ({
     if (activeSession === null) throw new Error("Ninebot candidate session client is closed");
     return activeSession;
   };
+  const requestSignal = (callerSignal: AbortSignal | undefined) =>
+    callerSignal === undefined
+      ? sessionAbortController.signal
+      : AbortSignal.any([sessionAbortController.signal, callerSignal]);
 
   const listVehicles = async ({
     service,
@@ -202,7 +207,7 @@ export const createNinebotCandidateSessionClient = ({
       service,
       fields,
       headers: withRequestId(headers),
-      ...(signal === undefined ? {} : { signal }),
+      signal: requestSignal(signal),
     });
   };
 
@@ -222,7 +227,7 @@ export const createNinebotCandidateSessionClient = ({
       service,
       fields,
       headers: withRequestId(headers),
-      ...(signal === undefined ? {} : { signal }),
+      signal: requestSignal(signal),
     });
   };
 
@@ -242,7 +247,7 @@ export const createNinebotCandidateSessionClient = ({
       service,
       fields,
       headers: withRequestId(headers),
-      ...(signal === undefined ? {} : { signal }),
+      signal: requestSignal(signal),
     });
   };
 
@@ -279,7 +284,7 @@ export const createNinebotCandidateSessionClient = ({
       fields,
       businessType: businessTypeFor(service),
       headers: withRequestId(headers),
-      ...(signal === undefined ? {} : { signal }),
+      signal: requestSignal(signal),
     });
   };
 
@@ -299,11 +304,12 @@ export const createNinebotCandidateSessionClient = ({
       fields,
       businessType: businessTypeFor(service),
       headers: withRequestId(headers),
-      ...(signal === undefined ? {} : { signal }),
+      signal: requestSignal(signal),
     });
   };
 
   const clear = () => {
+    sessionAbortController.abort(new Error("Ninebot candidate session client was cleared"));
     activeSession = null;
   };
 
