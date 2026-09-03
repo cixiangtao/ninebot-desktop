@@ -14,6 +14,7 @@
   "include": [
     "src/candidate-contracts.ts",
     "src/candidate-session-core.ts",
+    "src/auth.ts",
     "src/crypto-web.ts",
     "src/crypto-web-codec.ts",
     "src/transport-web.ts"

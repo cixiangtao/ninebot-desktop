@@ -69,6 +69,10 @@
       "types": "./dist/candidate-session-core.d.ts",
       "import": "./dist/candidate-session-core.js"
     },
+    "./auth": {
+      "types": "./dist/auth.d.ts",
+      "import": "./dist/auth.js"
+    },
     "./candidate-contracts": {
       "types": "./dist/candidate-contracts.d.ts",
       "import": "./dist/candidate-contracts.js"
