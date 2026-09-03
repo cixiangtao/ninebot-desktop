@@ -1,10 +1,9 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import {
-  createNinebotCandidateSessionClient,
+  createNinebotFetchCandidateSessionClient,
   type NinebotCandidateSessionFields,
 } from "@jiuhao/ninebot-client/candidate-session";
-import { createFetchNinebotTransport } from "@jiuhao/ninebot-client";
 import type { VehicleTelemetryReader } from "./vehicle-snapshot.js";
 
 export type CandidateService = "ebike" | "motor";
@@ -95,14 +94,8 @@ const readContext = async (configDirectory: string, serialNumber: string) => {
 };
 
 const createCandidateClient = (session: NinebotCandidateSessionFields): CandidateTelemetryClient =>
-  createNinebotCandidateSessionClient({
+  createNinebotFetchCandidateSessionClient({
     session,
-    transport: createFetchNinebotTransport({
-      origins: {
-        ebike: "https://ebike.ninebot.com",
-        motor: "https://steeldust.ninebot.com",
-      },
-    }),
     platform: 2,
   });
 

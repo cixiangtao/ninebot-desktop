@@ -1,10 +1,9 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import {
-  createNinebotCandidateSessionClient,
+  createNinebotFetchCandidateSessionClient,
   type NinebotCandidateSessionFields,
 } from "@jiuhao/ninebot-client/candidate-session";
-import { createFetchNinebotTransport } from "@jiuhao/ninebot-client";
 import type { NineCliClient } from "./ninecli.js";
 
 export type CandidateVehicleService = "ebike" | "motor";
@@ -63,15 +62,8 @@ const readService = (row: VehicleRow): CandidateVehicleService | null => {
 };
 
 const createCandidateClient = (session: NinebotCandidateSessionFields): CandidateVehicleClient =>
-  createNinebotCandidateSessionClient({
+  createNinebotFetchCandidateSessionClient({
     session,
-    transport: createFetchNinebotTransport({
-      origins: {
-        ebike: "https://ebike.ninebot.com",
-        motor: "https://steeldust.ninebot.com",
-        travel: "https://cn-cbu-gateway.ninebot.com",
-      },
-    }),
     platform: 2,
   });
 
