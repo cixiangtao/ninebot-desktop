@@ -56,6 +56,8 @@ describe("candidate travel source", () => {
         calls.push({ kind: "month", month: fields.month, businessType });
         expect(fields.vehicle_type).toBe("14363");
         expect(fields.access_token).toBe("token");
+        expect(fields.rnVersion).toBe("743");
+        expect(fields.serviceTime).toBeGreaterThan(1_000_000_000_000);
         expect(fields.nonce).toMatch(/^[0-9a-f]{32}$/);
         return { data: { month: fields.month, list: [] } };
       },

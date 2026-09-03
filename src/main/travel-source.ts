@@ -108,10 +108,11 @@ const readContext = async (configDirectory: string, serialNumber: string) => {
       access_token: accessToken,
       uid: businessUid,
       wnumber: serialNumber,
-      rnVersion: "3.0",
+      // Observed in the ninecli 0.1.7 travel request header (`rn-ver: 743`).
+      rnVersion: "743",
       vehicle_type: vehicleType,
       current_version: "610063322",
-      serviceTime: Math.floor(Date.now() / 1000),
+      serviceTime: Date.now(),
       nonce: generateNinebotNonce(),
     },
   } satisfies CandidateTravelContext;
@@ -130,7 +131,7 @@ const businessTypeFor = (service: CandidateTravelService): "1" | "2" =>
 
 const requestBaseFields = (context: CandidateTravelContext): TravelCandidateHeaderFields => ({
   ...context.fields,
-  serviceTime: Math.floor(Date.now() / 1000),
+  serviceTime: Date.now(),
   nonce: generateNinebotNonce(),
 });
 
