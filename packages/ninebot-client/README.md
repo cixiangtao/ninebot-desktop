@@ -21,11 +21,9 @@ The package is currently private (`0.0.0`) and is not an official Ninebot SDK.
 The `auth` entry now provides a platform-neutral `NinebotAuthSessionManager`,
 an async session-store contract, and an injected auth-provider contract. The
 manager handles login-result replacement, persistence, expiry-aware refresh,
-logout cleanup, and defensive session copies without retaining passwords. It
-does not yet implement the Ninebot wire-level login/signature provider, so it
-is a lifecycle boundary rather than a drop-in login replacement. Vehicle
-control remains out of scope. Callers must keep credentials out of source
-control and logs.
+logout cleanup, and defensive session copies without retaining passwords.
+Vehicle control remains out of scope. Callers must keep credentials out of
+source control and logs.
 
 `createNinebotPassportAuthProvider` adapts the Passport login client to this
 shared lifecycle. Password login, `whoami`, token refresh, and local logout can
@@ -40,10 +38,11 @@ import { NinebotAuthSessionManager } from "@jiuhao/ninebot-client/auth";
 ```
 
 The Passport client also exposes the verified password-login, refresh, and
-`whoami` request boundaries. Each requires a runtime-supplied signer; the
-`whoami` call additionally requires an authorization-header factory. This
-package does not claim that the sign algorithm is solved until it passes an
-upstream parity check.
+`whoami` request boundaries. The Node entry exports
+`createNinebotPassportSigner`, which reconstructs the sorted raw query
+canonical string and SHA-256 signature observed in ninecli 0.1.7. The
+`whoami` call defaults to a `Bearer` authorization header, while hosts may
+still inject a signer when testing a protocol version change.
 
 ## Build
 

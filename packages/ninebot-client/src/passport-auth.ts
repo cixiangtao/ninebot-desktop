@@ -14,6 +14,11 @@ export interface PassportSigningInput {
   path: "/v6/user/login";
   timestamp: string;
   clientId: string;
+  clientKey: string;
+  appVersion: string;
+  os: string;
+  osLanguage: string;
+  osVersion: string;
   body: Uint8Array;
 }
 
@@ -24,6 +29,11 @@ export interface PassportRefreshSigningInput {
   path: "/v3/user/refresh";
   timestamp: string;
   clientId: string;
+  clientKey: string;
+  appVersion: string;
+  os: string;
+  osLanguage: string;
+  osVersion: string;
   body: Uint8Array;
 }
 
@@ -36,6 +46,11 @@ export interface PassportWhoamiSigningInput {
   path: "/v5/user";
   timestamp: string;
   clientId: string;
+  clientKey: string;
+  appVersion: string;
+  os: string;
+  osLanguage: string;
+  osVersion: string;
   body: Uint8Array;
 }
 
@@ -48,6 +63,7 @@ export interface BuildPasswordLoginRequestOptions {
   username: string;
   password: string;
   clientId?: string;
+  clientKey?: string;
   appVersion?: string;
   os?: string;
   osLanguage?: string;
@@ -62,6 +78,7 @@ export interface BuildRefreshRequestOptions {
   accessToken: string;
   refreshToken: string;
   clientId?: string;
+  clientKey?: string;
   appVersion?: string;
   os?: string;
   osLanguage?: string;
@@ -75,6 +92,7 @@ export interface BuildRefreshRequestOptions {
 export interface BuildPassportWhoamiRequestOptions {
   authorization: string;
   clientId?: string;
+  clientKey?: string;
   appVersion?: string;
   os?: string;
   osLanguage?: string;
@@ -87,12 +105,69 @@ export interface BuildPassportWhoamiRequestOptions {
 const loginPath = "/v6/user/login" as const;
 const textEncoder = new TextEncoder();
 
+/** Static Passport client key observed in ninecli 0.1.7. */
+export const defaultPassportClientKey = "e177176a-3b3e-1513-e26e-d1123034cb66";
+
+/**
+ * Builds the ordered query-string canonical form used by PassportSign.
+ *
+ * ninecli sorts all primitive fields by bytewise key order, then joins raw
+ * values with `&`; values are not URL-encoded before hashing.
+ */
+export const buildPassportCanonicalString = ({
+  path,
+  timestamp,
+  clientKey,
+  appVersion,
+  os,
+  osLanguage,
+  osVersion,
+  body,
+}: {
+  path:
+    | PassportSigningInput["path"]
+    | PassportRefreshSigningInput["path"]
+    | PassportWhoamiSigningInput["path"];
+  timestamp: string;
+  clientKey: string;
+  appVersion: string;
+  os: string;
+  osLanguage: string;
+  osVersion: string;
+  body: Uint8Array;
+}) => {
+  const decoded = JSON.parse(new TextDecoder().decode(body)) as unknown;
+  if (!decoded || typeof decoded !== "object" || Array.isArray(decoded)) {
+    throw new Error("Ninebot Passport signing body must be a JSON object");
+  }
+  const fields: Record<string, string> = {
+    app_version: appVersion,
+    clientKey,
+    os,
+    os_language: osLanguage,
+    os_version: osVersion,
+    timestamp,
+    url: path,
+  };
+  for (const [key, value] of Object.entries(decoded)) {
+    if (typeof value !== "string" && typeof value !== "number" && typeof value !== "boolean") {
+      throw new Error(`Ninebot Passport signing field ${key} is not primitive`);
+    }
+    fields[key] = String(value);
+  }
+  return Object.keys(fields)
+    .toSorted()
+    .map((key) => `${key}=${fields[key]}`)
+    .join("&");
+};
+
 /** Builds the verified password-login request shape observed from ninecli. */
 export const buildPasswordLoginRequest = async ({
   areaCode,
   username,
   password,
   clientId = "vehicle_app_prod",
+  clientKey = defaultPassportClientKey,
   appVersion = "610063322",
   os = "Android",
   osLanguage = "zh-hans-cn",
@@ -109,6 +184,11 @@ export const buildPasswordLoginRequest = async ({
     path: loginPath,
     timestamp,
     clientId,
+    clientKey,
+    appVersion,
+    os,
+    osLanguage,
+    osVersion,
     body: body.slice(),
   });
   return {
@@ -136,6 +216,7 @@ export const buildRefreshRequest = async ({
   accessToken,
   refreshToken,
   clientId = "vehicle_app_prod",
+  clientKey = defaultPassportClientKey,
   appVersion = "610063322",
   os = "Android",
   osLanguage = "zh-hans-cn",
@@ -152,6 +233,11 @@ export const buildRefreshRequest = async ({
     path: "/v3/user/refresh",
     timestamp,
     clientId,
+    clientKey,
+    appVersion,
+    os,
+    osLanguage,
+    osVersion,
     body: body.slice(),
   });
   return {
@@ -178,6 +264,7 @@ export const buildRefreshRequest = async ({
 export const buildWhoamiPassportRequest = async ({
   authorization,
   clientId = "vehicle_app_prod",
+  clientKey = defaultPassportClientKey,
   appVersion = "610063322",
   os = "Android",
   osLanguage = "zh-hans-cn",
@@ -193,6 +280,11 @@ export const buildWhoamiPassportRequest = async ({
     path: "/v5/user",
     timestamp,
     clientId,
+    clientKey,
+    appVersion,
+    os,
+    osLanguage,
+    osVersion,
     body: body.slice(),
   });
   return {

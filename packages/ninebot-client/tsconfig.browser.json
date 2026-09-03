@@ -16,6 +16,7 @@
     "src/candidate-session-core.ts",
     "src/auth.ts",
     "src/passport-auth.ts",
+    "src/passport-signer.ts",
     "src/passport-login-client.ts",
     "src/crypto-web.ts",
     "src/crypto-web-codec.ts",

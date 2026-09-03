@@ -112,9 +112,9 @@ pnpm protocol:record -- --include-bodies --include-signing-headers
 - Header 延续 `clientid`、`app_version`、系统信息、13 位毫秒 `timestamp` 和 64 字符十六进制 `sign`。
 - ninecli 读取响应 `data.access_token`、`data.refresh_token`、`data.business_uid`，并把 `accessTokenValidity` 一并保存到本地 token 文件。
 
-该采集只证明 ninecli 的请求/响应形状和本地解析边界，不证明 stub 返回值能通过九号服务端认证；TypeScript 已提供 `buildPasswordLoginRequest` 与 token 字段解析器，签名仍通过显式 provider 注入。
+该采集只证明 ninecli 的请求/响应形状和本地解析边界，不证明 stub 返回值能通过九号服务端认证；TypeScript 已提供 `buildPasswordLoginRequest` 与 token 字段解析器。
 
-2026-09-03 对随应用分发的 arm64 ninecli 0.1.7 做了本地静态分析：Go 符号恢复得到 `internal/crypto.PassportCanonicalString`、`PassportSign` 和 `EncodeOrderedJSON` 三个函数边界；`PassportSign` 调用标准库 `crypto/sha256.Sum256`，再把 32 字节摘要编码成 64 位小写十六进制字符串。`PassportCanonicalString` 会组装包含 `clientKey`、`url`、`timestamp` 以及请求映射字段的有序 JSON，`EncodeOrderedJSON` 负责稳定键顺序。该证据解释了登录 Header 中 64 字符 `sign` 的长度和大小写，但尚未安全确认完整映射字段、值类型、固定 `clientKey` 来源或服务端 canonical 规则；TypeScript 不会据此猜测签名，仍要求请求/响应 parity 证据后才可移除 signer 注入边界。
+2026-09-03 对随应用分发的 arm64 ninecli 0.1.7 做了本地静态分析和动态断点：Go 符号恢复得到 `internal/crypto.PassportCanonicalString`、`PassportSign` 和 `EncodeOrderedJSON` 三个函数边界；`PassportSign` 调用标准库 `crypto/sha256.Sum256`，再把 32 字节摘要编码成 64 位小写十六进制字符串。动态返回值确认 canonical 是按字节序排序的原始查询字符串，字段包括 `app_version`、请求体原始字段、固定 `clientKey=e177176a-3b3e-1513-e26e-d1123034cb66`、系统字段、13 位毫秒 `timestamp` 和 `url`，以 `&` 连接且不做 URL 编码。Node 已实现 `buildPassportCanonicalString` 与 `createNinebotPassportSigner`，并用私有捕获的登录样本复算出相同的 `sign`；该实现仍保留显式 signer 覆盖点以支持版本差分。
 
 同日通过 ninecli 的本地 `serve` 暴露的 `/auth/refresh` 流程触发 refresh 请求，并将 Passport 上游指向本机 stub，确认：
 
@@ -122,7 +122,7 @@ pnpm protocol:record -- --include-bodies --include-signing-headers
 - 请求体字段和序列化顺序为 `accessToken`、`device`、`refreshToken`，设备值为 `ANDROID`。
 - 响应仍使用 `resultCode`、`resultDesc`、`data` 包装；refresh 返回可以省略 `business_uid`，调用方应沿用当前会话的业务 UID。
 
-该请求同样携带 13 位毫秒 `timestamp` 与 64 字符十六进制 `sign`。TypeScript 已提供 `buildRefreshRequest`、`parsePassportRefreshSession` 和 Passport client 的 `refresh()`；refresh signer 仍是显式注入点，尚未声称签名算法已经破解。
+该请求同样携带 13 位毫秒 `timestamp` 与 64 字符十六进制 `sign`。TypeScript 已提供 `buildRefreshRequest`、`parsePassportRefreshSession` 和 Passport client 的 `refresh()`；Node Passport client 默认使用已验证的 SHA-256 signer，同时保留显式覆盖点。
 
 ## 车辆列表首条观察
 

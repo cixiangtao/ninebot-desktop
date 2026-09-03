@@ -158,6 +158,7 @@ export type {
 } from "./vehicle-cache-node.ts";
 export {
   buildPasswordLoginRequest,
+  buildPassportCanonicalString,
   buildRefreshRequest,
   buildWhoamiPassportRequest,
   parsePassportLoginSession,
@@ -174,7 +175,10 @@ export type {
   PassportSigningInput,
   PassportWhoamiRequestSigner,
   PassportWhoamiSigningInput,
+  defaultPassportClientKey,
 } from "./passport-auth.ts";
+export { createNinebotPassportSigner, signNinebotPassportRequest } from "./passport-signer-node.ts";
+export { createNinebotPassportWebSigner } from "./passport-signer.ts";
 export {
   createNinebotPassportLoginClient,
   PassportLoginBusinessError,
