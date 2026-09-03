@@ -95,6 +95,7 @@ for (const requiredFile of [
   "/package.json",
   "/THIRD_PARTY_NOTICES.md",
   "/out/main/index.js",
+  "/node_modules/@jiuhao/ninebot-client/dist/candidate-session.js",
   "/out/preload/index.cjs",
   "/out/renderer/index.html",
   "/out/renderer/recovery.html",
