@@ -33,6 +33,10 @@
       "types": "./dist/crypto-web-codec.d.ts",
       "import": "./dist/crypto-web-codec.js"
     },
+    "./transport-web": {
+      "types": "./dist/transport-web.d.ts",
+      "import": "./dist/transport-web.js"
+    },
     "./crypto-codec": {
       "types": "./dist/crypto-codec.d.ts",
       "import": "./dist/crypto-codec.js"
