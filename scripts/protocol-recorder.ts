@@ -4,7 +4,7 @@ import {
   defaultNinebotServiceEndpoints,
   startProtocolRecorder,
   type NinebotServiceName,
-} from "../packages/ninebot-client/src/protocol-lab.ts";
+} from "@jiuhao/ninebot-client/protocol-lab";
 
 const projectRoot = resolve(import.meta.dirname, "..");
 const privateCaptureRoot = resolve(projectRoot, ".ninebot-private/protocol-captures");

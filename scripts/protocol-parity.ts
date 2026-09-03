@@ -2,10 +2,12 @@ import { execFile } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import { basename, join, resolve } from "node:path";
 import { promisify } from "node:util";
-import { createNinebotCandidateSessionClient } from "../packages/ninebot-client/src/candidate-session.ts";
-import { compareNinebotPayloads } from "../packages/ninebot-client/src/parity-node.ts";
-import { NinebotTelemetryBusinessError } from "../packages/ninebot-client/src/telemetry-node.ts";
-import { createFetchNinebotTransport } from "../packages/ninebot-client/src/transport.ts";
+import {
+  compareNinebotPayloads,
+  createFetchNinebotTransport,
+  createNinebotCandidateSessionClient,
+  NinebotTelemetryBusinessError,
+} from "@jiuhao/ninebot-client";
 
 const execFileAsync = promisify(execFile);
 const projectRoot = resolve(import.meta.dirname, "..");
