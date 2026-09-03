@@ -114,6 +114,14 @@ pnpm protocol:record -- --include-bodies --include-signing-headers
 
 该采集只证明 ninecli 的请求/响应形状和本地解析边界，不证明 stub 返回值能通过九号服务端认证；TypeScript 已提供 `buildPasswordLoginRequest` 与 token 字段解析器，签名仍通过显式 provider 注入。
 
+同日通过 ninecli 的本地 `serve` 暴露的 `/auth/refresh` 流程触发 refresh 请求，并将 Passport 上游指向本机 stub，确认：
+
+- HTTP 方法与路径为 `POST /v3/user/refresh`。
+- 请求体字段和序列化顺序为 `accessToken`、`device`、`refreshToken`，设备值为 `ANDROID`。
+- 响应仍使用 `resultCode`、`resultDesc`、`data` 包装；refresh 返回可以省略 `business_uid`，调用方应沿用当前会话的业务 UID。
+
+该请求同样携带 13 位毫秒 `timestamp` 与 64 字符十六进制 `sign`。TypeScript 已提供 `buildRefreshRequest`、`parsePassportRefreshSession` 和 Passport client 的 `refresh()`；refresh signer 仍是显式注入点，尚未声称签名算法已经破解。
+
 ## 车辆列表首条观察
 
 2026-09-02 使用同一会话运行 `vehicles` 时，记录到 `motor` 服务请求 `POST /vehicle/binding/my-vehicle`。请求包含 `uid`、设备与平台信息等 Header，请求体为 2400 字节的封装数据；本次代理没有拿到可用的上游响应状态，因此尚不能确认响应包装或字段契约。该请求体和 Header 值均未进入仓库。下一步会在私有原始模式下重复采集，并先判断封装/加密边界，再决定是复用通用解码器还是单独建模。
