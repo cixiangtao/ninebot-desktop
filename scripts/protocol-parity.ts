@@ -1,16 +1,24 @@
 import { execFile } from "node:child_process";
-import { readFile } from "node:fs/promises";
 import { basename, join, resolve } from "node:path";
 import { promisify } from "node:util";
 import {
   compareNinebotPayloads,
   createFetchNinebotTransport,
   createNinebotCandidateSessionClient,
+  createFileNinebotAuthSessionStore,
+  createFileNinebotDeviceContextStore,
+  createFileNinebotVehicleCacheStore,
   NinebotTelemetryBusinessError,
 } from "@jiuhao/ninebot-client";
 
 const execFileAsync = promisify(execFile);
 const projectRoot = resolve(import.meta.dirname, "..");
+
+interface CachedVehicle {
+  wnumber?: unknown;
+  business_line?: unknown;
+  vehicle_type?: unknown;
+}
 
 const printUsage = () => {
   console.log(`Usage: NINEBOT_CONFIG_DIR=<authenticated-config> pnpm protocol:parity -- [options]
@@ -95,9 +103,9 @@ if (allVehicles && argumentsList.some((argument) => argument.startsWith("--vehic
 }
 
 if (allVehicles) {
-  const cachedVehicles = await readFile(join(configDirectory, "vehicles.json"), "utf8").then(
-    JSON.parse,
-  );
+  const cachedVehicles = await createFileNinebotVehicleCacheStore({
+    directory: configDirectory,
+  }).load();
   const vehicleCount =
     cachedVehicles !== null &&
     typeof cachedVehicles === "object" &&
@@ -159,38 +167,45 @@ if (allVehicles) {
   process.exit();
 }
 
-const [config, tokens, vehicleCache] = await Promise.all([
-  readFile(join(configDirectory, "config.json"), "utf8").then(JSON.parse),
-  readFile(join(configDirectory, "tokens.json"), "utf8").then(JSON.parse),
-  readFile(join(configDirectory, "vehicles.json"), "utf8").then(JSON.parse),
+const [deviceContext, authSession, vehicleCache] = await Promise.all([
+  createFileNinebotDeviceContextStore({ directory: configDirectory }).load(),
+  createFileNinebotAuthSessionStore({ directory: configDirectory }).load(),
+  createFileNinebotVehicleCacheStore({ directory: configDirectory }).load(),
 ]);
-const vehicle = vehicleCache.vehicles?.[vehicleIndex];
+if (authSession === null) throw new Error("Authenticated SDK session is unavailable");
+if (
+  vehicleCache === null ||
+  typeof vehicleCache !== "object" ||
+  Array.isArray(vehicleCache) ||
+  !Array.isArray((vehicleCache as { vehicles?: unknown }).vehicles)
+) {
+  throw new Error("SDK vehicle cache is unavailable");
+}
+const cachedRows = (vehicleCache as { vehicles: CachedVehicle[] }).vehicles;
+const vehicle = cachedRows[vehicleIndex];
 if (!vehicle || typeof vehicle.wnumber !== "string" || vehicle.wnumber.length === 0) {
   throw new Error(`No cached vehicle at index ${vehicleIndex}`);
 }
+const serialNumber = vehicle.wnumber;
 const service = requestedService ?? vehicle.business_line;
 if (service !== "ebike" && service !== "motor") {
   throw new Error(
     "Cached vehicle business_line must be ebike or motor; pass --service to override",
   );
 }
-if (typeof tokens.access_token !== "string" || typeof tokens.business_uid !== "string") {
-  throw new Error("Authenticated ninecli tokens are incomplete");
-}
-
 const session = {
   sys_language: "zh-hans-cn",
   client_ver: "610063322",
-  device_id: config.device_id,
-  regionx: config.region,
+  device_id: deviceContext.deviceId,
+  regionx: deviceContext.region,
   language: "zh",
   ostype: "and",
   lang: "zh",
-  platform_ver: `${config.os_version} ${config.os_model}`,
+  platform_ver: `${deviceContext.osVersion} ${deviceContext.osModel}`,
   platform: "android",
   login_country: "CN",
-  access_token: tokens.access_token,
-  uid: tokens.business_uid,
+  access_token: authSession.accessToken,
+  uid: authSession.businessUid,
 };
 const candidate = createNinebotCandidateSessionClient({
   transport: createFetchNinebotTransport({
@@ -213,7 +228,7 @@ const runOracle = async (
   command: "status" | "battery" | "travel" | "vehicles",
   args: string[] = [],
 ) => {
-  const commandArgs = command === "vehicles" ? args : [vehicle.wnumber, ...args];
+  const commandArgs = command === "vehicles" ? args : [serialNumber, ...args];
   const result = await execFileAsync(
     ninecliBinary,
     ["--config", configDirectory, "--json", command, ...commandArgs],
@@ -229,8 +244,8 @@ const vehicleType = (payload: unknown) => {
       item !== null &&
       typeof item === "object" &&
       !Array.isArray(item) &&
-      ((item as Record<string, unknown>).wnumber === vehicle.wnumber ||
-        (item as Record<string, unknown>).sn === vehicle.wnumber),
+      ((item as Record<string, unknown>).wnumber === serialNumber ||
+        (item as Record<string, unknown>).sn === serialNumber),
   );
   const value = row?.vehicle_type;
   if ((typeof value !== "string" && typeof value !== "number") || String(value).length === 0) {
