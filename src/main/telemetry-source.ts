@@ -1,6 +1,5 @@
-import { readFile } from "node:fs/promises";
-import { join } from "node:path";
 import type { NinebotCandidateSessionFields } from "@jiuhao/ninebot-client/candidate-session";
+import { readCandidateSession, readCandidateVehicles } from "./candidate-context.js";
 import { createCandidateSessionClient } from "./candidate-client.js";
 import type { VehicleTelemetryReader } from "./vehicle-snapshot.js";
 
@@ -9,18 +8,6 @@ export type CandidateService = "ebike" | "motor";
 export interface CandidateTelemetryClient {
   status(options: { service: CandidateService; serialNumber: string }): Promise<unknown>;
   battery(options: { service: CandidateService; serialNumber: string }): Promise<unknown>;
-}
-
-interface CandidateConfig {
-  device_id: string;
-  region: string;
-  os_version: string;
-  os_model: string;
-}
-
-interface CandidateTokens {
-  access_token: string;
-  business_uid: string;
 }
 
 interface CachedVehicle {
@@ -40,54 +27,23 @@ interface CandidateContext {
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === "object" && !Array.isArray(value);
 
-const readJson = async (path: string): Promise<unknown> => JSON.parse(await readFile(path, "utf8"));
-
-const requireString = (value: unknown, label: string) => {
-  if (typeof value !== "string" || value.length === 0) {
-    throw new Error(`Ninebot ${label} is incomplete`);
-  }
-  return value;
-};
-
 const readContext = async (configDirectory: string, serialNumber: string) => {
-  const [configValue, tokensValue, vehiclesValue] = await Promise.all([
-    readJson(join(configDirectory, "config.json")),
-    readJson(join(configDirectory, "tokens.json")),
-    readJson(join(configDirectory, "vehicles.json")),
+  const [session, vehiclesValue] = await Promise.all([
+    readCandidateSession(configDirectory),
+    readCandidateVehicles(configDirectory),
   ]);
-  if (!isRecord(configValue) || !isRecord(tokensValue) || !isRecord(vehiclesValue)) {
+  if (!isRecord(vehiclesValue)) {
     throw new Error("Ninebot candidate session files are invalid");
   }
-  const config = configValue as Partial<CandidateConfig>;
-  const tokens = tokensValue as Partial<CandidateTokens>;
   const vehicles = vehiclesValue as CachedVehicles;
   const vehicle = vehicles.vehicles?.find((item) => item.wnumber === serialNumber);
   const service = vehicle?.business_line;
   if (service !== "ebike" && service !== "motor") {
     throw new Error("Ninebot candidate vehicle service is unavailable");
   }
-  const deviceId = requireString(config.device_id, "candidate device_id");
-  const region = requireString(config.region, "candidate region");
-  const osVersion = requireString(config.os_version, "candidate os_version");
-  const osModel = requireString(config.os_model, "candidate os_model");
-  const accessToken = requireString(tokens.access_token, "candidate access_token");
-  const businessUid = requireString(tokens.business_uid, "candidate business_uid");
   return {
     service,
-    session: {
-      sys_language: "zh-hans-cn",
-      client_ver: "610063322",
-      device_id: deviceId,
-      regionx: region,
-      language: "zh",
-      ostype: "and",
-      lang: "zh",
-      platform_ver: `${osVersion} ${osModel}`,
-      platform: "android",
-      login_country: "CN",
-      access_token: accessToken,
-      uid: businessUid,
-    },
+    session,
   } satisfies CandidateContext;
 };
 

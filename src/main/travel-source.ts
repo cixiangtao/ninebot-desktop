@@ -1,6 +1,5 @@
-import { readFile } from "node:fs/promises";
-import { join } from "node:path";
 import type { NinebotCandidateSessionFields } from "@jiuhao/ninebot-client/candidate-session";
+import { readCandidateSession, readCandidateVehicles } from "./candidate-context.js";
 import { createCandidateSessionClient } from "./candidate-client.js";
 import type { NineCliClient } from "./ninecli.js";
 
@@ -24,18 +23,6 @@ export interface CandidateTravelClient {
     vehicleType: string;
     travelId: string;
   }): Promise<unknown>;
-}
-
-interface CandidateConfig {
-  device_id: string;
-  region: string;
-  os_version: string;
-  os_model: string;
-}
-
-interface CandidateTokens {
-  access_token: string;
-  business_uid: string;
 }
 
 interface CachedVehicle {
@@ -62,8 +49,6 @@ type LegacyTravelClient = Pick<NineCliClient, "rides" | "rideDetail"> & {
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === "object" && !Array.isArray(value);
-
-const readJson = async (path: string): Promise<unknown> => JSON.parse(await readFile(path, "utf8"));
 
 const requireText = (value: unknown, label: string) => {
   if ((typeof value !== "string" && typeof value !== "number") || String(value).length === 0) {
@@ -94,16 +79,13 @@ const readContext = async (
   serialNumber: string,
   loadLegacyVehicles?: () => Promise<unknown>,
 ) => {
-  const [configValue, tokensValue, vehiclesValue] = await Promise.all([
-    readJson(join(configDirectory, "config.json")),
-    readJson(join(configDirectory, "tokens.json")),
-    readJson(join(configDirectory, "vehicles.json")),
+  const [session, vehiclesValue] = await Promise.all([
+    readCandidateSession(configDirectory),
+    readCandidateVehicles(configDirectory),
   ]);
-  if (!isRecord(configValue) || !isRecord(tokensValue) || !isRecord(vehiclesValue)) {
+  if (!isRecord(vehiclesValue)) {
     throw new Error("Ninebot candidate travel session files are invalid");
   }
-  const config = configValue as Partial<CandidateConfig>;
-  const tokens = tokensValue as Partial<CandidateTokens>;
   const vehicles = vehiclesValue as CachedVehicles;
   const cachedVehicle = vehicles.vehicles?.find((item) => item.wnumber === serialNumber);
   let legacyVehicle: Record<string, unknown> | null = null;
@@ -126,29 +108,10 @@ const readContext = async (
     vehicle?.vehicle_type ?? legacyVehicle?.vehicle_type,
     "candidate travel vehicle_type",
   );
-  const deviceId = requireText(config.device_id, "candidate device_id");
-  const region = requireText(config.region, "candidate region");
-  const osVersion = requireText(config.os_version, "candidate os_version");
-  const osModel = requireText(config.os_model, "candidate os_model");
-  const accessToken = requireText(tokens.access_token, "candidate access_token");
-  const businessUid = requireText(tokens.business_uid, "candidate business_uid");
   return {
     service,
     vehicleType,
-    session: {
-      sys_language: "zh-hans-cn",
-      client_ver: "610063322",
-      device_id: deviceId,
-      regionx: region,
-      language: "zh",
-      ostype: "and",
-      lang: "zh",
-      platform_ver: `${osVersion} ${osModel}`,
-      platform: "android",
-      login_country: "CN",
-      access_token: accessToken,
-      uid: businessUid,
-    },
+    session,
   } satisfies CandidateTravelContext;
 };
 

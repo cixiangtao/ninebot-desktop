@@ -1,6 +1,5 @@
-import { readFile } from "node:fs/promises";
-import { join } from "node:path";
 import type { NinebotCandidateSessionFields } from "@jiuhao/ninebot-client/candidate-session";
+import { readCandidateSession, readCandidateVehicles } from "./candidate-context.js";
 import { createCandidateSessionClient } from "./candidate-client.js";
 import type { NineCliClient } from "./ninecli.js";
 
@@ -17,18 +16,6 @@ export interface CandidateVehicleClient {
   }): Promise<{ data: unknown }>;
 }
 
-interface CandidateConfig {
-  device_id: string;
-  region: string;
-  os_version: string;
-  os_model: string;
-}
-
-interface CandidateTokens {
-  access_token: string;
-  business_uid: string;
-}
-
 interface VehicleRow {
   wnumber?: unknown;
   businessType?: unknown;
@@ -42,8 +29,6 @@ interface CachedVehicles {
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === "object" && !Array.isArray(value);
-
-const readJson = async (path: string): Promise<unknown> => JSON.parse(await readFile(path, "utf8"));
 
 const requireText = (value: unknown, label: string) => {
   if ((typeof value !== "string" && typeof value !== "number") || String(value).length === 0) {
@@ -59,24 +44,6 @@ const readService = (row: VehicleRow): CandidateVehicleService | null => {
   return null;
 };
 
-const buildSession = (
-  config: Partial<CandidateConfig>,
-  tokens: Partial<CandidateTokens>,
-): NinebotCandidateSessionFields => ({
-  sys_language: "zh-hans-cn",
-  client_ver: "610063322",
-  device_id: requireText(config.device_id, "candidate device_id"),
-  regionx: requireText(config.region, "candidate region"),
-  language: "zh",
-  ostype: "and",
-  lang: "zh",
-  platform_ver: `${requireText(config.os_version, "candidate os_version")} ${requireText(config.os_model, "candidate os_model")}`,
-  platform: "android",
-  login_country: "CN",
-  access_token: requireText(tokens.access_token, "candidate access_token"),
-  uid: requireText(tokens.business_uid, "candidate business_uid"),
-});
-
 /** Creates an opt-in vehicle reader; candidate service failures fall back atomically. */
 export const createCandidateVehicleReader = ({
   legacy,
@@ -89,18 +56,12 @@ export const createCandidateVehicleReader = ({
 }): VehicleReader => ({
   async vehicles() {
     try {
-      const [configValue, tokensValue, cachedVehiclesValue] = await Promise.all([
-        readJson(join(configDirectory, "config.json")),
-        readJson(join(configDirectory, "tokens.json")),
-        readJson(join(configDirectory, "vehicles.json")),
+      const [session, cachedVehiclesValue] = await Promise.all([
+        readCandidateSession(configDirectory),
+        readCandidateVehicles(configDirectory),
       ]);
-      if (!isRecord(configValue) || !isRecord(tokensValue) || !isRecord(cachedVehiclesValue)) {
-        throw new Error("Ninebot candidate vehicle session is invalid");
-      }
-      const session = buildSession(
-        configValue as Partial<CandidateConfig>,
-        tokensValue as Partial<CandidateTokens>,
-      );
+      if (!isRecord(cachedVehiclesValue))
+        throw new Error("Ninebot candidate vehicle cache is invalid");
       const candidateClient = candidateClientFactory(session);
       const cachedVehicleRows = (cachedVehiclesValue as CachedVehicles).vehicles;
       const cachedRows = Array.isArray(cachedVehicleRows)
