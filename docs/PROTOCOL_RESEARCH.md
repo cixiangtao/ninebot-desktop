@@ -198,6 +198,8 @@ Node 子路径另外提供 `decodeVehicleListResponseCandidateWithCodec`，将�
 
 仓库同时提供 `pnpm protocol:parity -- --rounds=3`，从 `NINEBOT_CONFIG_DIR` 读取本机已有 ninecli 会话，连续运行 oracle 与 Node telemetry/travel 候选，并只输出 parity 元数据。脚本支持 `--vehicle-index`、`--all-vehicles`、`--service` 和 `--month`；其中 `--all-vehicles` 会按缓存顺序逐车执行完整套件，适合新账号或多车型会话。脚本不会打印车辆序列号、令牌、坐标、Header 值或响应正文；只要任一轮请求失败或出现差异，进程就以退出码 1 结束。
 
+parity 脚本现在直接调用 SDK 的 `createNinebotCandidateSessionClient`，而不是在脚本内重复拼装 telemetry、车辆列表和 travel 客户端；因此真实账号门禁同时覆盖公共 SDK 的会话字段、车型映射和五类请求入口。
+
 Electron 现支持显式设置 `NINEBOT_TELEMETRY_SOURCE=candidate` 来试用 Node telemetry 候选；候选读取本地 ninecli 会话并在 status/battery 任一失败时自动回退内置 ninecli。未设置该变量时行为完全不变，仍由 ninecli 提供实时状态和电池数据。该开关用于迁移期验证，不代表已经切换默认数据源。
 
 候选源在主进程内按请求重新读取会话文件，因此登录、刷新和退出后不会复用旧令牌；候选或会话读取异常会分别回退对应的 ninecli 读取，不影响另一个 telemetry 域。该回退行为通过不访问真实账号的单元测试覆盖。

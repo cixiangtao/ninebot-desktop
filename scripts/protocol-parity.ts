@@ -2,23 +2,9 @@ import { execFile } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import { basename, join, resolve } from "node:path";
 import { promisify } from "node:util";
+import { createNinebotCandidateSessionClient } from "../packages/ninebot-client/src/candidate-session.ts";
 import { compareNinebotPayloads } from "../packages/ninebot-client/src/parity-node.ts";
-import { generateNinebotNonce } from "../packages/ninebot-client/src/crypto-node.ts";
-import {
-  buildVehicleBatteryFields,
-  buildVehicleStatusFields,
-  createNinebotTelemetryCandidateClient,
-  NinebotTelemetryBusinessError,
-} from "../packages/ninebot-client/src/telemetry-node.ts";
-import {
-  createNinebotTravelCandidateClient,
-  type TravelDetailPlaintextFields,
-  type TravelMonthPlaintextFields,
-} from "../packages/ninebot-client/src/travel-node.ts";
-import {
-  createNinebotVehicleCandidateClient,
-  type VehicleListPlaintextFields,
-} from "../packages/ninebot-client/src/vehicle-node.ts";
+import { NinebotTelemetryBusinessError } from "../packages/ninebot-client/src/telemetry-node.ts";
 import { createFetchNinebotTransport } from "../packages/ninebot-client/src/transport.ts";
 
 const execFileAsync = promisify(execFile);
@@ -204,28 +190,16 @@ const session = {
   access_token: tokens.access_token,
   uid: tokens.business_uid,
 };
-const origins =
-  service === "ebike"
-    ? { ebike: "https://ebike.ninebot.com" }
-    : { motor: "https://steeldust.ninebot.com" };
-const candidate = createNinebotTelemetryCandidateClient({
-  transport: createFetchNinebotTransport({ origins }),
-  platform: 2,
-});
-const travelCandidate = createNinebotTravelCandidateClient({
-  transport: createFetchNinebotTransport({
-    origins: { travel: "https://cn-cbu-gateway.ninebot.com" },
-  }),
-  platform: 2,
-});
-const vehicleCandidate = createNinebotVehicleCandidateClient({
+const candidate = createNinebotCandidateSessionClient({
   transport: createFetchNinebotTransport({
     origins: {
       ebike: "https://ebike.ninebot.com",
       motor: "https://steeldust.ninebot.com",
+      travel: "https://cn-cbu-gateway.ninebot.com",
     },
   }),
   platform: 2,
+  session,
 });
 const ninecliBinary = join(
   projectRoot,
@@ -325,14 +299,8 @@ for (let index = 0; index < rounds; index += 1) {
     ]);
     // eslint-disable-next-line no-await-in-loop
     const [candidateStatus, candidateBattery] = await Promise.all([
-      candidate.status({
-        service,
-        fields: buildVehicleStatusFields({ session, sn_str: vehicle.wnumber }),
-      }),
-      candidate.battery({
-        service,
-        fields: buildVehicleBatteryFields({ session, wnumber: vehicle.wnumber }),
-      }),
+      candidate.status({ service, serialNumber: vehicle.wnumber }),
+      candidate.battery({ service, serialNumber: vehicle.wnumber }),
     ]);
     sample.status = summarizeReport(compareNinebotPayloads(oracleStatus, candidateStatus.data[0]));
     sample.battery = summarizeReport(compareNinebotPayloads(oracleBattery, candidateBattery.data));
@@ -340,33 +308,21 @@ for (let index = 0; index < rounds; index += 1) {
     // eslint-disable-next-line no-await-in-loop
     const oracleVehicles = await runOracle("vehicles");
     // eslint-disable-next-line no-await-in-loop
-    const candidateVehicles = await vehicleCandidate.list({
+    const candidateVehicles = await candidate.listVehicles({
       service,
-      fields: {
-        ...session,
-        vehicle_type: selectedVehicleType,
-        serviceTime: Date.now(),
-        nonce: generateNinebotNonce(),
-      } as VehicleListPlaintextFields,
+      vehicleType: selectedVehicleType,
     });
     sample.vehicleList = summarizeReport(
       compareNinebotPayloads(oracleVehicles, candidateVehicles.data),
     );
-    const travelBase = {
-      ...session,
-      wnumber: vehicle.wnumber,
-      rnVersion: "743",
-      vehicle_type: selectedVehicleType,
-      current_version: "610063322",
-      serviceTime: Date.now(),
-      nonce: generateNinebotNonce(),
-    };
     // eslint-disable-next-line no-await-in-loop
     const oracleMonth = await runOracle("travel", ["--month", parityMonth]);
     // eslint-disable-next-line no-await-in-loop
-    const candidateMonth = await travelCandidate.month({
-      fields: { ...travelBase, month: parityMonth, page: "1" } as TravelMonthPlaintextFields,
-      businessType: service === "motor" ? "1" : "2",
+    const candidateMonth = await candidate.month({
+      service,
+      serialNumber: vehicle.wnumber,
+      vehicleType: selectedVehicleType,
+      month: parityMonth,
     });
     const travelReport: Record<string, unknown> = {
       month: summarizeReport(
@@ -392,14 +348,11 @@ for (let index = 0; index < rounds; index += 1) {
       // eslint-disable-next-line no-await-in-loop
       const oracleDetail = await runOracle("travel", ["--detail", travelId]);
       // eslint-disable-next-line no-await-in-loop
-      const candidateDetail = await travelCandidate.detail({
-        fields: {
-          ...travelBase,
-          nonce: generateNinebotNonce(),
-          serviceTime: Date.now(),
-          travel_id: travelId,
-        } as TravelDetailPlaintextFields,
-        businessType: service === "motor" ? "1" : "2",
+      const candidateDetail = await candidate.detail({
+        service,
+        serialNumber: vehicle.wnumber,
+        vehicleType: selectedVehicleType,
+        travelId,
       });
       travelReport.detail = summarizeReport(
         compareNinebotPayloads(
