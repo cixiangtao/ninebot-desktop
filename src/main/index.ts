@@ -9,6 +9,7 @@ import {
 import { registerIpcHandlers } from "./ipc.js";
 import { getBundledNineCliBinaryPath, NineCliClient } from "./ninecli.js";
 import { createCandidateTelemetryReader } from "./telemetry-source.js";
+import { createCandidateTravelReader } from "./travel-source.js";
 
 protocol.registerSchemesAsPrivileged([
   {
@@ -118,7 +119,11 @@ app.whenReady().then(async () => {
     process.env.NINEBOT_TELEMETRY_SOURCE === "candidate"
       ? createCandidateTelemetryReader({ legacy: nineCliClient, configDirectory })
       : nineCliClient;
-  registerIpcHandlers(nineCliClient, telemetryReader);
+  const travelReader =
+    process.env.NINEBOT_TRAVEL_SOURCE === "candidate"
+      ? createCandidateTravelReader({ legacy: nineCliClient, configDirectory })
+      : nineCliClient;
+  registerIpcHandlers(nineCliClient, telemetryReader, travelReader);
   await createWindow();
 
   app.on("activate", () => {

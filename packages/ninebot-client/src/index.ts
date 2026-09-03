@@ -102,5 +102,34 @@ export type {
   VehicleStatusLocationCandidate,
   VehicleStatusPlaintextFields,
 } from "./telemetry-node.ts";
+export {
+  buildTravelCandidateHeaders,
+  buildTravelDetailEncryptedRequestCandidate,
+  buildTravelDetailPlaintextBody,
+  buildTravelMonthEncryptedRequestCandidate,
+  buildTravelMonthPlaintextBody,
+  createNinebotTravelCandidateClient,
+  decodeTravelDetailResponseCandidate,
+  decodeTravelMonthResponseCandidate,
+  parseTravelDetailResponseCandidate,
+  parseTravelMonthResponseCandidate,
+  travelDetailPath,
+  travelMonthPath,
+} from "./travel-node.ts";
+export type {
+  BuildTravelCandidateHeadersOptions,
+  BuildTravelDetailEncryptedRequestCandidateOptions,
+  BuildTravelMonthEncryptedRequestCandidateOptions,
+  CreateNinebotTravelCandidateClientOptions,
+  GetTravelDetailCandidateOptions,
+  ListTravelMonthCandidateOptions,
+  TravelCandidateHeaderFields,
+  TravelDetailEncryptedRequestCandidate,
+  TravelDetailPlaintextFields,
+  TravelDetailResponseCandidate,
+  TravelMonthEncryptedRequestCandidate,
+  TravelMonthPlaintextFields,
+  TravelMonthResponseCandidate,
+} from "./travel-node.ts";
 export { createNinebotClient, NinebotHttpError } from "./client.ts";
 export type { NinebotClient, NinebotClientOptions } from "./client.ts";

@@ -1,0 +1,120 @@
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, describe, expect, it } from "vitest";
+import { createCandidateTravelReader, type CandidateTravelClient } from "./travel-source.js";
+
+const temporaryDirectories: string[] = [];
+
+const createSessionDirectory = async (vehicleType?: string) => {
+  const directory = await mkdtemp(join(tmpdir(), "ninebot-travel-source-"));
+  temporaryDirectories.push(directory);
+  await mkdir(directory, { recursive: true });
+  await Promise.all([
+    writeFile(
+      join(directory, "config.json"),
+      JSON.stringify({
+        device_id: "device-id",
+        region: "bj",
+        os_version: "13",
+        os_model: "Xiaomi",
+      }),
+    ),
+    writeFile(
+      join(directory, "tokens.json"),
+      JSON.stringify({ access_token: "token", business_uid: "12345678" }),
+    ),
+    writeFile(
+      join(directory, "vehicles.json"),
+      JSON.stringify({
+        vehicles: [
+          {
+            wnumber: "SN1234567890",
+            business_line: "ebike",
+            ...(vehicleType === undefined ? {} : { vehicle_type: vehicleType }),
+          },
+        ],
+      }),
+    ),
+  ]);
+  return directory;
+};
+
+afterEach(async () => {
+  await Promise.all(
+    temporaryDirectories.splice(0).map((directory) => rm(directory, { recursive: true })),
+  );
+});
+
+describe("candidate travel source", () => {
+  it("uses the candidate month and detail responses with private session fields", async () => {
+    const configDirectory = await createSessionDirectory("14363");
+    const calls: Array<{ kind: string; month?: string; travelId?: string; businessType: string }> =
+      [];
+    const candidateClient: CandidateTravelClient = {
+      month: async ({ fields, businessType }) => {
+        calls.push({ kind: "month", month: fields.month, businessType });
+        expect(fields.vehicle_type).toBe("14363");
+        expect(fields.access_token).toBe("token");
+        expect(fields.nonce).toMatch(/^[0-9a-f]{32}$/);
+        return { data: { month: fields.month, list: [] } };
+      },
+      detail: async ({ fields, businessType }) => {
+        calls.push({ kind: "detail", travelId: fields.travel_id, businessType });
+        expect(fields.vehicle_type).toBe("14363");
+        return { data: { trail: "" } };
+      },
+    };
+    const legacy = {
+      rides: async () => {
+        throw new Error("legacy rides should not be called");
+      },
+      rideDetail: async () => {
+        throw new Error("legacy detail should not be called");
+      },
+    };
+    const reader = createCandidateTravelReader({
+      legacy,
+      configDirectory,
+      candidateClientFactory: () => candidateClient,
+    });
+
+    await expect(reader.rides("SN1234567890", "202608")).resolves.toMatchObject({
+      data: { month: "202608" },
+    });
+    await expect(reader.rideDetail("SN1234567890", "travel-1")).resolves.toEqual({
+      data: { trail: "" },
+    });
+    expect(calls).toEqual([
+      { kind: "month", month: "202608", businessType: "2" },
+      { kind: "detail", travelId: "travel-1", businessType: "2" },
+    ]);
+  });
+
+  it("falls back to ninecli when the cached vehicle model code is unavailable", async () => {
+    const configDirectory = await createSessionDirectory();
+    const legacy = {
+      rides: async (_serialNumber: string, month: string) => ({ source: "legacy", month }),
+      rideDetail: async (_serialNumber: string, travelId: string) => ({
+        source: "legacy",
+        travelId,
+      }),
+    };
+    const reader = createCandidateTravelReader({
+      legacy,
+      configDirectory,
+      candidateClientFactory: () => {
+        throw new Error("candidate client should not be created");
+      },
+    });
+
+    await expect(reader.rides("SN1234567890", "202608")).resolves.toEqual({
+      source: "legacy",
+      month: "202608",
+    });
+    await expect(reader.rideDetail("SN1234567890", "travel-1")).resolves.toEqual({
+      source: "legacy",
+      travelId: "travel-1",
+    });
+  });
+});

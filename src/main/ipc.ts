@@ -28,6 +28,7 @@ import { loadRideSpeedVerifications } from "./ride-speed-verification.js";
 import { createYearSummaryExportDocument } from "./year-summary-export.js";
 import { SessionReadCache } from "./session-read-cache.js";
 import { loadVehicleSnapshot, type VehicleTelemetryReader } from "./vehicle-snapshot.js";
+import { type TravelReader } from "./travel-source.js";
 import {
   parseAccountProfile,
   parseRideDetail,
@@ -256,6 +257,7 @@ const handleError = <T>(error: unknown): BridgeResult<T> => {
 export const registerIpcHandlers = (
   client: NineCliClient,
   telemetryReader: VehicleTelemetryReader = client,
+  travelReader: TravelReader = client,
 ) => {
   const serialNumbers = new Map<string, string>();
   const travelIds = new Map<
@@ -279,7 +281,11 @@ export const registerIpcHandlers = (
       `${vehicleId}\0${rideId}`,
       rideDetailCacheTtlMs,
       async () =>
-        parseRideDetail(await client.rideDetail(serialNumber, travelId), rideId, dayMileageKm),
+        parseRideDetail(
+          await travelReader.rideDetail(serialNumber, travelId),
+          rideId,
+          dayMileageKm,
+        ),
       refresh,
     );
   const clearReadCaches = () => {
@@ -439,7 +445,10 @@ export const registerIpcHandlers = (
             `${vehicleId}\0${month}`,
             rideMonthCacheTtlMs,
             async () => {
-              const parsedMonth = parseRideMonth(await client.rides(serialNumber, month), month);
+              const parsedMonth = parseRideMonth(
+                await travelReader.rides(serialNumber, month),
+                month,
+              );
               const summaries = parsedMonth.rides.map(({ travelId, ...ride }) => {
                 const upstreamKey = `${serialNumber}\0${travelId}`;
                 const existingId = rideIdsByUpstream.get(upstreamKey);
