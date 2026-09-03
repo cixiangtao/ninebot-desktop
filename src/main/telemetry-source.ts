@@ -1,26 +1,17 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import {
-  buildVehicleBatteryFields,
-  buildVehicleStatusFields,
-  createNinebotTelemetryCandidateClient,
-  type VehicleBatteryPlaintextFields,
-  type VehicleStatusPlaintextFields,
-} from "../../packages/ninebot-client/src/telemetry-node.ts";
+  createNinebotCandidateSessionClient,
+  type NinebotCandidateSessionFields,
+} from "../../packages/ninebot-client/src/candidate-session.ts";
 import { createFetchNinebotTransport } from "../../packages/ninebot-client/src/transport.ts";
 import type { VehicleTelemetryReader } from "./vehicle-snapshot.js";
 
 export type CandidateService = "ebike" | "motor";
 
 export interface CandidateTelemetryClient {
-  status(options: {
-    service: CandidateService;
-    fields: VehicleStatusPlaintextFields;
-  }): Promise<unknown>;
-  battery(options: {
-    service: CandidateService;
-    fields: VehicleBatteryPlaintextFields;
-  }): Promise<unknown>;
+  status(options: { service: CandidateService; serialNumber: string }): Promise<unknown>;
+  battery(options: { service: CandidateService; serialNumber: string }): Promise<unknown>;
 }
 
 interface CandidateConfig {
@@ -46,20 +37,7 @@ interface CachedVehicles {
 
 interface CandidateContext {
   service: CandidateService;
-  session: {
-    sys_language: string;
-    client_ver: string;
-    device_id: string;
-    regionx: string;
-    language: string;
-    ostype: string;
-    lang: string;
-    platform_ver: string;
-    platform: string;
-    login_country: string;
-    access_token: string;
-    uid: string;
-  };
+  session: NinebotCandidateSessionFields;
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -116,12 +94,15 @@ const readContext = async (configDirectory: string, serialNumber: string) => {
   } satisfies CandidateContext;
 };
 
-const createCandidateClient = (service: CandidateService): CandidateTelemetryClient =>
-  createNinebotTelemetryCandidateClient({
-    transport:
-      service === "ebike"
-        ? createFetchNinebotTransport({ origins: { ebike: "https://ebike.ninebot.com" } })
-        : createFetchNinebotTransport({ origins: { motor: "https://steeldust.ninebot.com" } }),
+const createCandidateClient = (session: NinebotCandidateSessionFields): CandidateTelemetryClient =>
+  createNinebotCandidateSessionClient({
+    session,
+    transport: createFetchNinebotTransport({
+      origins: {
+        ebike: "https://ebike.ninebot.com",
+        motor: "https://steeldust.ninebot.com",
+      },
+    }),
     platform: 2,
   });
 
@@ -133,14 +114,14 @@ export const createCandidateTelemetryReader = ({
 }: {
   legacy: VehicleTelemetryReader;
   configDirectory: string;
-  candidateClientFactory?: (service: CandidateService) => CandidateTelemetryClient;
+  candidateClientFactory?: (session: NinebotCandidateSessionFields) => CandidateTelemetryClient;
 }): VehicleTelemetryReader => ({
   async vehicleStatus(serialNumber) {
     try {
       const context = await readContext(configDirectory, serialNumber);
-      const result = await candidateClientFactory(context.service).status({
+      const result = await candidateClientFactory(context.session).status({
         service: context.service,
-        fields: buildVehicleStatusFields({ session: context.session, sn_str: serialNumber }),
+        serialNumber,
       });
       return result;
     } catch {
@@ -150,9 +131,9 @@ export const createCandidateTelemetryReader = ({
   async battery(serialNumber) {
     try {
       const context = await readContext(configDirectory, serialNumber);
-      const result = await candidateClientFactory(context.service).battery({
+      const result = await candidateClientFactory(context.session).battery({
         service: context.service,
-        fields: buildVehicleBatteryFields({ session: context.session, wnumber: serialNumber }),
+        serialNumber,
       });
       return result;
     } catch {

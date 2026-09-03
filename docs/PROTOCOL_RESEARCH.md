@@ -202,6 +202,8 @@ parity 脚本现在直接调用 SDK 的 `createNinebotCandidateSessionClient`，
 
 Electron 现支持显式设置 `NINEBOT_TELEMETRY_SOURCE=candidate` 来试用 Node telemetry 候选；候选读取本地 ninecli 会话并在 status/battery 任一失败时自动回退内置 ninecli。未设置该变量时行为完全不变，仍由 ninecli 提供实时状态和电池数据。该开关用于迁移期验证，不代表已经切换默认数据源。
 
+telemetry 候选源现通过 `createNinebotCandidateSessionClient` 生成 status/battery 请求，主进程不再重复拼装候选字段；三类 Electron 候选开关同时开启时，真实只读 QA 仍验证账号、设备、历史行程和导出链路正常。
+
 候选源在主进程内按请求重新读取会话文件，因此登录、刷新和退出后不会复用旧令牌；候选或会话读取异常会分别回退对应的 ninecli 读取，不影响另一个 telemetry 域。该回退行为通过不访问真实账号的单元测试覆盖。
 
 首次使用本机配置自动拼装 status/battery 候选请求的回放显示：真实服务端返回 HTTP 200，但业务 wrapper 为 `code=190003`、`data=null`、通讯异常描述。由此确认 HTTP 层成功不等于业务协议已验证；类型化解析器会拒绝这类空数据，Electron 继续保留 ninecli 默认路径，后续需要用 oracle 明文/Header 做字段级修正。
