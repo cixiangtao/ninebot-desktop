@@ -87,8 +87,8 @@ export interface RuntimeSecurityStatus {
   policy: {
     allowedCommands: readonly string[];
     environment: "minimal";
-    passwordTransport: "process-arguments";
-    smsCodeTransport: "process-arguments";
+    passwordTransport: "process-arguments" | "in-memory-call";
+    smsCodeTransport: "process-arguments" | "in-memory-call";
     vehicleControlsExposed: false;
     sessionCache: {
       storage: "memory-only";

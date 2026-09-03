@@ -30,7 +30,7 @@ describe("Passport auth provider", () => {
     await expect(provider.whoami(session)).resolves.toEqual({ username: "rider" });
     expect(client.loginWithPassword).toHaveBeenCalledWith({
       areaCode: "86",
-      user: "rider",
+      username: "rider",
       password: "secret",
     });
     expect(client.refresh).toHaveBeenCalledWith(session);

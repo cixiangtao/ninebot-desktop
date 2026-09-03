@@ -7,8 +7,21 @@ import {
   appProtocolScheme,
   registerAppProtocol,
 } from "./app-protocol.js";
+import {
+  createFileNinebotAuthSessionStore,
+  createFetchNinebotTransport,
+  createNinebotPassportAuthProvider,
+  createNinebotPassportLoginClient,
+  NinebotAuthSessionManager,
+  defaultNinebotServiceEndpoints,
+} from "@jiuhao/ninebot-client";
+import { decodeGzipBody } from "@jiuhao/ninebot-client/response-node";
 import { registerIpcHandlers } from "./ipc.js";
+import type { NinebotAppClient } from "./app-client.js";
+import { candidateRequestTimeoutMs } from "./candidate-client.js";
 import { getBundledNineCliBinaryPath, NineCliClient } from "./ninecli.js";
+import { createNinebotSdkAppClient } from "./sdk-app-client.js";
+import { createSdkRuntimeDiagnostics } from "./sdk-runtime.js";
 import { createCandidateTelemetryReader } from "./telemetry-source.js";
 import { createCandidateTravelReader } from "./travel-source.js";
 import { createCandidateVehicleReader } from "./vehicle-source.js";
@@ -130,22 +143,55 @@ app.whenReady().then(async () => {
     sdkDirectoryExists,
     legacyDirectoryExists,
   });
-  const bundledBinaryPath = getBundledNineCliBinaryPath({
-    appPath: app.getAppPath(),
-    isPackaged: app.isPackaged,
-    resourcesPath: process.resourcesPath,
-  });
-  const nineCliClient = new NineCliClient(configDirectory, bundledBinaryPath);
-  const telemetryReader = isCandidateSourceEnabled(process.env, "telemetry")
-    ? createCandidateTelemetryReader({ configDirectory })
-    : nineCliClient;
-  const travelReader = isCandidateSourceEnabled(process.env, "travel")
-    ? createCandidateTravelReader({ configDirectory })
-    : nineCliClient;
-  const vehicleReader = isCandidateSourceEnabled(process.env, "vehicle")
-    ? createCandidateVehicleReader({ configDirectory })
-    : nineCliClient;
-  registerIpcHandlers(nineCliClient, telemetryReader, travelReader, vehicleReader);
+  let appClient: NinebotAppClient;
+  if (process.env.NINEBOT_AUTH_SOURCE === "sdk") {
+    const passportOrigin =
+      process.env.NINEBOT_PASSPORT_ORIGIN ??
+      defaultNinebotServiceEndpoints.find(({ service }) => service === "passport")?.upstreamOrigin;
+    if (!passportOrigin) throw new Error("Ninebot Passport origin is unavailable");
+    const transport = createFetchNinebotTransport({
+      origins: { passport: passportOrigin },
+      timeoutMs: candidateRequestTimeoutMs,
+    });
+    const passportClient = createNinebotPassportLoginClient({
+      transport,
+      responseBodyDecoder: (response) => decodeGzipBody(response),
+    });
+    const auth = new NinebotAuthSessionManager({
+      provider: createNinebotPassportAuthProvider(passportClient),
+      store: createFileNinebotAuthSessionStore({ directory: configDirectory }),
+    });
+    await auth.restore();
+    const telemetryReader = createCandidateTelemetryReader({ configDirectory });
+    const travelReader = createCandidateTravelReader({ configDirectory });
+    const vehicleReader = createCandidateVehicleReader({ configDirectory });
+    appClient = createNinebotSdkAppClient({
+      auth,
+      diagnostics: createSdkRuntimeDiagnostics({ configDirectory, auth }),
+      telemetryReader,
+      travelReader,
+      vehicleReader,
+    });
+  } else {
+    const bundledBinaryPath = getBundledNineCliBinaryPath({
+      appPath: app.getAppPath(),
+      isPackaged: app.isPackaged,
+      resourcesPath: process.resourcesPath,
+    });
+    const nineCliClient = new NineCliClient(configDirectory, bundledBinaryPath);
+    const telemetryReader = isCandidateSourceEnabled(process.env, "telemetry")
+      ? createCandidateTelemetryReader({ configDirectory })
+      : nineCliClient;
+    const travelReader = isCandidateSourceEnabled(process.env, "travel")
+      ? createCandidateTravelReader({ configDirectory })
+      : nineCliClient;
+    const vehicleReader = isCandidateSourceEnabled(process.env, "vehicle")
+      ? createCandidateVehicleReader({ configDirectory })
+      : nineCliClient;
+    appClient = nineCliClient;
+    registerIpcHandlers(appClient, telemetryReader, travelReader, vehicleReader);
+  }
+  if (process.env.NINEBOT_AUTH_SOURCE === "sdk") registerIpcHandlers(appClient);
   await createWindow();
 
   app.on("activate", () => {

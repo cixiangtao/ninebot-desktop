@@ -1,14 +1,16 @@
 import type {
   NinebotAuthProvider,
   NinebotAuthSession,
-  NinebotPasswordCredentials,
   NinebotSmsCodeRequest,
   NinebotSmsLoginInput,
 } from "./auth.ts";
+import type { BuildPasswordLoginRequestOptions } from "./passport-auth.ts";
 
 /** The Passport operations required by the shared authentication lifecycle. */
 export interface NinebotPassportAuthClient {
-  loginWithPassword(input: NinebotPasswordCredentials): Promise<NinebotAuthSession>;
+  loginWithPassword(
+    input: Omit<BuildPasswordLoginRequestOptions, "signer">,
+  ): Promise<NinebotAuthSession>;
   refresh(session: NinebotAuthSession): Promise<NinebotAuthSession>;
   whoami<T = unknown>(session: NinebotAuthSession): Promise<T>;
 }
@@ -34,7 +36,12 @@ export class NinebotHumanVerificationRequiredError extends Error {
 export const createNinebotPassportAuthProvider = (
   client: NinebotPassportAuthClient,
 ): NinebotAuthProvider => ({
-  loginWithPassword: (credentials) => client.loginWithPassword(credentials),
+  loginWithPassword: (credentials) =>
+    client.loginWithPassword({
+      areaCode: credentials.areaCode,
+      username: credentials.user,
+      password: credentials.password,
+    }),
   requestSmsCode: async (_input: NinebotSmsCodeRequest) => {
     throw new NinebotHumanVerificationRequiredError();
   },
