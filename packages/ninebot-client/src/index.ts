@@ -138,6 +138,7 @@ export {
   createNinebotFetchCandidateSessionClient,
   defaultNinebotCandidateOrigins,
 } from "./candidate-session.ts";
+export { createNinebotCandidateSessionClientFromClients } from "./candidate-session-core.ts";
 export type {
   CandidateServiceRequestOptions,
   CandidateTelemetryRequestOptions,
@@ -150,3 +151,10 @@ export type {
   NinebotCandidateSessionClient,
   NinebotCandidateSessionFields,
 } from "./candidate-session.ts";
+export type {
+  CandidateTelemetrySessionClient,
+  CandidateTravelSessionClient,
+  CandidateVehicleSessionClient,
+  CreateNinebotCandidateSessionClientFromClientsOptions,
+  NinebotCandidateSessionClients,
+} from "./candidate-session-core.ts";

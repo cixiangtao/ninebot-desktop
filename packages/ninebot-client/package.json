@@ -52,6 +52,10 @@
     "./candidate-session": {
       "types": "./dist/candidate-session.d.ts",
       "import": "./dist/candidate-session.js"
+    },
+    "./candidate-session-core": {
+      "types": "./dist/candidate-session-core.d.ts",
+      "import": "./dist/candidate-session-core.js"
     }
   },
   "scripts": {
