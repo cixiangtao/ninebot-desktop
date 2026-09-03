@@ -62,6 +62,35 @@ describe("Passport login client", () => {
     expect(decode).toHaveBeenCalled();
   });
 
+  it("refreshes with the verified request shape and retains the business uid", async () => {
+    const send = vi.fn().mockResolvedValue({
+      status: 200,
+      headers: {},
+      body: json({
+        resultCode: 0,
+        data: { access_token: "new-access", refresh_token: "new-refresh" },
+      }),
+    });
+    const client = createNinebotPassportLoginClient({
+      transport: { send },
+      signer: () => "login-signature",
+      refreshSigner: () => "refresh-signature",
+    });
+
+    await expect(
+      client.refresh({ accessToken: "access", refreshToken: "refresh", businessUid: "business" }),
+    ).resolves.toEqual({
+      accessToken: "new-access",
+      refreshToken: "new-refresh",
+      businessUid: "business",
+    });
+    const request = send.mock.calls[0]?.[0];
+    expect(request?.path).toBe("/v3/user/refresh");
+    expect(new TextDecoder().decode(request?.body)).toBe(
+      '{"accessToken":"access","device":"ANDROID","refreshToken":"refresh"}',
+    );
+  });
+
   it("surfaces non-success business codes without exposing response data", async () => {
     const client = createNinebotPassportLoginClient({
       transport: {
