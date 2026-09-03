@@ -56,9 +56,14 @@
     "./candidate-session-core": {
       "types": "./dist/candidate-session-core.d.ts",
       "import": "./dist/candidate-session-core.js"
+    },
+    "./candidate-contracts": {
+      "types": "./dist/candidate-contracts.d.ts",
+      "import": "./dist/candidate-contracts.js"
     }
   },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json"
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck:browser": "tsc -p tsconfig.browser.json"
   }
 }

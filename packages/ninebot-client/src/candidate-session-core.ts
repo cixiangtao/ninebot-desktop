@@ -1,44 +1,37 @@
 import type {
-  TelemetryResponseCandidate,
-  VehicleBatteryCandidateRecord,
-  VehicleBatteryCandidateOptions,
-  VehicleStatusCandidateRecord,
-  VehicleStatusCandidateOptions,
-} from "./telemetry-node.ts";
-import type {
-  TravelDetailPlaintextFields,
-  TravelDetailResponseCandidate,
-  TravelMonthPlaintextFields,
-  TravelMonthResponseCandidate,
-} from "./travel-node.ts";
-import type {
+  CandidateTravelBaseFields,
+  CandidateTravelDetailFields,
+  CandidateTravelMonthFields,
+  CandidateVehicleBatteryFields,
+  CandidateVehicleListFields,
+  CandidateVehicleStatusFields,
+  NinebotBatteryRecord,
+  NinebotCandidateService,
+  NinebotCandidateSessionFields,
+  NinebotTelemetryResponseCandidate,
+  NinebotTravelDetailResponseCandidate,
+  NinebotTravelMonthResponseCandidate,
   NinebotVehicleResponseCandidate,
-  VehicleListPlaintextFields,
-} from "./vehicle-node.ts";
-import type { VehicleServiceName } from "./vehicle.ts";
+  NinebotStatusRecord,
+} from "./candidate-contracts.ts";
 
-/** Supported candidate service families. */
-export type NinebotCandidateService = VehicleServiceName;
-
-/** Shared authenticated device fields required by every candidate request. */
-export interface NinebotCandidateSessionFields {
-  sys_language: string;
-  client_ver: string;
-  device_id: string;
-  regionx: string;
-  language: string;
-  ostype: string;
-  lang: string;
-  platform_ver: string;
-  platform: string;
-  login_country: string;
-  access_token: string;
-  uid: string;
-  /** Observed React-Native track module version used by travel requests. */
-  rnVersion?: string;
-  /** Observed app version used by travel requests. */
-  current_version?: string;
-}
+export type {
+  CandidateRequestFields,
+  CandidateTravelBaseFields,
+  CandidateTravelDetailFields,
+  CandidateTravelMonthFields,
+  CandidateVehicleBatteryFields,
+  CandidateVehicleListFields,
+  CandidateVehicleStatusFields,
+  NinebotBatteryRecord,
+  NinebotCandidateService,
+  NinebotCandidateSessionFields,
+  NinebotStatusRecord,
+  NinebotTelemetryResponseCandidate,
+  NinebotTravelDetailResponseCandidate,
+  NinebotTravelMonthResponseCandidate,
+  NinebotVehicleResponseCandidate,
+} from "./candidate-contracts.ts";
 
 export interface CandidateServiceRequestOptions {
   service: NinebotCandidateService;
@@ -69,42 +62,42 @@ export interface CandidateTravelDetailRequestOptions extends CandidateVehicleReq
 export interface CandidateVehicleSessionClient {
   list(options: {
     service: NinebotCandidateService;
-    fields: VehicleListPlaintextFields;
+    fields: CandidateVehicleListFields;
     headers?: Readonly<Record<string, string>>;
     signal?: AbortSignal;
-  }): Promise<NinebotVehicleResponseCandidate<unknown>>;
+  }): Promise<NinebotVehicleResponseCandidate>;
 }
 
 /** Minimal telemetry client contract that a runtime-specific crypto provider can implement. */
 export interface CandidateTelemetrySessionClient {
   status(options: {
     service: NinebotCandidateService;
-    fields: VehicleStatusCandidateOptions["fields"];
+    fields: CandidateVehicleStatusFields;
     headers?: Readonly<Record<string, string>>;
     signal?: AbortSignal;
-  }): Promise<TelemetryResponseCandidate<VehicleStatusCandidateRecord[]>>;
+  }): Promise<NinebotTelemetryResponseCandidate<NinebotStatusRecord[]>>;
   battery(options: {
     service: NinebotCandidateService;
-    fields: VehicleBatteryCandidateOptions["fields"];
+    fields: CandidateVehicleBatteryFields;
     headers?: Readonly<Record<string, string>>;
     signal?: AbortSignal;
-  }): Promise<TelemetryResponseCandidate<VehicleBatteryCandidateRecord>>;
+  }): Promise<NinebotTelemetryResponseCandidate<NinebotBatteryRecord>>;
 }
 
 /** Minimal travel client contract that a runtime-specific crypto provider can implement. */
 export interface CandidateTravelSessionClient {
   month(options: {
-    fields: TravelMonthPlaintextFields;
+    fields: CandidateTravelMonthFields;
     businessType: "1" | "2";
     headers?: Readonly<Record<string, string>>;
     signal?: AbortSignal;
-  }): Promise<TravelMonthResponseCandidate>;
+  }): Promise<NinebotTravelMonthResponseCandidate>;
   detail(options: {
-    fields: TravelDetailPlaintextFields;
+    fields: CandidateTravelDetailFields;
     businessType: "1" | "2";
     headers?: Readonly<Record<string, string>>;
     signal?: AbortSignal;
-  }): Promise<TravelDetailResponseCandidate>;
+  }): Promise<NinebotTravelDetailResponseCandidate>;
 }
 
 /** Runtime-specific implementations used by the platform-neutral session orchestrator. */
@@ -126,17 +119,17 @@ export interface CreateNinebotCandidateSessionClientFromClientsOptions {
 }
 
 export interface NinebotCandidateSessionClient {
-  listVehicles(
-    options: CandidateVehicleRequestOptions,
-  ): Promise<NinebotVehicleResponseCandidate<unknown>>;
+  listVehicles(options: CandidateVehicleRequestOptions): Promise<NinebotVehicleResponseCandidate>;
   status(
     options: CandidateTelemetryRequestOptions,
-  ): Promise<TelemetryResponseCandidate<VehicleStatusCandidateRecord[]>>;
+  ): Promise<NinebotTelemetryResponseCandidate<NinebotStatusRecord[]>>;
   battery(
     options: CandidateTelemetryRequestOptions,
-  ): Promise<TelemetryResponseCandidate<VehicleBatteryCandidateRecord>>;
-  month(options: CandidateTravelMonthRequestOptions): Promise<TravelMonthResponseCandidate>;
-  detail(options: CandidateTravelDetailRequestOptions): Promise<TravelDetailResponseCandidate>;
+  ): Promise<NinebotTelemetryResponseCandidate<NinebotBatteryRecord>>;
+  month(options: CandidateTravelMonthRequestOptions): Promise<NinebotTravelMonthResponseCandidate>;
+  detail(
+    options: CandidateTravelDetailRequestOptions,
+  ): Promise<NinebotTravelDetailResponseCandidate>;
   /** Cancels in-flight operations and releases the session reference. */
   clear(): void;
 }
@@ -243,7 +236,7 @@ export const createNinebotCandidateSessionClientFromClients = ({
     const request = requestSignal(signal);
     try {
       assertRequestActive(request.signal);
-      const fields: VehicleListPlaintextFields = {
+      const fields: CandidateVehicleListFields = {
         ...currentSession,
         vehicle_type: asVehicleType(vehicleType),
         serviceTime: clock(),
@@ -270,7 +263,7 @@ export const createNinebotCandidateSessionClientFromClients = ({
     const request = requestSignal(signal);
     try {
       assertRequestActive(request.signal);
-      const fields = {
+      const fields: CandidateVehicleStatusFields = {
         ...currentSession,
         sn_str: serialNumber,
         serviceTime: clock(),
@@ -297,7 +290,7 @@ export const createNinebotCandidateSessionClientFromClients = ({
     const request = requestSignal(signal);
     try {
       assertRequestActive(request.signal);
-      const fields = {
+      const fields: CandidateVehicleBatteryFields = {
         ...currentSession,
         wnumber: serialNumber,
         serviceTime: clock(),
@@ -322,7 +315,7 @@ export const createNinebotCandidateSessionClientFromClients = ({
     session: NinebotCandidateSessionFields;
     serialNumber: string;
     vehicleType: string | number;
-  }) => ({
+  }): CandidateTravelBaseFields => ({
     ...currentSession,
     wnumber: serialNumber,
     rnVersion: currentSession.rnVersion ?? "743",
@@ -344,11 +337,11 @@ export const createNinebotCandidateSessionClientFromClients = ({
     const request = requestSignal(signal);
     try {
       assertRequestActive(request.signal);
-      const fields = {
+      const fields: CandidateTravelMonthFields = {
         ...travelFields({ session: currentSession, serialNumber, vehicleType }),
         month: monthKey,
         page: "1",
-      } as TravelMonthPlaintextFields;
+      };
       return await clients.travel.month({
         fields,
         businessType: businessTypeFor(service),
@@ -372,10 +365,10 @@ export const createNinebotCandidateSessionClientFromClients = ({
     const request = requestSignal(signal);
     try {
       assertRequestActive(request.signal);
-      const fields = {
+      const fields: CandidateTravelDetailFields = {
         ...travelFields({ session: currentSession, serialNumber, vehicleType }),
         travel_id: travelId,
-      } as TravelDetailPlaintextFields;
+      };
       return await clients.travel.detail({
         fields,
         businessType: businessTypeFor(service),
