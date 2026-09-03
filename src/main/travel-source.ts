@@ -1,9 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import {
-  createNinebotFetchCandidateSessionClient,
-  type NinebotCandidateSessionFields,
-} from "@jiuhao/ninebot-client/candidate-session";
+import type { NinebotCandidateSessionFields } from "@jiuhao/ninebot-client/candidate-session";
+import { createCandidateSessionClient } from "./candidate-client.js";
 import type { NineCliClient } from "./ninecli.js";
 
 export type CandidateTravelService = "ebike" | "motor";
@@ -154,17 +152,11 @@ const readContext = async (
   } satisfies CandidateTravelContext;
 };
 
-const createCandidateClient = (session: NinebotCandidateSessionFields): CandidateTravelClient =>
-  createNinebotFetchCandidateSessionClient({
-    session,
-    platform: 2,
-  });
-
 /** Creates an opt-in travel reader; each domain falls back to ninecli independently. */
 export const createCandidateTravelReader = ({
   legacy,
   configDirectory,
-  candidateClientFactory = createCandidateClient,
+  candidateClientFactory = createCandidateSessionClient,
 }: {
   legacy: LegacyTravelClient;
   configDirectory: string;

@@ -1,9 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import {
-  createNinebotFetchCandidateSessionClient,
-  type NinebotCandidateSessionFields,
-} from "@jiuhao/ninebot-client/candidate-session";
+import type { NinebotCandidateSessionFields } from "@jiuhao/ninebot-client/candidate-session";
+import { createCandidateSessionClient } from "./candidate-client.js";
 import type { NineCliClient } from "./ninecli.js";
 
 export type CandidateVehicleService = "ebike" | "motor";
@@ -61,12 +59,6 @@ const readService = (row: VehicleRow): CandidateVehicleService | null => {
   return null;
 };
 
-const createCandidateClient = (session: NinebotCandidateSessionFields): CandidateVehicleClient =>
-  createNinebotFetchCandidateSessionClient({
-    session,
-    platform: 2,
-  });
-
 const buildSession = (
   config: Partial<CandidateConfig>,
   tokens: Partial<CandidateTokens>,
@@ -89,7 +81,7 @@ const buildSession = (
 export const createCandidateVehicleReader = ({
   legacy,
   configDirectory,
-  candidateClientFactory = createCandidateClient,
+  candidateClientFactory = createCandidateSessionClient,
 }: {
   legacy: Pick<NineCliClient, "vehicles">;
   configDirectory: string;

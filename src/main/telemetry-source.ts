@@ -1,9 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import {
-  createNinebotFetchCandidateSessionClient,
-  type NinebotCandidateSessionFields,
-} from "@jiuhao/ninebot-client/candidate-session";
+import type { NinebotCandidateSessionFields } from "@jiuhao/ninebot-client/candidate-session";
+import { createCandidateSessionClient } from "./candidate-client.js";
 import type { VehicleTelemetryReader } from "./vehicle-snapshot.js";
 
 export type CandidateService = "ebike" | "motor";
@@ -93,17 +91,11 @@ const readContext = async (configDirectory: string, serialNumber: string) => {
   } satisfies CandidateContext;
 };
 
-const createCandidateClient = (session: NinebotCandidateSessionFields): CandidateTelemetryClient =>
-  createNinebotFetchCandidateSessionClient({
-    session,
-    platform: 2,
-  });
-
 /** Creates an opt-in telemetry reader that falls back to ninecli on any candidate failure. */
 export const createCandidateTelemetryReader = ({
   legacy,
   configDirectory,
-  candidateClientFactory = createCandidateClient,
+  candidateClientFactory = createCandidateSessionClient,
 }: {
   legacy: VehicleTelemetryReader;
   configDirectory: string;
