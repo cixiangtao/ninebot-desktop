@@ -80,8 +80,9 @@ const client = createNinebotFetchCandidateSessionClient({
 });
 ```
 
-The client keeps the session only in an in-memory closure. After `clear()`, all
-operations fail closed until a new client is created.
+The client keeps the session only in an in-memory closure. Calling `clear()`
+cancels in-flight requests and makes all future operations fail closed until a
+new client is created.
 
 All five read-only methods also accept an optional `AbortSignal`. Hosts can
 cancel a request when the user switches vehicles or leaves a page:
