@@ -163,15 +163,15 @@ Node 专用 `@jiuhao/ninebot-client/vehicle-node` 子路径现在还提供车辆
 
 `decodeVehicleListResponseCandidate` 和 `parseVehicleListResponseCandidate` 负责把解密后的业务 JSON 校验为 `{ code, data, desc, time_cost, extra }` 候选包装，再由上层把 `data` 交给现有车辆领域解析器；它们不会把原始密文或账号字段写入磁盘。
 
-Node 子路径另外提供 `decodeVehicleListResponseCandidateWithCodec`，将通用的响应 envelope/codec 边界与上述业务包装解析串起，调用方可以直接拿到候选元数据和 `data`，无需先处理中间字节。该适配只改变本地解析便利性，不改变默认 ninecli 路径。
+Node 子路径另外提供 `decodeVehicleListResponseCandidateWithCodec`，将通用的响应 envelope/codec 边界与上述业务包装解析串起，调用方可以直接拿到候选元数据和 `data`，无需先处理中间字节。该适配只改变本地解析便利性；当前 Electron 的车辆数据默认已走 SDK，认证仍保留 ninecli 兼容入口。
 
-`createNinebotVehicleCandidateCodec` 已实现带上下文的 `NinebotVehicleCodec` 合同：每次编码返回独立 keyData 上下文，响应解码只使用传回的对应上下文；它仍属于 Node 候选路径，尚未替换 Electron 默认 ninecli。
+`createNinebotVehicleCandidateCodec` 已实现带上下文的 `NinebotVehicleCodec` 合同：每次编码返回独立 keyData 上下文，响应解码只使用传回的对应上下文；该 codec 已由 Electron 默认车辆 reader 使用，认证和显式 `NINEBOT_SOURCE=ninecli` 才会触及旧运行时。
 
 `createNinebotVehicleCandidateClient` 在此合同之上补齐车辆列表的 Node 调用链：接收 `transport`、`VehicleListPlaintextFields` 和服务类型，内部完成明文校验、候选 envelope 构造、响应上下文传递及业务包装解析。它适合接入本地 recorder 或测试 transport，尚未绑定 Electron 默认数据源。
 
-从 ninecli 0.1.7 二进制静态数据中还识别出唯一一段 1024-bit RSA PKCS#1 公钥（指数 65537）。该公钥以 `@jiuhao/ninebot-client/rsa-node` 的 `ninebotCandidateRsaPublicKeyPem` 导出，供候选请求使用或显式覆盖；它不是私钥，也不代表请求已经完成服务端验证。公钥材料仍只服务于 Node 候选路径，默认 Electron 客户端继续使用内置 ninecli。
+从 ninecli 0.1.7 二进制静态数据中还识别出唯一一段 1024-bit RSA PKCS#1 公钥（指数 65537）。该公钥以 `@jiuhao/ninebot-client/rsa-node` 的 `ninebotCandidateRsaPublicKeyPem` 导出，供候选请求使用或显式覆盖；它不是私钥，也不代表请求已经完成服务端验证。公钥材料服务于 Node SDK 候选路径；Electron 默认数据 reader 已使用该路径，认证仍待 Passport 签名协议闭环。
 
-车辆列表候选构造器和候选 codec 在未提供 `rsaPublicKey` 时会使用上述固定公钥；调用方仍可传入覆盖值做版本或环境差分。这个默认值只减少回放样板代码，不改变“候选、未服务端验证、不能替换默认 ninecli”的边界。
+车辆列表候选构造器和候选 codec 在未提供 `rsaPublicKey` 时会使用上述固定公钥；调用方仍可传入覆盖值做版本或环境差分。这个默认值只减少回放样板代码，Passport 登录/刷新签名仍未完成服务端 parity。
 
 候选请求在加密前会校验公钥必须是 1024-bit、指数 65537；这与捕获到的 128 字节 `k`/`s` 外壳一致，错误的 2048-bit 或损坏材料会在本地直接失败。
 
@@ -185,7 +185,7 @@ Node 子路径另外提供 `decodeVehicleListResponseCandidateWithCodec`，将�
 
 同批 oracle 样本确认两种车辆服务都使用 `p="101"`、`t="0"`。Node 候选现在将这两个值设为默认值，并提供 `buildVehicleListCandidateHeaders`：根据 `motor`/`ebike` 映射 `business-type`，从请求明文映射 `client-ver`、`device-id`、平台版本、地区、语言、用户标识和服务时间，同时补齐 `cache-control`、`debug`、`request-id` 与 `user-agent` 等已观察 Header。调用方仍可显式覆盖 Header 或 RSA 公钥，以便后续版本差分。
 
-这次验证只提升 Node 候选路径的可信度；Electron 默认数据源仍是内置 ninecli，未被自动切换。登录、令牌刷新和短信人机验证仍不在本迁移范围内。
+这次验证只提升 Node 候选路径的可信度；Electron 默认数据源已切换为 SDK，旧 ninecli 仅在显式配置或认证兼容入口中保留。登录、令牌刷新和短信人机验证仍未完成纯 SDK 迁移。
 
 ### 2026-09-03 travel 月度请求形状
 
@@ -193,13 +193,13 @@ Node 子路径另外提供 `decodeVehicleListResponseCandidateWithCodec`，将�
 
 在 `EncryptRequest` 入口捕获到的月度明文固定字段顺序为：通用设备/会话字段，随后是 `wnumber`、`rnVersion`、`vehicle_type`、`month`、`page`、`current_version`、`serviceTime`、`nonce` 和 `checkcode`。去掉 `checkcode` 后按该顺序重建 JSON，并计算大写 MD5，可与 oracle 明文中的 `checkcode` 一致。Node 子路径新增 `travel-node`，提供月度明文校验、候选加密 envelope、请求上下文和月度响应对象解析；原始 Body 未写入仓库。
 
-随后使用新 nonce/服务时间、完整 Header 映射和 `travel-node` 候选实现回放 `travel-list2`，真实服务端返回 HTTP 200；Node 成功解密并解析出业务 `code=1`、`month="202608"`、31 项日明细和 20 条行程记录。该验证提升了月度 travel 候选链的可信度，但尚未完成多月份、多车型的连续对照，因此 Electron 仍继续使用 ninecli。
+随后使用新 nonce/服务时间、完整 Header 映射和 `travel-node` 候选实现回放 `travel-list2`，真实服务端返回 HTTP 200；Node 成功解密并解析出业务 `code=1`、`month="202608"`、31 项日明细和 20 条行程记录。该验证提升了月度 travel 候选链的可信度；Electron 默认 travel reader 已接入 SDK，更多月份、车型和账号 parity 仍是持续验证项。
 
 ### 2026-09-03 travel 详情请求形状
 
 继续对同一月份的一条行程运行 `travel --detail`，确认请求进入 `POST /app-api/travel/v6/travel-info`。详情明文沿用月度请求的通用设备/会话字段、`wnumber`、`rnVersion`、`vehicle_type`、`current_version`、`serviceTime`、`nonce` 和大写 MD5 `checkcode`，将 `month`/`page` 替换为 `travel_id`。Node `travel-node` 现已提供详情明文构造器、候选 envelope、详情响应解包器和 `trail` 类型校验。
 
-使用新 nonce/服务时间和同一 Header 映射做了一次真实详情回放，服务端返回 HTTP 200；Node 成功解析 `code=1`，并得到字符串形式的 `trail` 和 `speed` 字段。现有 `parseRideMonth` / `parseRideDetail` 已能直接消费候选 codec 的业务 wrapper，保持渲染层数据模型不变。原始轨迹正文没有写入仓库，Electron 默认仍使用 ninecli；在完成多条行程和车型交叉样本前，不切换默认数据源。
+使用新 nonce/服务时间和同一 Header 映射做了一次真实详情回放，服务端返回 HTTP 200；Node 成功解析 `code=1`，并得到字符串形式的 `trail` 和 `speed` 字段。现有 `parseRideMonth` / `parseRideDetail` 已能直接消费候选 codec 的业务 wrapper，保持渲染层数据模型不变。原始轨迹正文没有写入仓库，Electron 默认详情 reader 已走 SDK；多条行程和车型交叉样本仍需补齐。
 
 ### 2026-09-03 status 与 battery 请求形状
 
@@ -207,9 +207,9 @@ Node 子路径另外提供 `decodeVehicleListResponseCandidateWithCodec`，将�
 
 两条明文都沿用通用设备/会话字段、`serviceTime`、`nonce` 和大写 MD5 `checkcode`。status 额外携带 `sn_str`，battery 额外携带 `wnumber`；请求 Header 与车辆列表保持同一组设备、平台、语言、用户、服务时间和 `business-type` 映射。Node 子路径新增 `telemetry-node`，提供两条明文构造器、候选加密 envelope、统一响应 wrapper 解析和 transport-backed client，便于后续用同一账号做字段级对照。
 
-本次 status/battery 请求已用真实服务端完成 HTTP 200 校验，原始账号、令牌、设备标识、密文和响应正文均未写入仓库。该证据只提升候选链的可信度，Electron 默认仍使用内置 ninecli；登录、令牌刷新和短信人机验证继续不在迁移范围内。
+本次 status/battery 请求已用真实服务端完成 HTTP 200 校验，原始账号、令牌、设备标识、密文和响应正文均未写入仓库。该证据只提升候选链的可信度；Electron 默认 telemetry reader 已走 SDK，登录、令牌刷新和短信人机验证仍未完成纯 SDK 迁移。
 
-应用层解析器现在也接受 telemetry 候选客户端返回的业务 wrapper：status 的数组数据取首个车辆对象，battery 的对象数据直接进入现有快照模型，位置读取复用同一解包边界。这样后续可以替换数据源而不改变 renderer 合同；当前 IPC 仍保持 ninecli 默认路径。
+应用层解析器现在也接受 telemetry 候选客户端返回的业务 wrapper：status 的数组数据取首个车辆对象，battery 的对象数据直接进入现有快照模型，位置读取复用同一解包边界。这样切换数据源不会改变 renderer 合同；IPC 仅在显式旧源配置下使用 ninecli。
 
 `telemetry-node` 还提供 `parseVehicleStatusResponseCandidate` 与 `parseVehicleBatteryResponseCandidate` 两个类型入口：前者校验并返回 status 车辆记录数组，后者校验并返回 battery 诊断对象；两者都保留固件新增字段。当前已知字段覆盖实时电量、充电、锁定/点火、续航、主电源、BMS 电压/温度/循环次数等，具体数值仍交由应用层按单位和范围校验。
 
