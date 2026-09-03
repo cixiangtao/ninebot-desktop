@@ -1,4 +1,4 @@
-import { generateKeyPairSync } from "node:crypto";
+import { constants, generateKeyPairSync, privateDecrypt } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import {
   buildTravelDetailEncryptedRequestCandidate,
@@ -6,16 +6,20 @@ import {
   buildTravelMonthEncryptedRequestCandidate,
   buildTravelMonthPlaintextBody,
   buildTravelCandidateHeaders,
+  createNinebotTravelCandidateClient,
   decodeTravelDetailResponseCandidate,
   decodeTravelMonthResponseCandidate,
   parseTravelDetailResponseCandidate,
   parseTravelMonthResponseCandidate,
 } from "./travel-node.ts";
 import {
+  decodeNinebotBase64,
+  decryptAesCbcPkcs7,
+  deriveNinebotKeyCandidate,
   encodeNinebotBase64,
   encryptAesCbcPkcs7,
-  deriveNinebotKeyCandidate,
 } from "./crypto-node.ts";
+import { parseNinebotEncryptedRequest } from "./crypto-envelope.ts";
 
 const fields = {
   sys_language: "zh-hans-cn",
@@ -89,6 +93,86 @@ describe("Node travel month candidate", () => {
     expect(result.keyData.keyDataTwo).toMatch(/^[0-9a-f]{11}$/);
     expect(result.keyData.keyDataThree).toMatch(/^[0-9a-f]{10}$/);
     expect(result.keyData.keyDataFour).toHaveLength(8);
+  });
+
+  it("runs the month client through a transport with observed path and headers", async () => {
+    const { publicKey, privateKey } = generateKeyPairSync("rsa", { modulusLength: 1024 });
+    const client = createNinebotTravelCandidateClient({
+      platform: 2,
+      rsaPublicKey: publicKey.export({ type: "spki", format: "pem" }),
+      transport: {
+        async send(request) {
+          expect(request.service).toBe("travel");
+          expect(request.path).toBe("/app-api/travel/v6/travel-list2");
+          expect(request.headers["business-type"]).toBe("2");
+          const requestEnvelope = parseNinebotEncryptedRequest(request.body ?? new Uint8Array());
+          const kReq = new Uint8Array(
+            privateDecrypt(
+              { key: privateKey, padding: constants.RSA_PKCS1_PADDING },
+              decodeNinebotBase64(requestEnvelope.k, "request k"),
+            ),
+          );
+          const wrapper = JSON.parse(
+            new TextDecoder().decode(
+              decryptAesCbcPkcs7({
+                ciphertext: decodeNinebotBase64(requestEnvelope.d, "request d"),
+                key: kReq,
+              }),
+            ),
+          ) as {
+            keyDataOne: string;
+            keyDataTwo: string;
+            keyDataThree: string;
+            keyDataFour: string;
+          };
+          const responseKey = deriveNinebotKeyCandidate([
+            new TextEncoder().encode(wrapper.keyDataOne),
+            new TextEncoder().encode(wrapper.keyDataTwo),
+            new TextEncoder().encode(wrapper.keyDataThree),
+            new TextEncoder().encode(wrapper.keyDataFour),
+          ]);
+          const business = new TextEncoder().encode(
+            JSON.stringify({
+              code: 1,
+              desc: "ok",
+              data: {
+                detail: [0],
+                duration: 0,
+                ec: 0,
+                first_time: 0,
+                list: [],
+                month: "202608",
+                times: 0,
+                total_mileages: "0.0",
+              },
+            }),
+          );
+          const responsePlaintext = new TextEncoder().encode(
+            JSON.stringify({ data: encodeNinebotBase64(business), timeStamp: 1_725_000_000 }),
+          );
+          return {
+            status: 200,
+            headers: {},
+            body: new TextEncoder().encode(
+              JSON.stringify({
+                v: 101,
+                s: encodeNinebotBase64(new Uint8Array(128)),
+                r: encodeNinebotBase64(
+                  encryptAesCbcPkcs7({ plaintext: responsePlaintext, key: responseKey }),
+                ),
+              }),
+            ),
+          };
+        },
+      },
+    });
+
+    await expect(client.month({ fields, businessType: "2" })).resolves.toMatchObject({
+      code: 1,
+      desc: "ok",
+      month: "202608",
+      list: [],
+    });
   });
 
   it("builds the observed detail body with travel_id instead of month pagination", () => {

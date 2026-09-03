@@ -1,16 +1,22 @@
 import { computeNinebotBodyCheckcode, generateNinebotNonce } from "./crypto-node.ts";
+import { NinebotHttpError } from "./client.ts";
 import {
   buildNinebotEncryptedRequestCandidate,
   decryptNinebotResponsePayloadCandidate,
   generateNinebotCandidateRequestMaterial,
 } from "./crypto-codec.ts";
 import type { NinebotCandidateKeyData } from "./crypto-codec.ts";
+import {
+  parseNinebotEncryptedResponse,
+  serializeNinebotEncryptedRequest,
+} from "./crypto-envelope.ts";
 import type {
   NinebotEncryptedRequestEnvelope,
   NinebotEncryptedResponseEnvelope,
 } from "./crypto-envelope.ts";
 import { ninebotCandidateRsaPublicKeyPem } from "./rsa-node.ts";
 import { ninebotVehicleCandidateProtocol } from "./vehicle-node.ts";
+import type { NinebotResponse, NinebotTransport } from "./transport.ts";
 
 export const travelMonthPath = "/app-api/travel/v6/travel-list2" as const;
 export const travelDetailPath = "/app-api/travel/v6/travel-info" as const;
@@ -410,3 +416,97 @@ export const decodeTravelDetailResponseCandidate = ({
   keyData: NinebotCandidateKeyData;
 }) =>
   parseTravelDetailResponseCandidate(decryptNinebotResponsePayloadCandidate({ envelope, keyData }));
+
+export interface CreateNinebotTravelCandidateClientOptions {
+  transport: NinebotTransport;
+  platform: number;
+  p?: string;
+  t?: string;
+  timeStamp?: number;
+  /** Defaults to the public key embedded in ninecli 0.1.7. */
+  rsaPublicKey?: Uint8Array | string;
+  /** Use `decodeGzipBody` in Node when the transport preserves content encoding. */
+  responseBodyDecoder?: (response: NinebotResponse) => Uint8Array | Promise<Uint8Array>;
+}
+
+export interface ListTravelMonthCandidateOptions {
+  fields: TravelMonthPlaintextFields;
+  businessType: "1" | "2";
+  headers?: Readonly<Record<string, string>>;
+}
+
+export interface GetTravelDetailCandidateOptions {
+  fields: TravelDetailPlaintextFields;
+  businessType: "1" | "2";
+  headers?: Readonly<Record<string, string>>;
+}
+
+/** Creates a transport-backed Node client for the validated travel endpoints. */
+export const createNinebotTravelCandidateClient = ({
+  transport,
+  platform,
+  p = ninebotVehicleCandidateProtocol.p,
+  t = ninebotVehicleCandidateProtocol.t,
+  timeStamp,
+  rsaPublicKey,
+  responseBodyDecoder = (response) => response.body,
+}: CreateNinebotTravelCandidateClientOptions) => {
+  const send = async <T>(
+    path: typeof travelMonthPath | typeof travelDetailPath,
+    fields: TravelCandidateHeaderFields,
+    businessType: "1" | "2",
+    plaintextBody: Uint8Array,
+    headers: Readonly<Record<string, string>> | undefined,
+    decode: (payload: Uint8Array) => T,
+  ) => {
+    const material = generateNinebotCandidateRequestMaterial(
+      timeStamp === undefined ? { platform, p, t } : { platform, p, t, timeStamp },
+    );
+    const envelope = buildNinebotEncryptedRequestCandidate({
+      plaintextBody,
+      material,
+      rsaPublicKey: rsaPublicKey ?? ninebotCandidateRsaPublicKeyPem,
+    });
+    const response = await transport.send({
+      service: "travel",
+      method: "POST",
+      path,
+      headers: {
+        ...buildTravelCandidateHeaders({ fields, businessType }),
+        ...headers,
+      },
+      body: new TextEncoder().encode(serializeNinebotEncryptedRequest(envelope)),
+    });
+    if (response.status < 200 || response.status >= 300) {
+      throw new NinebotHttpError(response.status);
+    }
+    const responseBody = await responseBodyDecoder(response);
+    return decode(
+      decryptNinebotResponsePayloadCandidate({
+        envelope: parseNinebotEncryptedResponse(responseBody),
+        keyData: material.keyData,
+      }),
+    );
+  };
+
+  return {
+    month: (options: ListTravelMonthCandidateOptions) =>
+      send(
+        travelMonthPath,
+        options.fields,
+        options.businessType,
+        buildTravelMonthPlaintextBody(options.fields),
+        options.headers,
+        parseTravelMonthResponseCandidate,
+      ),
+    detail: (options: GetTravelDetailCandidateOptions) =>
+      send(
+        travelDetailPath,
+        options.fields,
+        options.businessType,
+        buildTravelDetailPlaintextBody(options.fields),
+        options.headers,
+        parseTravelDetailResponseCandidate,
+      ),
+  };
+};
