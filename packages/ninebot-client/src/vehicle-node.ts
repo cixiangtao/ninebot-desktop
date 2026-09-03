@@ -9,7 +9,11 @@ import type {
   NinebotEncryptedRequestEnvelope,
   NinebotEncryptedResponseEnvelope,
 } from "./crypto-envelope.ts";
-import type { NinebotVehicleCodec } from "./vehicle-codec.ts";
+import {
+  decodeVehicleListResponseWithCodec,
+  type DecodeVehicleListResponseWithCodecOptions,
+  type NinebotVehicleCodec,
+} from "./vehicle-codec.ts";
 
 /** Fields observed in the plaintext JSON sent before vehicle-list encryption. */
 export interface VehicleListPlaintextFields {
@@ -169,6 +173,28 @@ export const decodeVehicleListResponseCandidate = <T = unknown>({
 }) =>
   parseVehicleListResponseCandidate<T>(
     decryptNinebotResponsePayloadCandidate({ envelope, keyData }),
+  );
+
+/**
+ * Decodes a vehicle response through a codec and parses its business wrapper.
+ *
+ * The helper keeps transport/envelope handling in the shared codec boundary while
+ * exposing the candidate response metadata to Node callers that are comparing the
+ * TypeScript path with ninecli.
+ */
+export const decodeVehicleListResponseCandidateWithCodec = async <T = unknown>({
+  service,
+  responseBody,
+  codec,
+  responseContext,
+}: DecodeVehicleListResponseWithCodecOptions): Promise<NinebotVehicleResponseCandidate<T>> =>
+  parseVehicleListResponseCandidate<T>(
+    await decodeVehicleListResponseWithCodec({
+      service,
+      responseBody,
+      codec,
+      responseContext,
+    }),
   );
 
 export interface CreateNinebotVehicleCandidateCodecOptions {

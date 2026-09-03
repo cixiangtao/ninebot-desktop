@@ -5,8 +5,10 @@ import {
   buildVehicleListPlaintextBody,
   createNinebotVehicleCandidateCodec,
   decodeVehicleListResponseCandidate,
+  decodeVehicleListResponseCandidateWithCodec,
   parseVehicleListResponseCandidate,
 } from "./vehicle-node.ts";
+import type { NinebotVehicleCodec } from "./vehicle-codec.ts";
 import {
   deriveNinebotKeyCandidate,
   encodeNinebotBase64,
@@ -76,6 +78,33 @@ describe("Node vehicle request body candidate", () => {
       desc: "ok",
       time_cost: 78,
       extra: null,
+    });
+  });
+
+  it("parses business metadata directly after codec decoding", async () => {
+    const codec: NinebotVehicleCodec = {
+      async encodeRequest() {
+        return { d: "cipher", h: "hash", k: "key", p: "100", t: "1" };
+      },
+      async decodeResponse() {
+        return new TextEncoder().encode(
+          '{"code":0,"data":[{"wnumber":"demo"}],"desc":"ok","time_cost":12,"extra":{"trace":true}}',
+        );
+      },
+    };
+
+    await expect(
+      decodeVehicleListResponseCandidateWithCodec({
+        service: "motor",
+        responseBody: '{"v":1,"s":"session","r":"cipher"}',
+        codec,
+      }),
+    ).resolves.toEqual({
+      code: 0,
+      data: [{ wnumber: "demo" }],
+      desc: "ok",
+      time_cost: 12,
+      extra: { trace: true },
     });
   });
 

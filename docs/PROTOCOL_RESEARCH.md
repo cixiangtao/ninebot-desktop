@@ -138,4 +138,6 @@ Node 专用 `@jiuhao/ninebot-client/vehicle-node` 子路径现在还提供车辆
 
 `decodeVehicleListResponseCandidate` 和 `parseVehicleListResponseCandidate` 负责把解密后的业务 JSON 校验为 `{ code, data, desc, time_cost, extra }` 候选包装，再由上层把 `data` 交给现有车辆领域解析器；它们不会把原始密文或账号字段写入磁盘。
 
+Node 子路径另外提供 `decodeVehicleListResponseCandidateWithCodec`，将通用的响应 envelope/codec 边界与上述业务包装解析串起，调用方可以直接拿到候选元数据和 `data`，无需先处理中间字节。该适配只改变本地解析便利性，不改变默认 ninecli 路径。
+
 `createNinebotVehicleCandidateCodec` 已实现带上下文的 `NinebotVehicleCodec` 合同：每次编码返回独立 keyData 上下文，响应解码只使用传回的对应上下文；它仍属于 Node 候选路径，尚未替换 Electron 默认 ninecli。
