@@ -113,10 +113,13 @@ export const createCandidateTravelReader = ({
   legacy,
   configDirectory,
   candidateClientFactory = createCandidateSessionClient,
+  fallbackToLegacy = false,
 }: {
   legacy: LegacyTravelClient;
   configDirectory: string;
   candidateClientFactory?: (session: NinebotCandidateSessionFields) => CandidateTravelClient;
+  /** Legacy oracle fallback is migration-only and must be explicitly enabled. */
+  fallbackToLegacy?: boolean;
 }): TravelReader => {
   const requestTracker = createCandidateRequestTracker();
   return {
@@ -125,7 +128,11 @@ export const createCandidateTravelReader = ({
       const request = requestTracker.start();
       let candidateClient: CandidateTravelClient | undefined;
       try {
-        const context = await readContext(configDirectory, serialNumber, legacy.vehicles);
+        const context = await readContext(
+          configDirectory,
+          serialNumber,
+          fallbackToLegacy ? legacy.vehicles : undefined,
+        );
         if (request.signal.aborted) {
           throw new Error("Ninebot candidate request was cancelled");
         }
@@ -143,6 +150,7 @@ export const createCandidateTravelReader = ({
         }
       } catch (error) {
         if (request.signal.aborted) throw error;
+        if (!fallbackToLegacy) throw error;
         return legacy.rides(serialNumber, month);
       } finally {
         request.release();
@@ -152,7 +160,11 @@ export const createCandidateTravelReader = ({
       const request = requestTracker.start();
       let candidateClient: CandidateTravelClient | undefined;
       try {
-        const context = await readContext(configDirectory, serialNumber, legacy.vehicles);
+        const context = await readContext(
+          configDirectory,
+          serialNumber,
+          fallbackToLegacy ? legacy.vehicles : undefined,
+        );
         if (request.signal.aborted) {
           throw new Error("Ninebot candidate request was cancelled");
         }
@@ -170,6 +182,7 @@ export const createCandidateTravelReader = ({
         }
       } catch (error) {
         if (request.signal.aborted) throw error;
+        if (!fallbackToLegacy) throw error;
         return legacy.rideDetail(serialNumber, travelId);
       } finally {
         request.release();

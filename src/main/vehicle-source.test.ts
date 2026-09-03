@@ -80,6 +80,7 @@ describe("candidate vehicle source", () => {
       legacy: {
         vehicles: async () => [{ wnumber: "SN1234567890", businessType: 2, vehicle_type: 14363 }],
       },
+      fallbackToLegacy: true,
       candidateClientFactory: () => candidateClient,
     });
 
@@ -97,6 +98,7 @@ describe("candidate vehicle source", () => {
     const reader = createCandidateVehicleReader({
       configDirectory,
       legacy: { vehicles: async () => legacyRows },
+      fallbackToLegacy: true,
       candidateClientFactory: () => {
         throw new Error("candidate unavailable");
       },

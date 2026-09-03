@@ -106,6 +106,7 @@ describe("candidate travel source", () => {
     const reader = createCandidateTravelReader({
       legacy,
       configDirectory,
+      fallbackToLegacy: true,
       candidateClientFactory: () => {
         throw new Error("candidate client should not be created");
       },
@@ -135,6 +136,7 @@ describe("candidate travel source", () => {
         vehicles: async () => [{ wnumber: "SN1234567890", businessType: 2, vehicle_type: 14363 }],
       },
       configDirectory,
+      fallbackToLegacy: true,
       candidateClientFactory: () => ({
         month: async ({ vehicleType, month }) => {
           observedVehicleType = vehicleType;

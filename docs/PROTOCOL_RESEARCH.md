@@ -223,11 +223,11 @@ Node 子路径另外提供 `decodeVehicleListResponseCandidateWithCodec`，将�
 
 parity 脚本现在直接调用 SDK 的 `createNinebotCandidateSessionClient`，而不是在脚本内重复拼装 telemetry、车辆列表和 travel 客户端；因此真实账号门禁同时覆盖公共 SDK 的会话字段、车型映射和五类请求入口。
 
-Electron 现支持显式设置 `NINEBOT_TELEMETRY_SOURCE=candidate` 来试用 Node telemetry 候选；候选读取本地 ninecli 会话并在 status/battery 任一失败时自动回退内置 ninecli。未设置该变量时行为完全不变，仍由 ninecli 提供实时状态和电池数据。该开关用于迁移期验证，不代表已经切换默认数据源。
+Electron 默认使用 Node telemetry 候选；设置 `NINEBOT_TELEMETRY_SOURCE=ninecli` 才会强制走内置 oracle。候选读取本地 SDK 会话，失败时默认直接报告错误；构造器的 `fallbackToLegacy` 仅供迁移 parity 测试显式开启。
 
 telemetry 候选源现通过 `createNinebotCandidateSessionClient` 生成 status/battery 请求，主进程不再重复拼装候选字段；三类 Electron 候选开关同时开启时，真实只读 QA 仍验证账号、设备、历史行程和导出链路正常。
 
-候选源在主进程内按请求重新读取会话文件，因此登录、刷新和退出后不会复用旧令牌；候选或会话读取异常会分别回退对应的 ninecli 读取，不影响另一个 telemetry 域。该回退行为通过不访问真实账号的单元测试覆盖。
+候选源在主进程内按请求重新读取会话文件，因此登录、刷新和退出后不会复用旧令牌；默认不会因候选或会话读取异常而回退 ninecli，避免 SDK 默认路径暗中依赖旧运行时。需要对照时由调用方显式开启 `fallbackToLegacy`。
 
 首次使用本机配置自动拼装 status/battery 候选请求的回放显示：真实服务端返回 HTTP 200，但业务 wrapper 为 `code=190003`、`data=null`、通讯异常描述。由此确认 HTTP 层成功不等于业务协议已验证；类型化解析器会拒绝这类空数据，Electron 继续保留 ninecli 默认路径，后续需要用 oracle 明文/Header 做字段级修正。
 
@@ -235,17 +235,17 @@ telemetry 候选源现通过 `createNinebotCandidateSessionClient` 生成 status
 
 继续回到 `EncryptRequest` 入口对照后发现，telemetry 明文的 `serviceTime` 使用 13 位 Unix 毫秒，而车辆列表和加密外壳的 `timeStamp` 仍使用已验证的 Unix 秒。Node 默认值已按能力拆开修正为毫秒；使用同一账号连续运行 3 轮 status/battery，并将 Node 数据与 ninecli 明文结果在内存中 parity，3 轮均为 `statusEqual=true`、`batteryEqual=true`，分别比较 25 和 19 个节点且未截断。该结果只证明当前账号、车辆和运行时版本下的只读 telemetry 候选链，Electron 默认仍保留 ninecli，待多车辆、多车型样本后再评估切换。
 
-为继续推进 travel 迁移，主进程新增了独立的 `TravelReader` 边界和 `NINEBOT_TRAVEL_SOURCE=candidate` 试用开关。候选源按请求重新读取本地会话，调用 `travel-node` 的月度/详情客户端；月度读取或详情读取失败时分别回退到 ninecli，不影响另一个域。travel 的 `serviceTime` 与请求 Header 的 `service-time` 均使用 Unix 毫秒，当前 ninecli 0.1.7 的 `rn-ver` 为 `743`。由于 travel 明文需要 `vehicle_type`，候选源会优先读本地 `vehicles.json`，缺失时仅在内存中调用 ninecli 的 `vehicles` 输出补齐，不写回缓存；若仍无法取得模型码则安全回退，不会猜测该值。默认行为仍是 ninecli。
+为继续推进 travel 迁移，主进程新增了独立的 `TravelReader` 边界；默认调用 `travel-node` 的月度/详情客户端，设置 `NINEBOT_TRAVEL_SOURCE=ninecli` 才强制走 oracle。候选源按请求重新读取本地会话，失败时默认直接报告；只有显式开启 `fallbackToLegacy` 才允许对照回退。travel 的 `serviceTime` 与请求 Header 的 `service-time` 均使用 Unix 毫秒，当前 ninecli 0.1.7 的 `rn-ver` 为 `743`。由于 travel 明文需要 `vehicle_type`，候选源优先读取 SDK 自己的 `vehicle-cache.json`，仅在显式 legacy fallback 时读取旧缓存或调用 oracle，不猜测模型值。
 
-travel 候选源现通过 `createNinebotCandidateSessionClient` 生成月度和详情请求，主进程只负责从本地会话与车辆元数据解析调用参数；月度、详情仍各自拥有失败回退边界。
+travel 候选源现通过 `createNinebotCandidateSessionClient` 生成月度和详情请求，主进程只负责从本地会话与车辆元数据解析调用参数；月度、详情默认各自失败即报错，legacy 回退边界必须显式开启。
 
 `@jiuhao/ninebot-client` 根入口现导出 `travel-node` 的构造器、解析器、transport client 和类型，调用方可以在 Node、Electron 主进程或测试 transport 中复用同一套候选合同。该导出不代表登录、令牌刷新或移动端能力已迁移，也不改变候选请求必须经过多车型 parity 的门槛。
 
 SDK 另提供 `createNinebotCandidateSessionClient` 和 `createNinebotFetchCandidateSessionClient` 作为只读聚合入口：调用方只需提供共享会话字段、车型编码和可注入 transport（或直接使用默认 fetch transport），即可访问车辆列表、status、battery、月度和详情候选。fetch 工厂会把局部 origin 覆盖与已验证默认地址合并，避免只改一个服务时意外丢失其它服务路由。该封装在内存中生成每次请求的 nonce、request-id 与服务时间，默认使用已验证的 `rnVersion=743` 和 `current_version=610063322`；协议回放和测试可以注入时钟及三个随机值工厂，显式传入的 Header 仍优先。调用方退出登录时可调用 `clear()`，之后的请求会在发送前失败。不执行登录、不读写令牌文件、不暴露控制能力，凭据生命周期仍由上层负责。
 
-车辆列表现在也有独立的 `VehicleReader` 和 `NINEBOT_VEHICLE_SOURCE=candidate` 试用开关。候选源先调用 ninecli 的只读 `vehicles` 输出取得服务族及 `vehicle_type`，然后按服务族顺序发送 Node 候选列表请求；候选返回非数组或请求失败时整体回退 ninecli。车辆列表候选不会把原始车辆响应写回缓存，默认数据源仍是 ninecli。
+车辆列表现在也有独立的 `VehicleReader`；默认按服务族顺序发送 Node 候选列表请求，设置 `NINEBOT_VEHICLE_SOURCE=ninecli` 才强制走 oracle。候选返回非数组或请求失败时默认直接报错；显式 legacy fallback 才会回退。成功的候选元数据会写入 SDK 自己的 `vehicle-cache.json`，不改写旧 ninecli 缓存。
 
-车辆列表候选源现同样通过 `createNinebotCandidateSessionClient` 发起请求；缓存完整时直接使用本地服务族和模型码，缓存缺少模型码时才临时向 ninecli 补齐。同一服务族存在多个模型码时会逐个请求并按车辆 SN 在内存中去重，三类 Electron 候选域因此共享同一个 SDK 会话入口。
+车辆列表候选源现同样通过 `createNinebotCandidateSessionClient` 发起请求；缓存完整时直接使用 SDK 本地服务族和模型码，缓存缺少模型码时只有显式 legacy fallback 才临时向 oracle 补齐。同一服务族存在多个模型码时会逐个请求并按车辆 SN 在内存中去重，三类 Electron 候选域因此共享同一个 SDK 会话入口。
 
 会话生命周期也已收口：密码登录、短信登录成功以及退出成功都会清理车辆序列号映射、行程映射和三类读取缓存，并在切换账号时重置本地行程编号。登录失败不会清理仍在使用的会话；候选数据源本身按请求重新读取会话文件，因此不会在模块级别保留令牌或车辆数据。
 

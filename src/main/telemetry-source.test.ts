@@ -167,6 +167,7 @@ describe("candidate telemetry source", () => {
         battery: async () => ({ electricity: 72 }),
       },
       configDirectory,
+      fallbackToLegacy: true,
       candidateClientFactory: () => ({
         status: async () => {
           throw new Error("candidate unavailable");

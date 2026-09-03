@@ -25,9 +25,9 @@ NINEBOT_CONFIG_DIR=/absolute/path/to/ninecli-config pnpm dev
 
 仓库正在把现有只读能力逐步迁移为 Node.js/TypeScript SDK。当前已经加入仅监听本机、默认不保存 Body 原文的协议记录器，以 ninecli 作为迁移期行为对照；使用方式、私有样本边界和实现顺序见[九号协议研究计划](docs/PROTOCOL_RESEARCH.md)。
 
-默认使用 TypeScript SDK 数据源；如需在迁移排查时强制使用 legacy oracle，可设置 `NINEBOT_SOURCE=ninecli`，也可以分别设置 `NINEBOT_VEHICLE_SOURCE`、`NINEBOT_TELEMETRY_SOURCE` 或 `NINEBOT_TRAVEL_SOURCE`。单域变量优先级更高。当前候选读取异常仍会按域回退 ninecli，待多账号、多车型 parity 完成后移除该回退。travel 候选会优先从本地 `vehicles.json` 读取私有 `vehicle_type` 模型码；缓存缺少该字段时，只在内存中向 legacy oracle 补齐，不会改写缓存或猜测模型值。
+默认使用 TypeScript SDK 数据源；如需在迁移排查时强制使用 legacy oracle，可设置 `NINEBOT_SOURCE=ninecli`，也可以分别设置 `NINEBOT_VEHICLE_SOURCE`、`NINEBOT_TELEMETRY_SOURCE` 或 `NINEBOT_TRAVEL_SOURCE`。单域变量优先级更高。SDK 读取异常默认直接报告，不会悄悄回退 ninecli；候选构造器仍保留显式 `fallbackToLegacy` 选项供 parity 工具使用。travel 候选会优先从 SDK 自己的 `vehicle-cache.json` 读取私有 `vehicle_type` 模型码；仅在显式启用 legacy fallback 时才读取旧缓存或调用 oracle，不会猜测模型值。
 
-候选请求默认最多等待 15 秒；VPN 或上游较慢时可通过 `NINEBOT_CANDIDATE_TIMEOUT_MS` 调整为正整数毫秒，超过 120 秒会按 120 秒执行，空值或非法值回到 15 秒。超时后该次读取会按原有策略回退 ninecli，不会改变数据源开关或会话凭据。
+候选请求默认最多等待 15 秒；VPN 或上游较慢时可通过 `NINEBOT_CANDIDATE_TIMEOUT_MS` 调整为正整数毫秒，超过 120 秒会按 120 秒执行，空值或非法值回到 15 秒。超时后该次读取按 SDK 错误边界结束，不会偷偷切换到 ninecli，也不会改变数据源开关或会话凭据。
 
 SDK 根入口同时导出 `createNinebotCandidateSessionClient` 和 `createNinebotFetchCandidateSessionClient`，把同一份内存会话元数据适配为车辆列表、status、battery、月度和详情五类只读调用；fetch 工厂默认使用已验证的九号服务地址，也支持局部覆盖 origin（未覆盖的服务仍保留默认地址）和 fetch 实现。它不提供登录、令牌文件读写或车辆控制；调用方负责会话生命周期和凭据保护，退出登录时可调用返回对象的 `clear()` 阻止后续请求并释放会话引用，可通过 `@jiuhao/ninebot-client/candidate-session` 单独导入。协议回放或测试可注入 `clock`、`nonceFactory` 和 `requestIdFactory`，生产环境默认仍使用系统时间与安全随机值。
 
