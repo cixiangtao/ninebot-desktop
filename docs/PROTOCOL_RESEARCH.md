@@ -99,9 +99,20 @@ pnpm protocol:record -- --include-bodies --include-signing-headers
 - 请求包含 `authorization`、`clientid`、`sign`、`timestamp` 以及应用和系统版本类 Header；记录器不保存前三类认证值，只保留长度和摘要。
 - 上游返回 HTTP 200，ninecli 能透过本地代理正常解析响应。
 
-本次只保存元数据和 Body 摘要，没有保存账号响应正文。下一步需要在私有 Body 捕获模式下取得一组 `whoami` 样本，确定响应包装和签名输入，再开始实现 TypeScript 请求生成器。
+本次只保存元数据和 Body 摘要，没有保存账号响应正文。响应包装已经由私有样本确认；签名输入仍需要更多受控样本和二进制实现对照。
 
 当前阶段已取得私有原始样本用于本地分析：响应为 gzip 编码，解压后是上述 JSON 包装；`timestamp` 为 13 位十进制毫秒时间戳，`sign` 为 64 字符十六进制值。样本不会进入仓库，签名算法仍待多组受控样本和二进制实现对照后确认。
+
+## 密码登录请求形状（2026-09-03）
+
+使用假的用户名和密码、仅转发到本机 stub 的私有记录器，ninecli 发出：
+
+- HTTP 方法与路径为 `POST /v6/user/login`。
+- 请求体字段和序列化顺序为 `areaCode`、`device`、`password`、`username`；默认设备值为 `ANDROID`。
+- Header 延续 `clientid`、`app_version`、系统信息、13 位毫秒 `timestamp` 和 64 字符十六进制 `sign`。
+- ninecli 读取响应 `data.access_token`、`data.refresh_token`、`data.business_uid`，并把 `accessTokenValidity` 一并保存到本地 token 文件。
+
+该采集只证明 ninecli 的请求/响应形状和本地解析边界，不证明 stub 返回值能通过九号服务端认证；TypeScript 已提供 `buildPasswordLoginRequest` 与 token 字段解析器，签名仍通过显式 provider 注入。
 
 ## 车辆列表首条观察
 
