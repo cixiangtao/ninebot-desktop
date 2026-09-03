@@ -123,6 +123,17 @@ The injected clients own encryption and transport details; the core only
 assembles the observed plaintext fields and controls the in-memory session
 lifecycle.
 
+The `@jiuhao/ninebot-client/crypto-web` subpath now exposes the first
+platform-neutral crypto provider primitives: canonical/Android Base64, MD5
+checkcodes, Web Crypto AES-CBC, browser-compatible RSAES-PKCS1-v1_5, the
+observed four-input response key mixer, and secure random material generation.
+AES/RSA functions expose asynchronous APIs; AES requires
+`globalThis.crypto.subtle`, while RSA uses Web Crypto randomness and a
+BigInt-based public operation because RSAES-PKCS1-v1_5 is not consistently
+available in Web Crypto implementations. This is a primitive layer for the
+future web/mobile codec, not yet a drop-in replacement for the Node candidate
+service clients.
+
 All five read-only methods also accept an optional `AbortSignal`. Hosts can
 cancel a request when the user switches vehicles or leaves a page:
 
