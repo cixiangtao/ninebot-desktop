@@ -52,6 +52,15 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 
 const readJson = async (path: string): Promise<unknown> => JSON.parse(await readFile(path, "utf8"));
 
+const readJsonIfPresent = async (path: string): Promise<unknown | null> => {
+  try {
+    return await readJson(path);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
+    throw error;
+  }
+};
+
 const requireText = (value: unknown, label: string) => {
   if ((typeof value !== "string" && typeof value !== "number") || String(value).length === 0) {
     throw new Error(`Ninebot ${label} is incomplete`);
@@ -81,15 +90,19 @@ export const readCandidateService = (
 export const readCandidateSession = async (
   configDirectory: string,
 ): Promise<NinebotCandidateSessionFields> => {
-  const [configValue, tokensValue] = await Promise.all([
+  const [configValue, authSessionValue] = await Promise.all([
     readJson(join(configDirectory, "config.json")),
-    readJson(join(configDirectory, "tokens.json")),
+    readJsonIfPresent(join(configDirectory, "auth-session.json")),
   ]);
+  const tokensValue = authSessionValue ?? (await readJson(join(configDirectory, "tokens.json")));
   if (!isRecord(configValue) || !isRecord(tokensValue)) {
     throw new Error("Ninebot candidate session files are invalid");
   }
   const config = configValue as Partial<CandidateConfig>;
-  const tokens = tokensValue as Partial<CandidateTokens>;
+  const tokens = tokensValue as Partial<CandidateTokens> & {
+    accessToken?: unknown;
+    businessUid?: unknown;
+  };
   return {
     sys_language: "zh-hans-cn",
     client_ver: "610063322",
@@ -101,8 +114,8 @@ export const readCandidateSession = async (
     platform_ver: `${requireText(config.os_version, "candidate os_version")} ${requireText(config.os_model, "candidate os_model")}`,
     platform: "android",
     login_country: "CN",
-    access_token: requireText(tokens.access_token, "candidate access_token"),
-    uid: requireText(tokens.business_uid, "candidate business_uid"),
+    access_token: requireText(tokens.accessToken ?? tokens.access_token, "candidate access_token"),
+    uid: requireText(tokens.businessUid ?? tokens.business_uid, "candidate business_uid"),
   };
 };
 

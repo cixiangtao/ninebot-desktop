@@ -71,6 +71,19 @@ describe("candidate context", () => {
     });
   });
 
+  it("prefers the new SDK session file when it exists", async () => {
+    const directory = await createSessionDirectory();
+    await writeFile(
+      join(directory, "auth-session.json"),
+      JSON.stringify({ accessToken: "sdk-token", businessUid: "sdk-uid" }),
+    );
+
+    await expect(readCandidateSession(directory)).resolves.toMatchObject({
+      access_token: "sdk-token",
+      uid: "sdk-uid",
+    });
+  });
+
   it("keeps vehicle metadata loading separate from session credentials", async () => {
     const directory = await createSessionDirectory();
 
