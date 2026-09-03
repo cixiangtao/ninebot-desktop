@@ -18,9 +18,14 @@ propagation, cancellation, and session cleanup. Hosts without Web Crypto must
 also provide a `nonceFactory`.
 
 The package is currently private (`0.0.0`) and is not an official Ninebot SDK.
-It does not implement account login, vehicle control, data persistence, or
-server-side credential storage. Callers must obtain credentials through an
-authorized flow and keep them out of source control and logs.
+The `auth` entry now provides a platform-neutral `NinebotAuthSessionManager`,
+an async session-store contract, and an injected auth-provider contract. The
+manager handles login-result replacement, persistence, expiry-aware refresh,
+logout cleanup, and defensive session copies without retaining passwords. It
+does not yet implement the Ninebot wire-level login/signature provider, so it
+is a lifecycle boundary rather than a drop-in login replacement. Vehicle
+control remains out of scope. Callers must keep credentials out of source
+control and logs.
 
 ## Build
 

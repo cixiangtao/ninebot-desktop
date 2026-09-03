@@ -20,6 +20,8 @@ scripts/protocol-recorder.ts
 
 会话编排另外拆在 `candidate-session-core` 子路径，公共字段与响应类型位于 `candidate-contracts`。这两个文件只使用 DOM/ECMAScript 可用的类型和运行时 API，不导入 Node 加密模块；core 只接收平台提供的车辆、telemetry 和 travel 客户端，统一负责字段组装、request-id、取消信号和会话清理。因此 Web 或 React Native 可以先复用生命周期，再单独实现符合平台能力的加密 provider。`crypto-web` 子路径已补上 Base64、MD5、Web Crypto AES、浏览器兼容的 RSA PKCS#1 v1.5、key mixer 和随机材料原语，`crypto-web-codec` 进一步组装请求外壳与响应解密链，`transport-web` 提供对应的 Fetch/超时/取消边界，但尚未组成完整的 Web/mobile service client。Node/Electron 继续通过 `candidate-session` 使用内置的 Node crypto 实现，两条路径共享同一份调用契约；`pnpm check` 会额外运行 DOM-only 类型检查。
 
+认证生命周期边界现在位于 `auth` 子路径：`NinebotAuthSessionManager` 负责登录结果替换、异步会话存储、过期前刷新、退出清理和防御性副本，密码只由调用方在一次登录尝试中持有，不会写入 manager。真实九号登录、签名和令牌刷新仍由待验证的 runtime-specific auth provider 注入；这一步不把尚未确认的协议字段伪装成已完成的登录实现。
+
 当前已落地的核心边界：
 
 - `buildWhoamiRequest` 固化已验证的 `POST /v5/user`、空 JSON Body 和请求 Header 形状。
