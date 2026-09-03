@@ -121,4 +121,33 @@ describe("candidate session client", () => {
     );
     expect(observedUrl).toBe("https://ebike.ninebot.com/vehicle/vehicle/desktop-component");
   });
+
+  it("merges partial origin overrides with the remaining defaults", async () => {
+    const observedUrls: string[] = [];
+    const client = createNinebotFetchCandidateSessionClient({
+      platform: 2,
+      session,
+      origins: { ebike: "https://example.test" },
+      fetch: async (input) => {
+        observedUrls.push(String(input));
+        return new Response("", { status: 500 });
+      },
+    });
+
+    await expect(client.status({ service: "ebike", serialNumber: "SN1234567890" })).rejects.toThrow(
+      "Ninebot request failed with HTTP 500",
+    );
+    await expect(
+      client.month({
+        service: "ebike",
+        serialNumber: "SN1234567890",
+        vehicleType: 14363,
+        month: "202608",
+      }),
+    ).rejects.toThrow("Ninebot request failed with HTTP 500");
+    expect(observedUrls).toEqual([
+      "https://example.test/vehicle/vehicle/desktop-component",
+      "https://cn-cbu-gateway.ninebot.com/app-api/travel/v6/travel-list2",
+    ]);
+  });
 });

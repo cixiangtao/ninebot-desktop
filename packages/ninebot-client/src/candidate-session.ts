@@ -285,7 +285,7 @@ export const createNinebotFetchCandidateSessionClient = ({
   createNinebotCandidateSessionClient({
     ...options,
     transport: createFetchNinebotTransport({
-      origins,
+      origins: { ...defaultNinebotCandidateOrigins, ...origins },
       ...(fetchImpl === undefined ? {} : { fetch: fetchImpl }),
     }),
   });

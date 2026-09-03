@@ -218,7 +218,7 @@ travel 候选源现通过 `createNinebotCandidateSessionClient` 生成月度和�
 
 `@jiuhao/ninebot-client` 根入口现导出 `travel-node` 的构造器、解析器、transport client 和类型，调用方可以在 Node、Electron 主进程或测试 transport 中复用同一套候选合同。该导出不代表登录、令牌刷新或移动端能力已迁移，也不改变候选请求必须经过多车型 parity 的门槛。
 
-SDK 另提供 `createNinebotCandidateSessionClient` 和 `createNinebotFetchCandidateSessionClient` 作为只读聚合入口：调用方只需提供共享会话字段、车型编码和可注入 transport（或直接使用默认 fetch transport），即可访问车辆列表、status、battery、月度和详情候选。该封装在内存中生成每次请求的 nonce、request-id 与服务时间，默认使用已验证的 `rnVersion=743` 和 `current_version=610063322`；协议回放和测试可以注入时钟及三个随机值工厂，显式传入的 Header 仍优先。调用方退出登录时可调用 `clear()`，之后的请求会在发送前失败。不执行登录、不读写令牌文件、不暴露控制能力，凭据生命周期仍由上层负责。
+SDK 另提供 `createNinebotCandidateSessionClient` 和 `createNinebotFetchCandidateSessionClient` 作为只读聚合入口：调用方只需提供共享会话字段、车型编码和可注入 transport（或直接使用默认 fetch transport），即可访问车辆列表、status、battery、月度和详情候选。fetch 工厂会把局部 origin 覆盖与已验证默认地址合并，避免只改一个服务时意外丢失其它服务路由。该封装在内存中生成每次请求的 nonce、request-id 与服务时间，默认使用已验证的 `rnVersion=743` 和 `current_version=610063322`；协议回放和测试可以注入时钟及三个随机值工厂，显式传入的 Header 仍优先。调用方退出登录时可调用 `clear()`，之后的请求会在发送前失败。不执行登录、不读写令牌文件、不暴露控制能力，凭据生命周期仍由上层负责。
 
 车辆列表现在也有独立的 `VehicleReader` 和 `NINEBOT_VEHICLE_SOURCE=candidate` 试用开关。候选源先调用 ninecli 的只读 `vehicles` 输出取得服务族及 `vehicle_type`，然后按服务族顺序发送 Node 候选列表请求；候选返回非数组或请求失败时整体回退 ninecli。车辆列表候选不会把原始车辆响应写回缓存，默认数据源仍是 ninecli。
 
