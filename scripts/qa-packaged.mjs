@@ -13,7 +13,7 @@ const executablePath =
     : resolve(projectRoot, "release/mac-arm64/韭号出行.app/Contents/MacOS/韭号出行"));
 const qaRoot = await mkdtemp(resolve(tmpdir(), "ninebot-desktop-packaged-qa-"));
 const userDataDirectory = resolve(qaRoot, "user-data");
-const configDirectory = resolve(qaRoot, "ninecli");
+const configDirectory = resolve(qaRoot, "ninebot");
 
 const reservePort = async () => {
   const server = createServer();
@@ -104,10 +104,9 @@ try {
   await page.locator(".playback-panel").waitFor();
   const runtimeStatus = await page.evaluate(() => window.ninebot.runtime.security());
   const sdkRuntime = runtimeStatus.ok && runtimeStatus.data.version === "typescript-sdk";
-  const legacyRuntime = runtimeStatus.ok && runtimeStatus.data.binary.status === "verified";
   if (
     !runtimeStatus.ok ||
-    (!sdkRuntime && !legacyRuntime) ||
+    !sdkRuntime ||
     runtimeStatus.data.policy.sessionCache.storage !== "memory-only" ||
     runtimeStatus.data.policy.sessionCache.rawResponsesStored !== false ||
     runtimeStatus.data.policy.sessionCache.persistsAcrossRestarts !== false ||
@@ -129,9 +128,9 @@ try {
       platform: process.platform,
       demoReady: true,
       bridgeReady: true,
-      runtimeMode: sdkRuntime ? "typescript-sdk" : "ninecli-legacy",
-      bundledRuntime: legacyRuntime,
-      binaryVerified: legacyRuntime,
+      runtimeMode: "typescript-sdk",
+      bundledRuntime: false,
+      binaryVerified: false,
       sessionCacheMemoryOnly: true,
       monthSummaryExportReady,
     }),
