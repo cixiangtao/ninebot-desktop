@@ -247,7 +247,7 @@ SDK 另提供 `createNinebotCandidateSessionClient` 和 `createNinebotFetchCandi
 
 车辆列表现在也有独立的 `VehicleReader`；默认按服务族顺序发送 Node 候选列表请求，设置 `NINEBOT_VEHICLE_SOURCE=ninecli` 才强制走 oracle。候选返回非数组或请求失败时默认直接报错；显式 legacy fallback 才会回退。成功的候选元数据会写入 SDK 自己的 `vehicle-cache.json`，不改写旧 ninecli 缓存。
 
-车辆列表候选源现同样通过 `createNinebotCandidateSessionClient` 发起请求；缓存完整时直接使用 SDK 本地服务族和模型码，缓存缺少模型码时只有显式 legacy fallback 才临时向 oracle 补齐。同一服务族存在多个模型码时会逐个请求并按车辆 SN 在内存中去重，三类 Electron 候选域因此共享同一个 SDK 会话入口。
+车辆列表候选源现同样通过 `createNinebotCandidateSessionClient` 发起请求；缓存完整时直接使用 SDK 本地服务族和模型码，首次运行或缓存缺少模型码时先用电自 `65` / 电摩 `64` 服务族发现码获取具体车型元数据并写入 SDK 缓存。只有显式 legacy fallback 才会临时向 oracle 补齐。同一服务族存在多个模型码时会逐个请求并按车辆 SN 在内存中去重，三类 Electron 候选域因此共享同一个 SDK 会话入口。
 
 会话生命周期也已收口：密码登录、短信登录成功以及退出成功都会清理车辆序列号映射、行程映射和三类读取缓存，并在切换账号时重置本地行程编号。登录失败不会清理仍在使用的会话；候选数据源本身按请求重新读取会话文件，因此不会在模块级别保留令牌或车辆数据。
 
