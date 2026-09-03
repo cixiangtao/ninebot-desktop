@@ -32,6 +32,15 @@ const createSessionDirectory = async () => {
   return directory;
 };
 
+const addCachedVehicleType = async (directory: string) => {
+  await writeFile(
+    join(directory, "vehicles.json"),
+    JSON.stringify({
+      vehicles: [{ wnumber: "SN1234567890", business_line: "ebike", vehicle_type: 14363 }],
+    }),
+  );
+};
+
 afterEach(async () => {
   await Promise.all(
     temporaryDirectories.splice(0).map((directory) => rm(directory, { recursive: true })),
@@ -80,5 +89,29 @@ describe("candidate vehicle source", () => {
     });
 
     await expect(reader.vehicles()).resolves.toEqual(legacyRows);
+  });
+
+  it("does not invoke ninecli when the private vehicle cache has complete metadata", async () => {
+    const configDirectory = await createSessionDirectory();
+    await addCachedVehicleType(configDirectory);
+    const candidateClient: CandidateVehicleClient = {
+      list: async ({ fields }) => {
+        expect(fields.vehicle_type).toBe("14363");
+        return { data: [{ wnumber: "SN1234567890", vehicle_name: "cached metadata vehicle" }] };
+      },
+    };
+    const reader = createCandidateVehicleReader({
+      configDirectory,
+      legacy: {
+        vehicles: async () => {
+          throw new Error("legacy vehicles should not be called");
+        },
+      },
+      candidateClientFactory: () => candidateClient,
+    });
+
+    await expect(reader.vehicles()).resolves.toEqual([
+      { wnumber: "SN1234567890", vehicle_name: "cached metadata vehicle" },
+    ]);
   });
 });

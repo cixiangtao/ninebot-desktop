@@ -40,6 +40,10 @@ interface VehicleRow {
   vehicle_type?: unknown;
 }
 
+interface CachedVehicles {
+  vehicles?: VehicleRow[];
+}
+
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === "object" && !Array.isArray(value);
 
@@ -104,15 +108,38 @@ export const createCandidateVehicleReader = ({
 }): VehicleReader => ({
   async vehicles() {
     try {
-      const [configValue, tokensValue, legacyValue] = await Promise.all([
+      const [configValue, tokensValue, cachedVehiclesValue] = await Promise.all([
         readJson(join(configDirectory, "config.json")),
         readJson(join(configDirectory, "tokens.json")),
-        legacy.vehicles(),
+        readJson(join(configDirectory, "vehicles.json")),
       ]);
-      if (!isRecord(configValue) || !isRecord(tokensValue) || !Array.isArray(legacyValue)) {
+      if (!isRecord(configValue) || !isRecord(tokensValue) || !isRecord(cachedVehiclesValue)) {
         throw new Error("Ninebot candidate vehicle session is invalid");
       }
-      const rows = legacyValue.filter((item): item is VehicleRow => isRecord(item));
+      const cachedVehicleRows = (cachedVehiclesValue as CachedVehicles).vehicles;
+      const cachedRows = Array.isArray(cachedVehicleRows)
+        ? cachedVehicleRows.filter((item): item is VehicleRow => isRecord(item))
+        : [];
+      let rows = cachedRows;
+      const cachedGroups = new Map<CandidateVehicleService, VehicleRow[]>();
+      for (const row of cachedRows) {
+        const service = readService(row);
+        if (!service) continue;
+        const serviceRows = cachedGroups.get(service) ?? [];
+        serviceRows.push(row);
+        cachedGroups.set(service, serviceRows);
+      }
+      const cacheHasCompleteMetadata =
+        cachedGroups.size > 0 &&
+        [...cachedGroups.values()].every((serviceRows) =>
+          serviceRows.some((row) => row.vehicle_type !== undefined),
+        );
+      if (!cacheHasCompleteMetadata) {
+        const legacyValue = await legacy.vehicles();
+        if (Array.isArray(legacyValue)) {
+          rows = legacyValue.filter((item): item is VehicleRow => isRecord(item));
+        }
+      }
       const grouped = new Map<CandidateVehicleService, VehicleRow[]>();
       for (const row of rows) {
         const service = readService(row);
