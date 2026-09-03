@@ -134,6 +134,12 @@ available in Web Crypto implementations. This is a primitive layer for the
 future web/mobile codec, not yet a drop-in replacement for the Node candidate
 service clients.
 
+`@jiuhao/ninebot-client/crypto-web-codec` composes those primitives into the
+observed encrypted request envelope and response `r`/inner-Base64 decoding
+chain. It keeps response key-data bound to the originating request and uses
+async methods to match Web Crypto-friendly providers. Service-specific browser
+clients and login are still outside this package boundary.
+
 All five read-only methods also accept an optional `AbortSignal`. Hosts can
 cancel a request when the user switches vehicles or leaves a page:
 
