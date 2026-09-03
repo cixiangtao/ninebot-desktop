@@ -27,6 +27,12 @@ is a lifecycle boundary rather than a drop-in login replacement. Vehicle
 control remains out of scope. Callers must keep credentials out of source
 control and logs.
 
+The lifecycle layer can be imported without pulling in Node-only crypto:
+
+```ts
+import { NinebotAuthSessionManager } from "@jiuhao/ninebot-client/auth";
+```
+
 ## Build
 
 From the repository root:
