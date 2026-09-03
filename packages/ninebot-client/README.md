@@ -140,6 +140,11 @@ chain. It keeps response key-data bound to the originating request and uses
 async methods to match Web Crypto-friendly providers. Service-specific browser
 clients and login are still outside this package boundary.
 
+`@jiuhao/ninebot-client/transport-web` provides the matching Fetch boundary
+for `ebike`, `motor`, and `travel`: it preserves binary response bytes, passes
+through caller cancellation, and can enforce a per-request timeout. It does
+not add cookies, login, token persistence, or vehicle-control operations.
+
 All five read-only methods also accept an optional `AbortSignal`. Hosts can
 cancel a request when the user switches vehicles or leaves a page:
 
