@@ -27,6 +27,12 @@ is a lifecycle boundary rather than a drop-in login replacement. Vehicle
 control remains out of scope. Callers must keep credentials out of source
 control and logs.
 
+`createNinebotPassportAuthProvider` adapts the Passport login client to this
+shared lifecycle. Password login, `whoami`, token refresh, and local logout can
+therefore use one provider contract. SMS requests intentionally throw
+`NinebotHumanVerificationRequiredError` until the upstream human-verification
+challenge is completed; the SDK does not bypass or simulate that challenge.
+
 The lifecycle layer can be imported without pulling in Node-only crypto:
 
 ```ts

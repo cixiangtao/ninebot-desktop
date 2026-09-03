@@ -81,6 +81,10 @@
       "types": "./dist/passport-login-client.d.ts",
       "import": "./dist/passport-login-client.js"
     },
+    "./passport-auth-provider": {
+      "types": "./dist/passport-auth-provider.d.ts",
+      "import": "./dist/passport-auth-provider.js"
+    },
     "./session-store-node": {
       "types": "./dist/session-store-node.d.ts",
       "import": "./dist/session-store-node.js"

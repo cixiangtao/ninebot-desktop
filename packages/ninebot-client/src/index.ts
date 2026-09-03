@@ -176,6 +176,11 @@ export type {
   PassportTransport,
 } from "./passport-login-client.ts";
 export {
+  createNinebotPassportAuthProvider,
+  NinebotHumanVerificationRequiredError,
+} from "./passport-auth-provider.ts";
+export type { NinebotPassportAuthClient } from "./passport-auth-provider.ts";
+export {
   createNinebotCandidateSessionClient,
   createNinebotFetchCandidateSessionClient,
   defaultNinebotCandidateOrigins,
