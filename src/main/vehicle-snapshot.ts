@@ -2,7 +2,7 @@ import type { VehicleSnapshot } from "../shared/contracts.js";
 import { NineCliError } from "./ninecli.js";
 import { parseVehicleSnapshot } from "./parsers.js";
 
-interface VehicleTelemetryReader {
+export interface VehicleTelemetryReader {
   vehicleStatus: (serialNumber: string) => Promise<unknown>;
   battery: (serialNumber: string) => Promise<unknown>;
 }

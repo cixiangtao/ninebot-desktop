@@ -27,7 +27,7 @@ import { createRideExportDocument } from "./ride-export.js";
 import { loadRideSpeedVerifications } from "./ride-speed-verification.js";
 import { createYearSummaryExportDocument } from "./year-summary-export.js";
 import { SessionReadCache } from "./session-read-cache.js";
-import { loadVehicleSnapshot } from "./vehicle-snapshot.js";
+import { loadVehicleSnapshot, type VehicleTelemetryReader } from "./vehicle-snapshot.js";
 import {
   parseAccountProfile,
   parseRideDetail,
@@ -253,7 +253,10 @@ const handleError = <T>(error: unknown): BridgeResult<T> => {
 };
 
 /** Registers the complete renderer-facing domain bridge. */
-export const registerIpcHandlers = (client: NineCliClient) => {
+export const registerIpcHandlers = (
+  client: NineCliClient,
+  telemetryReader: VehicleTelemetryReader = client,
+) => {
   const serialNumbers = new Map<string, string>();
   const travelIds = new Map<
     string,
@@ -397,7 +400,7 @@ export const registerIpcHandlers = (client: NineCliClient) => {
           await snapshotCache.read(
             vehicleId,
             snapshotCacheTtlMs,
-            () => loadVehicleSnapshot(client, serialNumber),
+            () => loadVehicleSnapshot(telemetryReader, serialNumber),
             refresh,
           ),
         );
@@ -416,7 +419,7 @@ export const registerIpcHandlers = (client: NineCliClient) => {
         if (!serialNumber) {
           return fail({ code: "INVALID_INPUT", message: "车辆已失效，请刷新车辆列表。" });
         }
-        return ok(parseVehicleLocationRead(await client.vehicleStatus(serialNumber)));
+        return ok(parseVehicleLocationRead(await telemetryReader.vehicleStatus(serialNumber)));
       } catch (error) {
         return handleError(error);
       }

@@ -198,6 +198,10 @@ Node 子路径另外提供 `decodeVehicleListResponseCandidateWithCodec`，将�
 
 仓库同时提供 `pnpm protocol:parity -- --rounds=3`，从 `NINEBOT_CONFIG_DIR` 读取本机已有 ninecli 会话，连续运行 oracle 与 Node telemetry 候选，并只输出 parity 元数据。脚本支持 `--vehicle-index` 和 `--service`，不会打印车辆序列号、令牌、坐标、Header 值或响应正文；只要任一轮请求失败或出现差异，进程就以退出码 1 结束，适合在迁移前重复执行多车辆、多车型校验和自动化门禁。
 
+Electron 现支持显式设置 `NINEBOT_TELEMETRY_SOURCE=candidate` 来试用 Node telemetry 候选；候选读取本地 ninecli 会话并在 status/battery 任一失败时自动回退内置 ninecli。未设置该变量时行为完全不变，仍由 ninecli 提供实时状态和电池数据。该开关用于迁移期验证，不代表已经切换默认数据源。
+
+候选源在主进程内按请求重新读取会话文件，因此登录、刷新和退出后不会复用旧令牌；候选或会话读取异常会分别回退对应的 ninecli 读取，不影响另一个 telemetry 域。该回退行为通过不访问真实账号的单元测试覆盖。
+
 首次使用本机配置自动拼装 status/battery 候选请求的回放显示：真实服务端返回 HTTP 200，但业务 wrapper 为 `code=190003`、`data=null`、通讯异常描述。由此确认 HTTP 层成功不等于业务协议已验证；类型化解析器会拒绝这类空数据，Electron 继续保留 ninecli 默认路径，后续需要用 oracle 明文/Header 做字段级修正。
 
 随后对同一账号运行了一次私有 oracle 采集：status 与 battery 的请求 `d` 均为解码后 1616 字节，响应 `r` 分别为 1296 和 880 字节，均保持 AES 块对齐。将 oracle 的 Header 名称和值指纹与 Node 生成结果在内存中对照后，18 个非敏感、非随机 Header 全部一致；差异只剩每次调用都会重新生成的 `request-id`。因此当前剩余不确定性已收敛到 telemetry 的业务调用上下文或服务端字段语义，不能再通过修改通用加密外壳解决。
