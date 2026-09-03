@@ -264,3 +264,9 @@ SDK 另提供 `createNinebotCandidateSessionClient` 和 `createNinebotFetchCandi
 对本机隔离副本中的现有会话做了真实 Passport `POST /v5/user` 验证：SDK 使用与 ninecli 相同的原始 JWT Authorization 值（不添加 `Bearer`），并接受 Passport 的成功码 `90000`。服务端返回用户资料对象，SDK 仅记录字段名用于验证；会话解析同时把 `accessTokenValidity` 的秒/毫秒格式归一化为 `expiresAtMs`，供自动刷新判断。
 
 同一隔离会话运行 `pnpm protocol:parity -- --rounds=1 --month=202609`，车辆列表、status、battery、travel 月度和详情五类请求均 `equal=true`、未截断并以退出码 0 完成。Node 直连还得到 12 条当月行程和一条详情的 `trail` 字符串；本次只保留计数、字段名和差异元数据，未将令牌、序列号、坐标、密文或原始响应写入仓库。证据目前覆盖一台电自和一个账号；多账号及 motor 服务族仍需真实会话样本后才能宣称 parity 完成。
+
+### 2026-09-03 SDK-only 成品与多账号 parity 门禁
+
+Electron 主进程已删除 ninecli 运行时分支，正式应用的数据源和认证入口固定为 TypeScript SDK；安装包的 `extraResources` 不再包含 Python、uv 或 ninecli 原生文件。ninecli 仍只由协议 parity 工具按需准备，不会被生产包加载。macOS Apple Silicon 成品已验证 SDK-only 诊断、ASAR/Fuses、崩溃恢复和月度导出；Windows x64 NSIS/ZIP 已在 macOS 上完成跨平台生成及资源静态检查，原生验收脚本仍必须在 Windows 上执行。
+
+`protocol-parity` 新增 `--all-configs` 门禁，用逗号分隔的 `NINEBOT_PARITY_CONFIG_DIRS` 顺序执行多个已认证配置目录；每个目录仍分别比较车辆列表、status、battery、travel 月度和详情，并只输出目录名、节点数、差异元数据和 `allEqual`，不打印账号、令牌、车辆序列号或响应正文。车辆服务族解析同时接受 `business_line` 与 ninecli 可能返回的数值 `businessType`，便于覆盖电自和电摩缓存。该工具提升了多账号/多车型验证的可执行性，但在获得对应真实配置前不把门禁结果预先宣称为完成。

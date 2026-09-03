@@ -17,6 +17,7 @@ const projectRoot = resolve(import.meta.dirname, "..");
 interface CachedVehicle {
   wnumber?: unknown;
   business_line?: unknown;
+  businessType?: unknown;
   vehicle_type?: unknown;
 }
 
@@ -26,6 +27,7 @@ const printUsage = () => {
 Options:
   --vehicle-index=<number>  Zero-based cached vehicle index (default: 0).
   --all-vehicles            Run the parity suite for every cached vehicle.
+  --all-configs              Run the suite for each comma-separated directory in NINEBOT_PARITY_CONFIG_DIRS.
   --rounds=<number>         Number of sequential samples, from 1 to 20 (default: 3).
   --service=<ebike|motor>   Override the cached vehicle business line.
   --month=<YYYYMM>          Travel month to compare (default: previous calendar month).
@@ -50,6 +52,7 @@ const unknownArguments = argumentsList.filter(
   (argument) =>
     !argument.startsWith("--vehicle-index=") &&
     argument !== "--all-vehicles" &&
+    argument !== "--all-configs" &&
     !argument.startsWith("--rounds=") &&
     !argument.startsWith("--service=") &&
     !argument.startsWith("--month="),
@@ -59,6 +62,66 @@ if (unknownArguments.length > 0) {
 }
 
 const configDirectory = process.env.NINEBOT_CONFIG_DIR;
+const allConfigs = argumentsList.includes("--all-configs");
+if (allConfigs) {
+  const configDirectories = (process.env.NINEBOT_PARITY_CONFIG_DIRS ?? "")
+    .split(",")
+    .map((value) => value.trim())
+    .filter((value) => value.length > 0);
+  if (configDirectories.length < 2) {
+    throw new Error("NINEBOT_PARITY_CONFIG_DIRS must contain at least two config directories");
+  }
+  const scriptPath = process.argv[1];
+  if (!scriptPath) throw new Error("Unable to resolve protocol parity script path");
+  const reports: unknown[] = [];
+  for (const directory of configDirectories) {
+    try {
+      // Keep account runs sequential to avoid duplicating authenticated traffic concurrently.
+      // eslint-disable-next-line no-await-in-loop
+      const result = await execFileAsync(
+        process.execPath,
+        [scriptPath, ...argumentsList.filter((arg) => arg !== "--all-configs")],
+        {
+          env: {
+            ...process.env,
+            NINEBOT_CONFIG_DIR: directory,
+            NINEBOT_PARITY_CONFIG_DIRS: undefined,
+          },
+          maxBuffer: 16 * 1024 * 1024,
+        },
+      );
+      reports.push(JSON.parse(result.stdout));
+    } catch (error) {
+      reports.push({
+        configDirectoryName: basename(directory),
+        error: { type: error instanceof Error ? error.name : "UnknownError" },
+      });
+    }
+  }
+  const allEqual =
+    reports.length === configDirectories.length &&
+    reports.every(
+      (report) =>
+        report !== null &&
+        typeof report === "object" &&
+        (report as { allEqual?: unknown }).allEqual === true,
+    );
+  console.log(
+    JSON.stringify(
+      {
+        configCount: configDirectories.length,
+        configDirectoryNames: configDirectories.map((directory) => basename(directory)),
+        reports,
+        allEqual,
+      },
+      null,
+      2,
+    ),
+  );
+  process.exitCode = allEqual ? 0 : 1;
+  process.exit();
+}
+
 if (!configDirectory)
   throw new Error("NINEBOT_CONFIG_DIR must point to an authenticated ninecli config");
 
@@ -187,7 +250,15 @@ if (!vehicle || typeof vehicle.wnumber !== "string" || vehicle.wnumber.length ==
   throw new Error(`No cached vehicle at index ${vehicleIndex}`);
 }
 const serialNumber = vehicle.wnumber;
-const service = requestedService ?? vehicle.business_line;
+const cachedService =
+  vehicle.business_line === "ebike" || vehicle.business_line === "motor"
+    ? vehicle.business_line
+    : vehicle.businessType === 1 || vehicle.businessType === "1"
+      ? "motor"
+      : vehicle.businessType === 2 || vehicle.businessType === "2"
+        ? "ebike"
+        : null;
+const service = requestedService ?? cachedService;
 if (service !== "ebike" && service !== "motor") {
   throw new Error(
     "Cached vehicle business_line must be ebike or motor; pass --service to override",
