@@ -41,6 +41,10 @@ if (!gotLock) app.quit();
 let mainWindow: BrowserWindow | null = null;
 let unresponsivePromptOpen = false;
 
+/** Resolves the authentication implementation; legacy is an explicit recovery switch. */
+export const resolveAuthSource = (environment: Readonly<Record<string, string | undefined>>) =>
+  environment.NINEBOT_AUTH_SOURCE === "legacy" ? "legacy" : "sdk";
+
 const loadRecoveryPage = async (reason: string) => {
   if (!mainWindow || mainWindow.isDestroyed()) return;
   if (mainWindow.webContents.getURL().startsWith(appProtocolRecoveryUrl)) return;
@@ -146,7 +150,7 @@ app.whenReady().then(async () => {
   let appClient: NinebotAppClient;
   // The pure TypeScript Passport/session client is the default. The legacy
   // process boundary remains an explicit recovery switch during migration.
-  const useSdkAuth = process.env.NINEBOT_AUTH_SOURCE !== "legacy";
+  const useSdkAuth = resolveAuthSource(process.env) === "sdk";
   if (useSdkAuth) {
     const passportOrigin =
       process.env.NINEBOT_PASSPORT_ORIGIN ??
