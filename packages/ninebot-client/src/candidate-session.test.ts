@@ -84,4 +84,21 @@ describe("candidate session client", () => {
       client.listVehicles({ service: "ebike", vehicleType: Number.NaN }),
     ).rejects.toThrow("vehicleType must be finite");
   });
+
+  it("stops future requests after the caller clears the session", async () => {
+    let sendCount = 0;
+    const transport: NinebotTransport = {
+      send: async () => {
+        sendCount += 1;
+        return { status: 500, headers: {}, body: new Uint8Array() };
+      },
+    };
+    const client = createNinebotCandidateSessionClient({ transport, platform: 2, session });
+
+    client.clear();
+    await expect(client.status({ service: "ebike", serialNumber: "SN1234567890" })).rejects.toThrow(
+      "session client is closed",
+    );
+    expect(sendCount).toBe(0);
+  });
 });

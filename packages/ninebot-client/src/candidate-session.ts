@@ -119,6 +119,7 @@ export const createNinebotCandidateSessionClient = ({
   requestIdFactory = generateNinebotNonce,
   ...options
 }: CreateNinebotCandidateSessionClientOptions) => {
+  let activeSession: NinebotCandidateSessionFields | null = session;
   const sharedOptions = protocolOptions(options);
   const telemetry = createNinebotTelemetryCandidateClient(
     sharedOptions as CreateNinebotTelemetryCandidateClientOptions,
@@ -133,6 +134,10 @@ export const createNinebotCandidateSessionClient = ({
     "request-id": requestIdFactory(),
     ...headers,
   });
+  const getSession = () => {
+    if (activeSession === null) throw new Error("Ninebot candidate session client is closed");
+    return activeSession;
+  };
 
   const listVehicles = async ({
     service,
@@ -140,7 +145,7 @@ export const createNinebotCandidateSessionClient = ({
     headers,
   }: CandidateVehicleRequestOptions) => {
     const fields: VehicleListPlaintextFields = {
-      ...session,
+      ...getSession(),
       vehicle_type: asVehicleType(vehicleType),
       serviceTime: clock(),
       nonce: nonceFactory(),
@@ -150,7 +155,7 @@ export const createNinebotCandidateSessionClient = ({
 
   const status = async ({ service, serialNumber, headers }: CandidateTelemetryRequestOptions) => {
     const fields: VehicleStatusCandidateOptions["fields"] = buildVehicleStatusFields({
-      session,
+      session: getSession(),
       sn_str: serialNumber,
       serviceTime: clock(),
       nonce: nonceFactory(),
@@ -160,7 +165,7 @@ export const createNinebotCandidateSessionClient = ({
 
   const battery = async ({ service, serialNumber, headers }: CandidateTelemetryRequestOptions) => {
     const fields: VehicleBatteryCandidateOptions["fields"] = buildVehicleBatteryFields({
-      session,
+      session: getSession(),
       wnumber: serialNumber,
       serviceTime: clock(),
       nonce: nonceFactory(),
@@ -175,11 +180,11 @@ export const createNinebotCandidateSessionClient = ({
     serialNumber: string;
     vehicleType: string | number;
   }) => ({
-    ...session,
+    ...getSession(),
     wnumber: serialNumber,
-    rnVersion: session.rnVersion ?? "743",
+    rnVersion: getSession().rnVersion ?? "743",
     vehicle_type: asVehicleType(vehicleType),
-    current_version: session.current_version ?? "610063322",
+    current_version: getSession().current_version ?? "610063322",
     serviceTime: clock(),
     nonce: nonceFactory(),
   });
@@ -221,5 +226,9 @@ export const createNinebotCandidateSessionClient = ({
     });
   };
 
-  return { listVehicles, status, battery, month, detail };
+  const clear = () => {
+    activeSession = null;
+  };
+
+  return { listVehicles, status, battery, month, detail, clear };
 };
