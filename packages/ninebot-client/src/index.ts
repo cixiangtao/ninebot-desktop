@@ -83,13 +83,14 @@ export type {
   TelemetryCandidateHeaderFields,
   TelemetryCandidateSessionFields,
   TelemetryResponseCandidate,
+  VehicleBatteryCandidateOptions,
   VehicleBatteryCandidateRecord,
   VehicleBatteryPackCandidate,
   VehicleBatteryPlaintextFields,
   VehicleStatusCandidateRecord,
+  VehicleStatusCandidateOptions,
   VehicleStatusLocationCandidate,
   VehicleStatusPlaintextFields,
-  VehicleTelemetryCandidateOptions,
 } from "./telemetry-node.ts";
 export { createNinebotClient, NinebotHttpError } from "./client.ts";
 export type { NinebotClient, NinebotClientOptions } from "./client.ts";

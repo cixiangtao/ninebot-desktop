@@ -189,3 +189,5 @@ Node 子路径另外提供 `decodeVehicleListResponseCandidateWithCodec`，将�
 `telemetry-node` 还提供 `parseVehicleStatusResponseCandidate` 与 `parseVehicleBatteryResponseCandidate` 两个类型入口：前者校验并返回 status 车辆记录数组，后者校验并返回 battery 诊断对象；两者都保留固件新增字段。当前已知字段覆盖实时电量、充电、锁定/点火、续航、主电源、BMS 电压/温度/循环次数等，具体数值仍交由应用层按单位和范围校验。
 
 为减少接入方手工拼接请求字段，`buildVehicleStatusFields` / `buildVehicleBatteryFields` 接收共享会话元数据和车辆序列号，自动补齐 Unix 秒级 `serviceTime` 与随机 nonce；测试或回放可显式传入两者。会话元数据只停留在调用方内存中，SDK 不负责从 ninecli 私有配置文件读取令牌。
+
+客户端方法参数也按能力拆成 `VehicleStatusCandidateOptions` 与 `VehicleBatteryCandidateOptions`，避免调用方把两种不同的明文字段误混在一起；两者仍共享 `service` 和可选 Header 覆盖。

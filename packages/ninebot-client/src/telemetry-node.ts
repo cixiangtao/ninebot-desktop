@@ -391,10 +391,17 @@ export interface CreateNinebotTelemetryCandidateClientOptions {
   responseBodyDecoder?: (response: NinebotResponse) => Uint8Array | Promise<Uint8Array>;
 }
 
-export interface VehicleTelemetryCandidateOptions {
+interface VehicleTelemetryCandidateOptionsBase {
   service: "ebike" | "motor";
-  fields: VehicleStatusPlaintextFields | VehicleBatteryPlaintextFields;
   headers?: Readonly<Record<string, string>>;
+}
+
+export interface VehicleStatusCandidateOptions extends VehicleTelemetryCandidateOptionsBase {
+  fields: VehicleStatusPlaintextFields;
+}
+
+export interface VehicleBatteryCandidateOptions extends VehicleTelemetryCandidateOptionsBase {
+  fields: VehicleBatteryPlaintextFields;
 }
 
 /** Creates a transport-backed Node client for status and battery candidates. */
@@ -444,9 +451,7 @@ export const createNinebotTelemetryCandidateClient = ({
     );
   };
   return {
-    status: (
-      options: VehicleTelemetryCandidateOptions & { fields: VehicleStatusPlaintextFields },
-    ) =>
+    status: (options: VehicleStatusCandidateOptions) =>
       send<VehicleStatusCandidateRecord[]>(
         options.service,
         vehicleStatusPath,
@@ -455,9 +460,7 @@ export const createNinebotTelemetryCandidateClient = ({
         options.headers,
         parseVehicleStatusResponseCandidate,
       ),
-    battery: (
-      options: VehicleTelemetryCandidateOptions & { fields: VehicleBatteryPlaintextFields },
-    ) =>
+    battery: (options: VehicleBatteryCandidateOptions) =>
       send<VehicleBatteryCandidateRecord>(
         options.service,
         vehicleBatteryPath,
