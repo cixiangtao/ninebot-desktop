@@ -197,3 +197,5 @@ Node 子路径另外提供 `decodeVehicleListResponseCandidateWithCodec`，将�
 为支持迁移期的字段级对照，`@jiuhao/ninebot-client` 新增 `compareNinebotPayloads`。它只在内存比较 ninecli 与 Node 结果，报告路径、类型、长度和差异原因，不返回任何字段值；数组和嵌套对象达到比较上限时会标记 `truncated`，不会把不完整比较误报为一致。
 
 首次使用本机配置自动拼装 status/battery 候选请求的回放显示：真实服务端返回 HTTP 200，但业务 wrapper 为 `code=190003`、`data=null`、通讯异常描述。由此确认 HTTP 层成功不等于业务协议已验证；类型化解析器会拒绝这类空数据，Electron 继续保留 ninecli 默认路径，后续需要用 oracle 明文/Header 做字段级修正。
+
+随后对同一账号运行了一次私有 oracle 采集：status 与 battery 的请求 `d` 均为解码后 1616 字节，响应 `r` 分别为 1296 和 880 字节，均保持 AES 块对齐。将 oracle 的 Header 名称和值指纹与 Node 生成结果在内存中对照后，18 个非敏感、非随机 Header 全部一致；差异只剩每次调用都会重新生成的 `request-id`。因此当前剩余不确定性已收敛到 telemetry 的业务调用上下文或服务端字段语义，不能再通过修改通用加密外壳解决。
