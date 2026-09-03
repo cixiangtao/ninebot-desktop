@@ -65,6 +65,8 @@ export {
   createNinebotTelemetryCandidateClient,
   decodeTelemetryResponseCandidate,
   parseTelemetryResponseCandidate,
+  parseVehicleBatteryResponseCandidate,
+  parseVehicleStatusResponseCandidate,
   vehicleBatteryPath,
   vehicleStatusPath,
 } from "./telemetry-node.ts";
@@ -74,7 +76,11 @@ export type {
   CreateNinebotTelemetryCandidateClientOptions,
   TelemetryCandidateHeaderFields,
   TelemetryResponseCandidate,
+  VehicleBatteryCandidateRecord,
+  VehicleBatteryPackCandidate,
   VehicleBatteryPlaintextFields,
+  VehicleStatusCandidateRecord,
+  VehicleStatusLocationCandidate,
   VehicleStatusPlaintextFields,
   VehicleTelemetryCandidateOptions,
 } from "./telemetry-node.ts";

@@ -163,12 +163,63 @@ export const buildVehicleBatteryEncryptedRequestCandidate = ({
     plaintextBody: buildVehicleBatteryPlaintextBody(fields),
   });
 
-export interface TelemetryResponseCandidate {
+export interface TelemetryResponseCandidate<TData = unknown, TExtra = unknown> {
   code: number | string | null;
-  data: unknown;
+  data: TData;
   desc: string | null;
   time_cost: number | string | null;
-  extra: unknown;
+  extra: TExtra;
+}
+
+export interface VehicleStatusLocationCandidate {
+  acc?: number | string | boolean;
+  lat?: number | string;
+  lock?: number | string | boolean;
+  lon?: number | string;
+  [key: string]: unknown;
+}
+
+/** Known status fields, with an open index for firmware-specific additions. */
+export interface VehicleStatusCandidateRecord {
+  ai_estimate_mileage?: number | string;
+  battery_exist?: number | string | boolean;
+  charging?: number | string | boolean;
+  dump_energy?: number | string;
+  estimate_mileage?: number | string;
+  is_smart_service_expired?: number | string | boolean;
+  loc?: VehicleStatusLocationCandidate;
+  permissions?: Record<string, unknown>;
+  precise_estimate_mileage?: number | string;
+  pwr?: number | string | boolean;
+  remain_charge_time?: string;
+  remain_charge_timestamp?: number | string;
+  sn?: string;
+  [key: string]: unknown;
+}
+
+export interface VehicleBatteryPackCandidate {
+  bat_temp?: number | string;
+  bms_cycle?: number | string;
+  bms_cycle_support?: boolean;
+  bms_cycle_tips?: string;
+  bms_volt?: number | string;
+  electricity?: number | string;
+  score?: number | string;
+  [key: string]: unknown;
+}
+
+/** Known battery fields, with an open index for firmware-specific additions. */
+export interface VehicleBatteryCandidateRecord {
+  battery_count?: number | string;
+  battery_find_my_support?: boolean;
+  battery_list?: VehicleBatteryPackCandidate[];
+  battery_main?: { electricity?: number | string; [key: string]: unknown };
+  battery_type?: number | string;
+  charging?: number | string | boolean;
+  electricity?: number | string;
+  have_bms_cycle_support?: boolean;
+  remain_charge_time?: string;
+  [key: string]: unknown;
 }
 
 const asRecord = (value: unknown): Record<string, unknown> | null =>
@@ -184,9 +235,9 @@ const readScalar = (record: Record<string, unknown>, key: string) => {
 };
 
 /** Parses the shared business wrapper returned by status and battery endpoints. */
-export const parseTelemetryResponseCandidate = (
+export const parseTelemetryResponseCandidate = <TData = unknown, TExtra = unknown>(
   plaintext: Uint8Array,
-): TelemetryResponseCandidate => {
+): TelemetryResponseCandidate<TData, TExtra> => {
   let parsed: unknown;
   try {
     parsed = JSON.parse(new TextDecoder().decode(plaintext));
@@ -199,11 +250,37 @@ export const parseTelemetryResponseCandidate = (
   }
   return {
     code: readScalar(record, "code"),
-    data: record.data,
+    data: record.data as TData,
     desc: typeof record.desc === "string" ? record.desc : null,
     time_cost: readScalar(record, "time_cost"),
-    extra: record.extra ?? null,
+    extra: (record.extra ?? null) as TExtra,
   };
+};
+
+/** Parses status data as the one-or-more vehicle records returned by ninecli. */
+export const parseVehicleStatusResponseCandidate = (
+  plaintext: Uint8Array,
+): TelemetryResponseCandidate<VehicleStatusCandidateRecord[]> => {
+  const response = parseTelemetryResponseCandidate<unknown>(plaintext);
+  if (!Array.isArray(response.data)) {
+    throw new Error("Ninebot status response data is not an array");
+  }
+  const data = response.data.map((item, index) => {
+    const record = asRecord(item);
+    if (!record) throw new Error(`Ninebot status response data item ${index} is not an object`);
+    return record as VehicleStatusCandidateRecord;
+  });
+  return { ...response, data };
+};
+
+/** Parses battery data as the diagnostic object returned by ninecli. */
+export const parseVehicleBatteryResponseCandidate = (
+  plaintext: Uint8Array,
+): TelemetryResponseCandidate<VehicleBatteryCandidateRecord> => {
+  const response = parseTelemetryResponseCandidate<unknown>(plaintext);
+  const data = asRecord(response.data);
+  if (!data) throw new Error("Ninebot battery response data is not an object");
+  return { ...response, data: data as VehicleBatteryCandidateRecord };
 };
 
 /** Decrypts one telemetry response while retaining its business wrapper metadata. */

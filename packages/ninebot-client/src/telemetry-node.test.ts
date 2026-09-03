@@ -6,6 +6,8 @@ import {
   buildVehicleStatusPlaintextBody,
   createNinebotTelemetryCandidateClient,
   parseTelemetryResponseCandidate,
+  parseVehicleBatteryResponseCandidate,
+  parseVehicleStatusResponseCandidate,
   vehicleBatteryPath,
   vehicleStatusPath,
 } from "./telemetry-node.ts";
@@ -89,6 +91,32 @@ describe("Node telemetry candidate", () => {
         ),
       ),
     ).toMatchObject({ code: 1, data: { battery: 80 }, desc: "ok", extra: null });
+  });
+
+  it("provides typed status and battery response parsers without dropping unknown fields", () => {
+    const status = parseVehicleStatusResponseCandidate(
+      new TextEncoder().encode(
+        JSON.stringify({
+          code: 1,
+          data: [{ pwr: 1, loc: { lon: "116.3" }, firmware_only: "kept" }],
+          desc: "ok",
+          time_cost: 2,
+        }),
+      ),
+    );
+    expect(status.data[0]).toMatchObject({ pwr: 1, firmware_only: "kept" });
+
+    const battery = parseVehicleBatteryResponseCandidate(
+      new TextEncoder().encode(
+        JSON.stringify({
+          code: 1,
+          data: { electricity: 74, battery_list: [{ electricity: "73" }], firmware_only: true },
+          desc: "ok",
+          time_cost: 2,
+        }),
+      ),
+    );
+    expect(battery.data).toMatchObject({ electricity: 74, firmware_only: true });
   });
 
   it("runs the status candidate through a complete local request/response loop", async () => {

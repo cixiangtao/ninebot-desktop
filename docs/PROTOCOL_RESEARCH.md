@@ -185,3 +185,5 @@ Node 子路径另外提供 `decodeVehicleListResponseCandidateWithCodec`，将�
 本次 status/battery 请求已用真实服务端完成 HTTP 200 校验，原始账号、令牌、设备标识、密文和响应正文均未写入仓库。该证据只提升候选链的可信度，Electron 默认仍使用内置 ninecli；登录、令牌刷新和短信人机验证继续不在迁移范围内。
 
 应用层解析器现在也接受 telemetry 候选客户端返回的业务 wrapper：status 的数组数据取首个车辆对象，battery 的对象数据直接进入现有快照模型，位置读取复用同一解包边界。这样后续可以替换数据源而不改变 renderer 合同；当前 IPC 仍保持 ninecli 默认路径。
+
+`telemetry-node` 还提供 `parseVehicleStatusResponseCandidate` 与 `parseVehicleBatteryResponseCandidate` 两个类型入口：前者校验并返回 status 车辆记录数组，后者校验并返回 battery 诊断对象；两者都保留固件新增字段。当前已知字段覆盖实时电量、充电、锁定/点火、续航、主电源、BMS 电压/温度/循环次数等，具体数值仍交由应用层按单位和范围校验。
