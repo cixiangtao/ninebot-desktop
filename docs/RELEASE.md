@@ -13,9 +13,9 @@ pnpm package:mac:local
 1. 执行 TypeScript 构建与 electron-vite 生产构建。
 2. 生成 ad-hoc 签名的 `.app`、DMG 和 ZIP。
 3. 验证 Bundle ID、版本、架构、ASAR 内容、Electron Fuses 和代码签名完整性。
-4. 确认包内没有令牌、车辆缓存或配置文件，并核对资源目录内置 ninecli 的架构与固定摘要。
+4. 确认包内没有令牌、车辆缓存、配置文件或 ninecli/Python 运行时，并核对 SDK 入口文件存在。
 5. 生成 `release/SHA256SUMS.txt`。
-6. 使用接近 Finder 的精简 `PATH` 启动成品，验证 UI、预加载桥接及内置数据组件，不依赖 Python、uv 或用户 `PATH` 中的 ninecli。
+6. 使用接近 Finder 的精简 `PATH` 启动成品，验证 UI、预加载桥接及内置 TypeScript SDK，不依赖 Python、uv 或用户 `PATH` 中的 ninecli。
 7. 主动终止一次渲染进程，确认本地恢复页出现并能重新进入主界面。
 
 ad-hoc 签名不能建立发布者身份，也没有 Apple 公证票据，其他 Mac 的 Gatekeeper 可能阻止运行。这类产物只能作为明确标注风险的 GitHub prerelease 测试版，不能冒充稳定公开版。
@@ -67,12 +67,11 @@ APPLE_TEAM_ID
 
 Windows 测试版目前没有 Authenticode 证书，Microsoft Defender SmartScreen 可能警告或阻止运行。稳定 Windows 版需要可信的代码签名证书与可持续的签名流程；不能仅因为 NSIS 安装成功就称为正式签名版。
 
-## ninecli 内置边界
+## 协议 oracle 边界
 
-- 安装包只内置当前平台的 `ninecli==0.1.7` 原生可执行文件，不包含 Python、uv、完整 wheel 或其他平台文件；使用者无需额外安装依赖。
-- 构建脚本从固定的 `files.pythonhosted.org` URL 下载对应 wheel，先校验 wheel SHA-256，再只提取 `ninecli/bin/ninecli` 或 `ninecli/bin/ninecli.exe` 并校验第二个 SHA-256。任一环节不一致都停止构建。
-- 成品验收再次检查 macOS arm64 或 Windows PE x64 架构与固定摘要；macOS 摘要排除签名容器及 `__LINKEDIT` 签名尺寸字段，并另行验证代码签名，因此 ad-hoc 与 Developer ID 重签不会伪装成程序内容变化。应用每次执行前还会校验同一口径，不回退到 `PATH`、uvx 或用户自行安装的 ninecli。
-- [PyPI 元数据](https://pypi.org/project/ninecli/0.1.7/)把 ninecli 标为 MIT，但 0.1.7 wheel 中没有独立许可证正文、版权声明或项目链接。当前安装包选择再分发该二进制，并在 `THIRD_PARTY_NOTICES.md` 中保留元数据来源与证据缺口；这不等同于已经取得更完整的上游源码或授权证明。
+- Electron 安装包只包含 TypeScript SDK，不包含 Python、uv、完整 wheel 或 ninecli 原生可执行文件；使用者无需额外安装依赖。
+- ninecli 0.1.7 仍可由仓库内 parity 工具按固定 URL 下载并校验，用于和 SDK 做只读字段级比对；这条开发工具链不参与生产入口，也不会随安装包发布。
+- [PyPI 元数据](https://pypi.org/project/ninecli/0.1.7/)与 `THIRD_PARTY_NOTICES.md` 仅记录该开发期 oracle 的来源，不构成安装包再分发授权声明。
 
 签名与公证要求以 [electron-builder macOS 文档](https://www.electron.build/docs/mac/)和[公证文档](https://www.electron.build/docs/notarization/)为准。
 
