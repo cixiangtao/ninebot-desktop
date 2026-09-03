@@ -214,6 +214,7 @@ export {
 export type {
   BusinessLoginEncryptedRequest,
   BusinessLoginKeyData,
+  NinebotBusinessLoginResponseCandidate,
   BusinessLoginPlaintextFields,
   BuildBusinessLoginEncryptedRequestOptions,
   BuildBusinessLoginHeadersOptions,

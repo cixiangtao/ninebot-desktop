@@ -11,10 +11,51 @@ import {
   type NinebotEncryptedRequestEnvelope,
 } from "./crypto-envelope.ts";
 import type { NinebotResponse, NinebotRequest, NinebotTransport } from "./transport.ts";
-import {
-  parseVehicleListResponseCandidate,
-  type NinebotVehicleResponseCandidate,
-} from "./vehicle-node.ts";
+
+export interface NinebotBusinessLoginResponseCandidate<T = unknown> {
+  code: number | string | null;
+  data: T;
+  desc: string | null;
+  time_cost: number | null;
+  extra: unknown;
+}
+
+const parseBusinessLoginResponseCandidate = <T = unknown>(
+  plaintext: Uint8Array,
+): NinebotBusinessLoginResponseCandidate<T> => {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(new TextDecoder().decode(plaintext));
+  } catch {
+    throw new Error("Ninebot business login response payload is not valid JSON");
+  }
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error("Ninebot business login response payload is not a JSON object");
+  }
+  const record = parsed as Record<string, unknown>;
+  const code = record.code;
+  if (code !== undefined && code !== null && typeof code !== "number" && typeof code !== "string") {
+    throw new Error("Ninebot business login response field code is invalid");
+  }
+  const desc = record.desc;
+  if (desc !== undefined && desc !== null && typeof desc !== "string") {
+    throw new Error("Ninebot business login response field desc is invalid");
+  }
+  if (!("data" in record)) {
+    throw new Error("Ninebot business login response field data is missing");
+  }
+  const timeCost = record.time_cost;
+  if (timeCost !== undefined && timeCost !== null && typeof timeCost !== "number") {
+    throw new Error("Ninebot business login response field time_cost is invalid");
+  }
+  return {
+    code: code === undefined ? null : code,
+    data: record.data as T,
+    desc: desc === undefined ? null : desc,
+    time_cost: timeCost === undefined ? null : timeCost,
+    extra: record.extra ?? null,
+  };
+};
 
 export const businessLoginPath = "/user/user/login" as const;
 export const businessLoginProtocol = { p: "101", t: "0" } as const;
@@ -194,8 +235,8 @@ export const decodeBusinessLoginResponse = <T = unknown>({
 }: {
   responseBody: Uint8Array | string;
   keyData: NinebotCandidateKeyData;
-}): NinebotVehicleResponseCandidate<T> =>
-  parseVehicleListResponseCandidate<T>(
+}): NinebotBusinessLoginResponseCandidate<T> =>
+  parseBusinessLoginResponseCandidate<T>(
     decryptNinebotResponsePayloadCandidate({
       envelope: parseNinebotEncryptedResponse(responseBody),
       keyData,
