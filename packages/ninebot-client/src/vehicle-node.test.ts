@@ -2,11 +2,13 @@ import { constants, generateKeyPairSync, privateDecrypt } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import {
   buildVehicleListEncryptedRequestCandidate,
+  buildVehicleListCandidateHeaders,
   buildVehicleListPlaintextBody,
   createNinebotVehicleCandidateClient,
   createNinebotVehicleCandidateCodec,
   decodeVehicleListResponseCandidate,
   decodeVehicleListResponseCandidateWithCodec,
+  ninebotVehicleCandidateProtocol,
   parseVehicleListResponseCandidate,
 } from "./vehicle-node.ts";
 import type { NinebotVehicleCodec } from "./vehicle-codec.ts";
@@ -78,6 +80,47 @@ describe("Node vehicle request body candidate", () => {
     expect(result.keyData.keyDataTwo).toMatch(/^[0-9a-f]{11}$/);
     expect(result.keyData.keyDataThree).toMatch(/^[0-9a-f]{10}$/);
     expect(result.keyData.keyDataFour).toHaveLength(8);
+  });
+
+  it("defaults the observed protocol envelope values", () => {
+    const result = buildVehicleListEncryptedRequestCandidate({
+      fields,
+      platform: 2,
+      timeStamp: 1_725_000_000,
+    });
+
+    expect(result.envelope).toMatchObject(ninebotVehicleCandidateProtocol);
+  });
+
+  it("maps the observed vehicle headers and allows deterministic replay values", () => {
+    expect(
+      buildVehicleListCandidateHeaders({
+        service: "motor",
+        fields: {
+          ...fields,
+          platform: "android",
+          platform_ver: "13 Xiaomi",
+        },
+        requestId: "ABCDEF0123456789ABCDEF0123456789",
+        serviceTime: 1_725_000_001,
+      }),
+    ).toEqual({
+      "business-type": "1",
+      "cache-control": "no-cache",
+      "client-ver": "5.5.5.5",
+      "device-id": "device-id",
+      debug: "0",
+      language: "zh",
+      "login-country": "CN",
+      platform: "Android",
+      "platform-ver": "13",
+      regionx: "CN",
+      "request-id": "ABCDEF0123456789ABCDEF0123456789",
+      "service-time": "1725000001",
+      "sys-language": "zh_CN",
+      uid: "12345678",
+      "user-agent": "okhttp/4.9.1",
+    });
   });
 
   it("uses the pinned ninecli public key when no override is supplied", () => {

@@ -1,4 +1,4 @@
-import { computeNinebotBodyCheckcode } from "./crypto-node.ts";
+import { computeNinebotBodyCheckcode, generateNinebotNonce } from "./crypto-node.ts";
 import {
   buildNinebotEncryptedRequestCandidate,
   decryptNinebotResponsePayloadCandidate,
@@ -17,6 +17,10 @@ import {
 } from "./vehicle-codec.ts";
 import { createNinebotVehicleClient } from "./vehicle-client.ts";
 import type { NinebotResponse, NinebotTransport } from "./transport.ts";
+import type { VehicleServiceName } from "./vehicle.ts";
+
+/** Protocol values observed for both vehicle-list service families. */
+export const ninebotVehicleCandidateProtocol = { p: "101", t: "0" } as const;
 
 /** Fields observed in the plaintext JSON sent before vehicle-list encryption. */
 export interface VehicleListPlaintextFields {
@@ -87,8 +91,8 @@ export const buildVehicleListPlaintextBody = (fields: VehicleListPlaintextFields
 export interface BuildVehicleListEncryptedRequestCandidateOptions {
   fields: VehicleListPlaintextFields;
   platform: number;
-  p: string;
-  t: string;
+  p?: string;
+  t?: string;
   timeStamp?: number;
   /** Defaults to the public key embedded in ninecli 0.1.7. */
   rsaPublicKey?: Uint8Array | string;
@@ -103,8 +107,8 @@ export interface VehicleListEncryptedRequestCandidate {
 export const buildVehicleListEncryptedRequestCandidate = ({
   fields,
   platform,
-  p,
-  t,
+  p = ninebotVehicleCandidateProtocol.p,
+  t = ninebotVehicleCandidateProtocol.t,
   timeStamp,
   rsaPublicKey,
 }: BuildVehicleListEncryptedRequestCandidateOptions): VehicleListEncryptedRequestCandidate => {
@@ -118,6 +122,48 @@ export const buildVehicleListEncryptedRequestCandidate = ({
       rsaPublicKey: rsaPublicKey ?? ninebotCandidateRsaPublicKeyPem,
     }),
     keyData: material.keyData,
+  };
+};
+
+export interface BuildVehicleListCandidateHeadersOptions {
+  service: VehicleServiceName;
+  fields: VehicleListPlaintextFields;
+  requestId?: string;
+  serviceTime?: number;
+}
+
+/** Builds the observed non-secret headers for a vehicle-list request. */
+export const buildVehicleListCandidateHeaders = ({
+  service,
+  fields,
+  requestId = generateNinebotNonce(),
+  serviceTime = fields.serviceTime,
+}: BuildVehicleListCandidateHeadersOptions) => {
+  if (!/^[0-9A-Fa-f]{32}$/.test(requestId)) {
+    throw new Error("Ninebot vehicle request header request-id must be 32 hexadecimal characters");
+  }
+  if (!Number.isSafeInteger(serviceTime)) {
+    throw new Error("Ninebot vehicle request header service-time must be a safe integer");
+  }
+  const platformHeader = fields.platform.toLowerCase() === "android" ? "Android" : fields.platform;
+  const platformVersion = fields.platform_ver.split(" ")[0];
+  if (!platformVersion) throw new Error("Ninebot vehicle request header platform-ver is empty");
+  return {
+    "business-type": service === "motor" ? "1" : "2",
+    "cache-control": "no-cache",
+    "client-ver": fields.client_ver,
+    "device-id": fields.device_id,
+    debug: "0",
+    language: fields.language,
+    "login-country": fields.login_country,
+    platform: platformHeader,
+    "platform-ver": platformVersion,
+    regionx: fields.regionx,
+    "request-id": requestId,
+    "service-time": String(serviceTime),
+    "sys-language": fields.sys_language,
+    uid: fields.uid,
+    "user-agent": "okhttp/4.9.1",
   };
 };
 
@@ -201,8 +247,8 @@ export const decodeVehicleListResponseCandidateWithCodec = async <T = unknown>({
 
 export interface CreateNinebotVehicleCandidateCodecOptions {
   platform: number;
-  p: string;
-  t: string;
+  p?: string;
+  t?: string;
   timeStamp?: number;
   /** Defaults to the public key embedded in ninecli 0.1.7. */
   rsaPublicKey?: Uint8Array | string;
@@ -233,8 +279,8 @@ const readResponseKeyData = (context: unknown) => {
 /** Creates a context-safe Node candidate codec for the high-level vehicle client. */
 export const createNinebotVehicleCandidateCodec = ({
   platform,
-  p,
-  t,
+  p = ninebotVehicleCandidateProtocol.p,
+  t = ninebotVehicleCandidateProtocol.t,
   timeStamp,
   rsaPublicKey,
 }: CreateNinebotVehicleCandidateCodecOptions): NinebotVehicleCodec => ({
@@ -291,7 +337,11 @@ export const createNinebotVehicleCandidateClient = ({
   return {
     async list<T = unknown>({ service, fields, headers = {} }: ListNinebotVehicleCandidateOptions) {
       const plaintextBody = buildVehicleListPlaintextBody(fields);
-      const payload = await client.list({ service, plaintextBody, headers });
+      const payload = await client.list({
+        service,
+        plaintextBody,
+        headers: { ...buildVehicleListCandidateHeaders({ service, fields }), ...headers },
+      });
       return parseVehicleListResponseCandidate<T>(payload);
     },
   };

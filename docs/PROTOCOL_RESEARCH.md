@@ -153,3 +153,11 @@ Node 子路径另外提供 `decodeVehicleListResponseCandidateWithCodec`，将�
 2026-09-03 使用本机已有会话做了一次不保存 Body 原文的 `vehicles` 回放：`ebike` 的 `POST /vehicle/binding/my-vehicle` 返回 HTTP 200，响应外壳 `v=101`、`s` 解码 128 字节、`r` 解码 2256 字节；ninecli 输出 1 条车辆记录。请求 `d` 解码 1616 字节、`k` 解码 128 字节，和候选请求的 AES/RSA 外壳长度一致。该回放只保留在 `.ninebot-private`，未把账号、车辆或密文写入仓库。
 
 同日通过 lldb 在 `EncryptRequest` 入口捕获了 3 组脱敏前的本机临时明文（只留在 `/tmp`）：`nonce` 均为 32 位十六进制，但字母大小写可为全大写或混合大小写；按固定 15 个字段重建的 JSON 计算出的 32 位大写 MD5 均与 `checkcode` 一致。因此 Node 候选只约束十六进制字符集，不再错误限定 nonce 必须小写。
+
+### 2026-09-03 候选请求完成服务端验证
+
+使用同一台机器上的现有会话，对候选 Node 请求使用新生成的 nonce、当前 Unix epoch 秒 `serviceTime`、已提取的 RSA-1024 公钥，以及从 ninecli 观察到的非敏感 Header 映射后，经本地记录器发送到真实 `steeldust.ninebot.com`。`motor` 车辆列表请求返回 HTTP 200，候选解密链成功得到业务包装：`code=1`、`data` 为数组（本账号该服务族为空）。这证明候选的 AES-CBC、Android Base64、MD5、RSA PKCS#1 v1.5、响应 keyData 绑定和 envelope 外壳已通过一次真实服务端校验；本次只保留归一化结果，未将账号、令牌、密文或车辆数据写入仓库。
+
+同批 oracle 样本确认两种车辆服务都使用 `p="101"`、`t="0"`。Node 候选现在将这两个值设为默认值，并提供 `buildVehicleListCandidateHeaders`：根据 `motor`/`ebike` 映射 `business-type`，从请求明文映射 `client-ver`、`device-id`、平台版本、地区、语言、用户标识和服务时间，同时补齐 `cache-control`、`debug`、`request-id` 与 `user-agent` 等已观察 Header。调用方仍可显式覆盖 Header 或 RSA 公钥，以便后续版本差分。
+
+这次验证只提升 Node 候选路径的可信度；Electron 默认数据源仍是内置 ninecli，未被自动切换。登录、令牌刷新和短信人机验证仍不在本迁移范围内。
