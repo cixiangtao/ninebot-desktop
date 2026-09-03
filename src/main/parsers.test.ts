@@ -134,6 +134,42 @@ describe("Ninebot response parsers", () => {
     ]);
   });
 
+  it("accepts telemetry candidate wrappers for status arrays and battery objects", () => {
+    const snapshot = parseVehicleSnapshot(
+      {
+        code: 1,
+        data: [{ dump_energy: "73", pwr: 1, loc: { acc: 1, lock: 1 } }],
+        desc: "ok",
+      },
+      {
+        code: 1,
+        data: { electricity: "74", charging: 1 },
+        desc: "ok",
+      },
+    );
+    expect(snapshot).toMatchObject({
+      batteryPercent: 74,
+      batteryPercentSource: "battery",
+      charging: true,
+      poweredOn: true,
+      ignitionOn: true,
+      locked: true,
+    });
+  });
+
+  it("accepts a telemetry status wrapper for location reads", () => {
+    expect(
+      parseVehicleLocationRead({
+        code: 1,
+        data: [{ loc: { lon: 116.3, lat: 39.9, lock: 0, acc: 1 } }],
+        desc: "ok",
+      }),
+    ).toEqual({
+      permission: "allowed",
+      location: { longitude: 116.3, latitude: 39.9, locked: false, ignitionOn: true },
+    });
+  });
+
   it("prefers the declared max and calculates average speed when avg_speed is zero", () => {
     const detail = parseRideDetail(
       {

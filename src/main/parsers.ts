@@ -27,6 +27,21 @@ const asRecord = (value: unknown): JsonRecord | null => {
   return value as JsonRecord;
 };
 
+/**
+ * Unwraps a telemetry business envelope while preserving the raw ninecli shape.
+ *
+ * The candidate Node client returns `{ code, data, desc, ... }`; status data is
+ * currently a one-item array while battery data is an object. The renderer
+ * parser consumes one vehicle record, so only the first status object is used.
+ */
+const unwrapTelemetryPayload = (value: unknown) => {
+  const record = asRecord(value);
+  if (!record || !("data" in record) || !("code" in record || "desc" in record)) return record;
+  const data = record.data;
+  if (Array.isArray(data)) return asRecord(data[0]);
+  return asRecord(data);
+};
+
 /** Unwraps the business envelope emitted by the travel candidate codec. */
 const unwrapTravelPayload = (value: unknown) => {
   const record = asRecord(value);
@@ -210,8 +225,8 @@ export const parseVehicleSnapshot = (
   batteryPayload: unknown,
   availability: VehicleSnapshot["availability"] = { status: true, battery: true },
 ): VehicleSnapshot => {
-  const status = asRecord(statusPayload) ?? {};
-  const battery = asRecord(batteryPayload) ?? {};
+  const status = unwrapTelemetryPayload(statusPayload) ?? {};
+  const battery = unwrapTelemetryPayload(batteryPayload) ?? {};
   const location = asRecord(status.loc) ?? {};
   const batteryMain = asRecord(battery.battery_main) ?? {};
   const rawBatteryPacks = Array.isArray(battery.battery_list) ? battery.battery_list : [];
@@ -289,7 +304,7 @@ export const parseRideDays = (value: unknown, requestedMonth: string): RideDaySu
 
 /** Extracts sharing permission plus the minimum location state after explicit user consent. */
 export const parseVehicleLocationRead = (statusPayload: unknown): VehicleLocationRead => {
-  const status = asRecord(statusPayload) ?? {};
+  const status = unwrapTelemetryPayload(statusPayload) ?? {};
   const permissions = asRecord(status.permissions);
   const explicitPermission = permissions ? toOptionalFlag(permissions.see_location) : null;
   const location = asRecord(status.loc);
