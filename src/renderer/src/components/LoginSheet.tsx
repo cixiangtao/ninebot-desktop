@@ -19,7 +19,7 @@ interface LoginSheetProps {
   onClearError: () => void;
 }
 
-/** Provides password login and the non-bypassing two-step ninecli SMS flow. */
+/** Provides password login and the non-bypassing two-step SMS flow. */
 export const LoginSheet = ({
   open,
   busy,
@@ -101,8 +101,8 @@ export const LoginSheet = ({
               连接九号账号
             </h2>
             <p className="mt-2 max-w-[42ch] text-sm leading-6 text-slate-600">
-              凭据只传给本机固定版本且通过哈希校验的
-              ninecli。客户端仅查询车辆状态、电池信息和骑行记录，不包含车辆控制能力。
+              凭据只在本机 SDK 会话中短暂使用。客户端仅查询车辆状态、电池信息和骑行记录，
+              不包含车辆控制能力。
             </p>
           </div>
           <button className="icon-button" type="button" onClick={onClose} aria-label="关闭登录">
@@ -221,7 +221,7 @@ export const LoginSheet = ({
             />
             {codeSent && !error ? (
               <p className="login-sms-success" role="status">
-                验证码请求已发送，请查看短信。验证码只会提交给本机 ninecli。
+                验证码请求已发送，请查看短信。验证码只会提交给本机 SDK 会话。
               </p>
             ) : null}
             <LoginError message={error} />
@@ -238,9 +238,8 @@ export const LoginSheet = ({
 
         <p className="login-warning mt-4 text-xs leading-5 text-slate-500">
           {mode === "password"
-            ? "注意：密码会在登录瞬间作为本地子进程参数传递，但不会写入本项目或渲染层日志。"
-            : "短信发送可能触发网易易盾人机验证；ninecli 0.1.7 无法完成该挑战，客户端不会尝试绕过，并会提示改用密码登录。"}{" "}
-          ninecli 0.1.7 是非官方、未完整开源的逆向工具。
+            ? "注意：密码只在登录调用期间保留在本机内存，不会写入磁盘或渲染层日志。"
+            : "短信发送可能触发网易易盾人机验证；客户端不会尝试绕过该挑战，服务端要求验证时请改用密码登录。"}
         </p>
       </section>
     </div>

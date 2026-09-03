@@ -71,7 +71,7 @@ type StatisticsTrendRange = "calendar" | "rolling";
 
 const formatTrendMonthName = (month: string) => `${month.slice(0, 4)}年${Number(month.slice(4))}月`;
 
-/** Presents on-demand yearly summaries built from monthly ninecli travel lists. */
+/** Presents on-demand yearly summaries built from monthly SDK travel lists. */
 export const StatisticsDashboard = ({
   vehicle,
   statistics,
@@ -410,7 +410,7 @@ export const StatisticsDashboard = ({
       </section>
 
       <p className="statistics-boundary">
-        月度总次数、总里程、总时长和总能耗优先使用 ninecli `travel`
+        月度总次数、总里程、总时长和总能耗优先使用 SDK `travel`
         顶层完整汇总；活跃天数来自完整的每日里程数组。可选择的行程明细仍最多返回 20 条，并会按“明细
         20/总次数”单独标注。`first_time` 之前的月份不会发起空查询。统计不读取 GPS 轨迹和坐标。
       </p>

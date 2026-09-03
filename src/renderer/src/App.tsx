@@ -497,7 +497,7 @@ export default function App() {
       try {
         for (let index = 0; index < requestMonthKeys.length; index += STATISTICS_BATCH_SIZE) {
           const batch = requestMonthKeys.slice(index, index + STATISTICS_BATCH_SIZE);
-          // Keep at most three ninecli processes active to avoid hammering the private upstream API.
+          // Keep at most three SDK requests active to avoid hammering the private upstream API.
           // oxlint-disable-next-line no-await-in-loop
           const results = await Promise.all(
             batch.map(async (monthKey) => ({

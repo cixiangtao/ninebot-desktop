@@ -76,7 +76,7 @@ export type StatisticsTrendMetric =
   | "activeDays"
   | "efficiency";
 
-/** Returns a comparable monthly value from ninecli's already-loaded aggregate fields. */
+/** Returns a comparable monthly value from the SDK's already-loaded aggregate fields. */
 export const getMonthTrendValue = (
   month: MonthRideStatistics,
   metric: StatisticsTrendMetric,

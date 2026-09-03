@@ -76,7 +76,7 @@ const formatLifecycleDate = (timestamp: number) =>
 
 const BATTERY_READING_DIFFERENCE_WARNING = 5;
 
-/** Presents the location-free subset of ninecli status and battery telemetry. */
+/** Presents the location-free subset of SDK status and battery telemetry. */
 export const VehicleDashboard = ({
   vehicle,
   snapshot,
@@ -442,7 +442,7 @@ export const VehicleDashboard = ({
       </div>
 
       <p className="vehicle-dashboard-boundary">
-        此页面只读取 ninecli 的 status 与 battery 数据；车辆 SN、实时坐标和控制能力不会传给页面。
+        此页面只读取 SDK 的 status 与 battery 数据；车辆 SN、实时坐标和控制能力不会传给页面。
       </p>
     </div>
   );

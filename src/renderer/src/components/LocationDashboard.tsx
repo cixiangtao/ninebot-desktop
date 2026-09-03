@@ -69,7 +69,7 @@ export const LocationDashboard = ({
           <p>车辆位置</p>
           <h1>按需显示，不在后台追踪</h1>
           <span className="location-consent-description">
-            设备状态查询的 ninecli status 响应可能包含位置，但授权前坐标不会交给页面。确认后才会把
+            设备状态查询的 SDK status 响应可能包含位置，但授权前坐标不会交给页面。确认后才会把
             {vehicle.name} 的新读取位置传给页面，并按该区域请求 OpenFreeMap 地图瓦片。
           </span>
 

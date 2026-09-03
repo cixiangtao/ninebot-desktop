@@ -170,7 +170,7 @@ export const createVehicleSnapshotChanges = (
   return changes;
 };
 
-/** Keeps automatic ninecli polling scoped to an explicitly enabled, visible device surface. */
+/** Keeps automatic SDK polling scoped to an explicitly enabled, visible device surface. */
 export const shouldRunVehicleMonitor = ({
   enabled,
   live,

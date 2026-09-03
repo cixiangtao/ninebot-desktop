@@ -792,7 +792,7 @@ try {
     "login-dialog",
     await window.getByRole("dialog", { name: "连接九号账号" }).isVisible(),
   );
-  console.log("login-warning", await window.getByText(/ninecli 0\.1\.7/).isVisible());
+  console.log("login-warning", await window.getByText(/网易易盾人机验证/).isVisible());
   console.log(
     "password-login-default",
     await window.getByRole("tab", { name: "密码登录" }).getAttribute("aria-selected"),

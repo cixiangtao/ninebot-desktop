@@ -130,7 +130,7 @@ export const MonthSummaryExportSheet = ({
           <div className="month-summary-export-coverage">
             <TriangleAlert size={18} />
             <p>
-              整月总次数、里程、时长、能耗和每日里程是完整汇总；逐次清单仅包含 ninecli 当前返回的{" "}
+              整月总次数、里程、时长、能耗和每日里程是完整汇总；逐次清单仅包含 SDK 当前返回的{" "}
               {visibleRideCount} 条可选行程。
             </p>
           </div>
