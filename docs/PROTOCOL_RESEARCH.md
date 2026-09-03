@@ -114,6 +114,8 @@ pnpm protocol:record -- --include-bodies --include-signing-headers
 
 该采集只证明 ninecli 的请求/响应形状和本地解析边界，不证明 stub 返回值能通过九号服务端认证；TypeScript 已提供 `buildPasswordLoginRequest` 与 token 字段解析器，签名仍通过显式 provider 注入。
 
+2026-09-03 对随应用分发的 arm64 ninecli 0.1.7 做了本地静态分析：Go 符号恢复得到 `internal/crypto.PassportCanonicalString`、`PassportSign` 和 `EncodeOrderedJSON` 三个函数边界；`PassportSign` 调用标准库 `crypto/sha256.Sum256`，再把 32 字节摘要编码成 64 位小写十六进制字符串。`PassportCanonicalString` 会组装包含 `clientKey`、`url`、`timestamp` 以及请求映射字段的有序 JSON，`EncodeOrderedJSON` 负责稳定键顺序。该证据解释了登录 Header 中 64 字符 `sign` 的长度和大小写，但尚未安全确认完整映射字段、值类型、固定 `clientKey` 来源或服务端 canonical 规则；TypeScript 不会据此猜测签名，仍要求请求/响应 parity 证据后才可移除 signer 注入边界。
+
 同日通过 ninecli 的本地 `serve` 暴露的 `/auth/refresh` 流程触发 refresh 请求，并将 Passport 上游指向本机 stub，确认：
 
 - HTTP 方法与路径为 `POST /v3/user/refresh`。
