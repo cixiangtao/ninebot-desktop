@@ -152,13 +152,18 @@ const protocolOptions = ({
   ...(responseBodyDecoder === undefined ? {} : { responseBodyDecoder }),
 });
 
-const mergeAbortSignals = (signals: readonly AbortSignal[]): AbortSignal => {
+interface RequestSignal {
+  signal: AbortSignal;
+  cleanup: () => void;
+}
+
+const mergeAbortSignals = (signals: readonly AbortSignal[]): RequestSignal => {
   const nativeAny = (
     AbortSignal as typeof AbortSignal & {
       any?: (signals: readonly AbortSignal[]) => AbortSignal;
     }
   ).any;
-  if (typeof nativeAny === "function") return nativeAny(signals);
+  if (typeof nativeAny === "function") return { signal: nativeAny(signals), cleanup: () => {} };
 
   const controller = new AbortController();
   const listeners = new Map<AbortSignal, () => void>();
@@ -173,14 +178,14 @@ const mergeAbortSignals = (signals: readonly AbortSignal[]): AbortSignal => {
   for (const signal of signals) {
     if (signal.aborted) {
       abort(signal);
-      return controller.signal;
+      return { signal: controller.signal, cleanup };
     }
     const listener = () => abort(signal);
     listeners.set(signal, listener);
     signal.addEventListener("abort", listener, { once: true });
   }
   controller.signal.addEventListener("abort", cleanup, { once: true });
-  return controller.signal;
+  return { signal: controller.signal, cleanup };
 };
 
 /**
@@ -219,7 +224,7 @@ export const createNinebotCandidateSessionClient = ({
   };
   const requestSignal = (callerSignal: AbortSignal | undefined) =>
     callerSignal === undefined
-      ? sessionAbortController.signal
+      ? { signal: sessionAbortController.signal, cleanup: () => {} }
       : mergeAbortSignals([sessionAbortController.signal, callerSignal]);
 
   const listVehicles = async ({
@@ -234,12 +239,17 @@ export const createNinebotCandidateSessionClient = ({
       serviceTime: clock(),
       nonce: nonceFactory(),
     };
-    return vehicles.list({
-      service,
-      fields,
-      headers: withRequestId(headers),
-      signal: requestSignal(signal),
-    });
+    const request = requestSignal(signal);
+    try {
+      return await vehicles.list({
+        service,
+        fields,
+        headers: withRequestId(headers),
+        signal: request.signal,
+      });
+    } finally {
+      request.cleanup();
+    }
   };
 
   const status = async ({
@@ -254,12 +264,17 @@ export const createNinebotCandidateSessionClient = ({
       serviceTime: clock(),
       nonce: nonceFactory(),
     });
-    return telemetry.status({
-      service,
-      fields,
-      headers: withRequestId(headers),
-      signal: requestSignal(signal),
-    });
+    const request = requestSignal(signal);
+    try {
+      return await telemetry.status({
+        service,
+        fields,
+        headers: withRequestId(headers),
+        signal: request.signal,
+      });
+    } finally {
+      request.cleanup();
+    }
   };
 
   const battery = async ({
@@ -274,12 +289,17 @@ export const createNinebotCandidateSessionClient = ({
       serviceTime: clock(),
       nonce: nonceFactory(),
     });
-    return telemetry.battery({
-      service,
-      fields,
-      headers: withRequestId(headers),
-      signal: requestSignal(signal),
-    });
+    const request = requestSignal(signal);
+    try {
+      return await telemetry.battery({
+        service,
+        fields,
+        headers: withRequestId(headers),
+        signal: request.signal,
+      });
+    } finally {
+      request.cleanup();
+    }
   };
 
   const travelFields = ({
@@ -311,12 +331,17 @@ export const createNinebotCandidateSessionClient = ({
       month: monthKey,
       page: "1",
     } as TravelMonthPlaintextFields;
-    return travel.month({
-      fields,
-      businessType: businessTypeFor(service),
-      headers: withRequestId(headers),
-      signal: requestSignal(signal),
-    });
+    const request = requestSignal(signal);
+    try {
+      return await travel.month({
+        fields,
+        businessType: businessTypeFor(service),
+        headers: withRequestId(headers),
+        signal: request.signal,
+      });
+    } finally {
+      request.cleanup();
+    }
   };
 
   const detail = async ({
@@ -331,12 +356,17 @@ export const createNinebotCandidateSessionClient = ({
       ...travelFields({ serialNumber, vehicleType }),
       travel_id: travelId,
     } as TravelDetailPlaintextFields;
-    return travel.detail({
-      fields,
-      businessType: businessTypeFor(service),
-      headers: withRequestId(headers),
-      signal: requestSignal(signal),
-    });
+    const request = requestSignal(signal);
+    try {
+      return await travel.detail({
+        fields,
+        businessType: businessTypeFor(service),
+        headers: withRequestId(headers),
+        signal: request.signal,
+      });
+    } finally {
+      request.cleanup();
+    }
   };
 
   const clear = () => {
