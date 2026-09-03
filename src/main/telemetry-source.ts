@@ -11,6 +11,7 @@ import type { VehicleTelemetryReader } from "./vehicle-snapshot.js";
 export interface CandidateTelemetryClient {
   status(options: { service: CandidateService; serialNumber: string }): Promise<unknown>;
   battery(options: { service: CandidateService; serialNumber: string }): Promise<unknown>;
+  clear?: () => void;
 }
 
 interface CachedVehicle {
@@ -64,11 +65,15 @@ export const createCandidateTelemetryReader = ({
   async vehicleStatus(serialNumber) {
     try {
       const context = await readContext(configDirectory, serialNumber);
-      const result = await candidateClientFactory(context.session).status({
-        service: context.service,
-        serialNumber,
-      });
-      return result;
+      const candidateClient = candidateClientFactory(context.session);
+      try {
+        return await candidateClient.status({
+          service: context.service,
+          serialNumber,
+        });
+      } finally {
+        candidateClient.clear?.();
+      }
     } catch {
       return legacy.vehicleStatus(serialNumber);
     }
@@ -76,11 +81,15 @@ export const createCandidateTelemetryReader = ({
   async battery(serialNumber) {
     try {
       const context = await readContext(configDirectory, serialNumber);
-      const result = await candidateClientFactory(context.session).battery({
-        service: context.service,
-        serialNumber,
-      });
-      return result;
+      const candidateClient = candidateClientFactory(context.session);
+      try {
+        return await candidateClient.battery({
+          service: context.service,
+          serialNumber,
+        });
+      } finally {
+        candidateClient.clear?.();
+      }
     } catch {
       return legacy.battery(serialNumber);
     }

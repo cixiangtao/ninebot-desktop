@@ -19,6 +19,7 @@ export interface CandidateVehicleClient {
     service: CandidateVehicleService;
     vehicleType: string | number;
   }): Promise<{ data: unknown }>;
+  clear?: () => void;
 }
 
 interface VehicleRow {
@@ -61,63 +62,71 @@ export const createCandidateVehicleReader = ({
       if (!isRecord(cachedVehiclesValue))
         throw new Error("Ninebot candidate vehicle cache is invalid");
       const candidateClient = candidateClientFactory(session);
-      const cachedVehicleRows = (cachedVehiclesValue as CachedVehicles).vehicles;
-      const cachedRows = Array.isArray(cachedVehicleRows)
-        ? cachedVehicleRows.filter((item): item is VehicleRow => isRecord(item))
-        : [];
-      let rows = cachedRows;
-      const cachedGroups = new Map<CandidateVehicleService, VehicleRow[]>();
-      for (const row of cachedRows) {
-        const service = readCandidateService(row);
-        if (!service) continue;
-        const serviceRows = cachedGroups.get(service) ?? [];
-        serviceRows.push(row);
-        cachedGroups.set(service, serviceRows);
-      }
-      const cacheHasCompleteMetadata =
-        cachedGroups.size > 0 &&
-        [...cachedGroups.values()].every((serviceRows) =>
-          serviceRows.every((row) => row.vehicle_type !== undefined),
-        );
-      if (!cacheHasCompleteMetadata) {
-        const legacyValue = await legacy.vehicles();
-        if (Array.isArray(legacyValue)) {
-          rows = legacyValue.filter((item): item is VehicleRow => isRecord(item));
+      try {
+        const cachedVehicleRows = (cachedVehiclesValue as CachedVehicles).vehicles;
+        const cachedRows = Array.isArray(cachedVehicleRows)
+          ? cachedVehicleRows.filter((item): item is VehicleRow => isRecord(item))
+          : [];
+        let rows = cachedRows;
+        const cachedGroups = new Map<CandidateVehicleService, VehicleRow[]>();
+        for (const row of cachedRows) {
+          const service = readCandidateService(row);
+          if (!service) continue;
+          const serviceRows = cachedGroups.get(service) ?? [];
+          serviceRows.push(row);
+          cachedGroups.set(service, serviceRows);
         }
-      }
-      const grouped = new Map<string, { service: CandidateVehicleService; vehicleType: string }>();
-      for (const row of rows) {
-        const service = readCandidateService(row);
-        if (!service) continue;
-        const vehicleType = requireText(row.vehicle_type, "candidate vehicle_type");
-        grouped.set(`${service}\0${vehicleType}`, { service, vehicleType });
-      }
-      if (grouped.size === 0) throw new Error("Ninebot candidate vehicle services are unavailable");
-
-      const candidateRows: unknown[] = [];
-      const seenVehicleKeys = new Set<string>();
-      for (const { service, vehicleType } of grouped.values()) {
-        // Keep service-family requests sequential during migration to avoid bursting upstream.
-        // eslint-disable-next-line no-await-in-loop
-        const result = await candidateClient.listVehicles({
-          service,
-          vehicleType,
-        });
-        if (!Array.isArray(result.data))
-          throw new Error("Ninebot candidate vehicle data is invalid");
-        for (const row of result.data) {
-          if (isRecord(row)) {
-            const vehicleKey = row.wnumber ?? row.sn;
-            if (typeof vehicleKey === "string" && vehicleKey.length > 0) {
-              if (seenVehicleKeys.has(vehicleKey)) continue;
-              seenVehicleKeys.add(vehicleKey);
-            }
+        const cacheHasCompleteMetadata =
+          cachedGroups.size > 0 &&
+          [...cachedGroups.values()].every((serviceRows) =>
+            serviceRows.every((row) => row.vehicle_type !== undefined),
+          );
+        if (!cacheHasCompleteMetadata) {
+          const legacyValue = await legacy.vehicles();
+          if (Array.isArray(legacyValue)) {
+            rows = legacyValue.filter((item): item is VehicleRow => isRecord(item));
           }
-          // Preserve opaque rows without identifiers; the renderer parser will discard them.
-          candidateRows.push(row);
         }
+        const grouped = new Map<
+          string,
+          { service: CandidateVehicleService; vehicleType: string }
+        >();
+        for (const row of rows) {
+          const service = readCandidateService(row);
+          if (!service) continue;
+          const vehicleType = requireText(row.vehicle_type, "candidate vehicle_type");
+          grouped.set(`${service}\0${vehicleType}`, { service, vehicleType });
+        }
+        if (grouped.size === 0)
+          throw new Error("Ninebot candidate vehicle services are unavailable");
+
+        const candidateRows: unknown[] = [];
+        const seenVehicleKeys = new Set<string>();
+        for (const { service, vehicleType } of grouped.values()) {
+          // Keep service-family requests sequential during migration to avoid bursting upstream.
+          // eslint-disable-next-line no-await-in-loop
+          const result = await candidateClient.listVehicles({
+            service,
+            vehicleType,
+          });
+          if (!Array.isArray(result.data))
+            throw new Error("Ninebot candidate vehicle data is invalid");
+          for (const row of result.data) {
+            if (isRecord(row)) {
+              const vehicleKey = row.wnumber ?? row.sn;
+              if (typeof vehicleKey === "string" && vehicleKey.length > 0) {
+                if (seenVehicleKeys.has(vehicleKey)) continue;
+                seenVehicleKeys.add(vehicleKey);
+              }
+            }
+            // Preserve opaque rows without identifiers; the renderer parser will discard them.
+            candidateRows.push(row);
+          }
+        }
+        return candidateRows;
+      } finally {
+        candidateClient.clear?.();
       }
-      return candidateRows;
     } catch {
       return legacy.vehicles();
     }

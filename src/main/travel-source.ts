@@ -28,6 +28,7 @@ export interface CandidateTravelClient {
     vehicleType: string;
     travelId: string;
   }): Promise<unknown>;
+  clear?: () => void;
 }
 
 interface CachedVehicle {
@@ -116,12 +117,17 @@ export const createCandidateTravelReader = ({
   async rides(serialNumber, month) {
     try {
       const context = await readContext(configDirectory, serialNumber, legacy.vehicles);
-      return await candidateClientFactory(context.session).month({
-        service: context.service,
-        serialNumber,
-        vehicleType: context.vehicleType,
-        month,
-      });
+      const candidateClient = candidateClientFactory(context.session);
+      try {
+        return await candidateClient.month({
+          service: context.service,
+          serialNumber,
+          vehicleType: context.vehicleType,
+          month,
+        });
+      } finally {
+        candidateClient.clear?.();
+      }
     } catch {
       return legacy.rides(serialNumber, month);
     }
@@ -129,12 +135,17 @@ export const createCandidateTravelReader = ({
   async rideDetail(serialNumber, travelId) {
     try {
       const context = await readContext(configDirectory, serialNumber, legacy.vehicles);
-      return await candidateClientFactory(context.session).detail({
-        service: context.service,
-        serialNumber,
-        vehicleType: context.vehicleType,
-        travelId,
-      });
+      const candidateClient = candidateClientFactory(context.session);
+      try {
+        return await candidateClient.detail({
+          service: context.service,
+          serialNumber,
+          vehicleType: context.vehicleType,
+          travelId,
+        });
+      } finally {
+        candidateClient.clear?.();
+      }
     } catch {
       return legacy.rideDetail(serialNumber, travelId);
     }

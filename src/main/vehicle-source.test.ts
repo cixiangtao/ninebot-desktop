@@ -64,11 +64,15 @@ describe("candidate vehicle source", () => {
     const configDirectory = await createSessionDirectory();
     let observedService: string | undefined;
     let observedVehicleType: string | undefined;
+    let clearCount = 0;
     const candidateClient: CandidateVehicleClient = {
       listVehicles: async ({ service, vehicleType }) => {
         observedService = service;
         observedVehicleType = String(vehicleType);
         return { data: [{ wnumber: "SN1234567890", vehicle_name: "candidate vehicle" }] };
+      },
+      clear: () => {
+        clearCount += 1;
       },
     };
     const reader = createCandidateVehicleReader({
@@ -84,6 +88,7 @@ describe("candidate vehicle source", () => {
     ]);
     expect(observedService).toBe("ebike");
     expect(observedVehicleType).toBe("14363");
+    expect(clearCount).toBe(1);
   });
 
   it("falls back to the legacy vehicle list when candidate data is unavailable", async () => {

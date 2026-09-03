@@ -44,9 +44,13 @@ afterEach(async () => {
 describe("candidate telemetry source", () => {
   it("uses the candidate response when the session and request succeed", async () => {
     const configDirectory = await createSessionDirectory();
+    let clearCount = 0;
     const candidateClient: CandidateTelemetryClient = {
       status: async () => ({ data: [{ pwr: 1 }] }),
       battery: async () => ({ data: { electricity: 80 } }),
+      clear: () => {
+        clearCount += 1;
+      },
     };
     const legacy = {
       vehicleStatus: async () => {
@@ -64,6 +68,7 @@ describe("candidate telemetry source", () => {
 
     await expect(reader.vehicleStatus("SN1234567890")).resolves.toEqual({ data: [{ pwr: 1 }] });
     await expect(reader.battery("SN1234567890")).resolves.toEqual({ data: { electricity: 80 } });
+    expect(clearCount).toBe(2);
   });
 
   it("accepts numeric businessType values from the vehicle cache", async () => {

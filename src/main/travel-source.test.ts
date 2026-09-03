@@ -51,6 +51,7 @@ describe("candidate travel source", () => {
     const configDirectory = await createSessionDirectory("14363");
     const calls: Array<{ kind: string; month?: string; travelId?: string; businessType: string }> =
       [];
+    let clearCount = 0;
     const candidateClient: CandidateTravelClient = {
       month: async ({ month, service, vehicleType }) => {
         calls.push({ kind: "month", month, businessType: service === "motor" ? "1" : "2" });
@@ -61,6 +62,9 @@ describe("candidate travel source", () => {
         calls.push({ kind: "detail", travelId, businessType: service === "motor" ? "1" : "2" });
         expect(vehicleType).toBe("14363");
         return { data: { trail: "" } };
+      },
+      clear: () => {
+        clearCount += 1;
       },
     };
     const legacy = {
@@ -87,6 +91,7 @@ describe("candidate travel source", () => {
       { kind: "month", month: "202608", businessType: "2" },
       { kind: "detail", travelId: "travel-1", businessType: "2" },
     ]);
+    expect(clearCount).toBe(2);
   });
 
   it("falls back to ninecli when the cached vehicle model code is unavailable", async () => {
