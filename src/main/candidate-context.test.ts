@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import {
+  createCandidateRequestTracker,
   readCandidateSession,
   readCandidateService,
   readCandidateVehicles,
@@ -39,6 +40,18 @@ const createSessionDirectory = async () => {
 };
 
 describe("candidate context", () => {
+  it("cancels tracked requests and allows a fresh session generation", () => {
+    const tracker = createCandidateRequestTracker();
+    const first = tracker.start();
+
+    tracker.clear();
+
+    expect(first.signal.aborted).toBe(true);
+    const second = tracker.start();
+    expect(second.signal.aborted).toBe(false);
+    second.release();
+  });
+
   it("normalizes textual and numeric service-family fields", () => {
     expect(readCandidateService({ business_line: "ebike" })).toBe("ebike");
     expect(readCandidateService({ businessType: 1 })).toBe("motor");

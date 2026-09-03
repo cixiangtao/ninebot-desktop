@@ -1,7 +1,6 @@
 import type { NinebotCandidateSessionFields } from "@jiuhao/ninebot-client/candidate-session";
 import {
-  beginCandidateRequest,
-  cancelCandidateRequests,
+  createCandidateRequestTracker,
   readCandidateSession,
   readCandidateService,
   readCandidateVehicles,
@@ -72,63 +71,57 @@ export const createCandidateTelemetryReader = ({
   configDirectory: string;
   candidateClientFactory?: (session: NinebotCandidateSessionFields) => CandidateTelemetryClient;
 }): VehicleTelemetryReader => {
-  const activeRequests = new Set<AbortController>();
-  let generation = 0;
+  const requestTracker = createCandidateRequestTracker();
   return {
-    clear: () => {
-      generation += 1;
-      cancelCandidateRequests(activeRequests);
-    },
+    clear: requestTracker.clear,
     async vehicleStatus(serialNumber) {
-      const requestGeneration = generation;
-      let requestController: AbortController | undefined;
+      const request = requestTracker.start();
+      let candidateClient: CandidateTelemetryClient | undefined;
       try {
         const context = await readContext(configDirectory, serialNumber);
-        if (requestGeneration !== generation) {
+        if (request.signal.aborted) {
           throw new Error("Ninebot candidate request was cancelled");
         }
-        requestController = beginCandidateRequest(activeRequests);
-        let candidateClient: CandidateTelemetryClient | undefined;
         try {
           candidateClient = candidateClientFactory(context.session);
           return await candidateClient.status({
             service: context.service,
             serialNumber,
-            signal: requestController.signal,
+            signal: request.signal,
           });
         } finally {
-          activeRequests.delete(requestController);
           candidateClient?.clear?.();
         }
       } catch (error) {
-        if (requestGeneration !== generation || requestController?.signal.aborted) throw error;
+        if (request.signal.aborted) throw error;
         return legacy.vehicleStatus(serialNumber);
+      } finally {
+        request.release();
       }
     },
     async battery(serialNumber) {
-      const requestGeneration = generation;
-      let requestController: AbortController | undefined;
+      const request = requestTracker.start();
+      let candidateClient: CandidateTelemetryClient | undefined;
       try {
         const context = await readContext(configDirectory, serialNumber);
-        if (requestGeneration !== generation) {
+        if (request.signal.aborted) {
           throw new Error("Ninebot candidate request was cancelled");
         }
-        requestController = beginCandidateRequest(activeRequests);
-        let candidateClient: CandidateTelemetryClient | undefined;
         try {
           candidateClient = candidateClientFactory(context.session);
           return await candidateClient.battery({
             service: context.service,
             serialNumber,
-            signal: requestController.signal,
+            signal: request.signal,
           });
         } finally {
-          activeRequests.delete(requestController);
           candidateClient?.clear?.();
         }
       } catch (error) {
-        if (requestGeneration !== generation || requestController?.signal.aborted) throw error;
+        if (request.signal.aborted) throw error;
         return legacy.battery(serialNumber);
+      } finally {
+        request.release();
       }
     },
   };

@@ -4,19 +4,35 @@ import type { NinebotCandidateSessionFields } from "@jiuhao/ninebot-client/candi
 
 export type CandidateService = "ebike" | "motor";
 
-/** Creates an abortable candidate request tracked by its owning adapter. */
-export const beginCandidateRequest = (activeRequests: Set<AbortController>) => {
-  const controller = new AbortController();
-  activeRequests.add(controller);
-  return controller;
-};
+export interface CandidateRequestHandle {
+  signal: AbortSignal;
+  release: () => void;
+}
 
-/** Cancels all candidate requests currently owned by one adapter. */
-export const cancelCandidateRequests = (activeRequests: Set<AbortController>) => {
-  for (const controller of activeRequests) {
-    controller.abort(new Error("Ninebot candidate request was cancelled"));
-  }
-  activeRequests.clear();
+export interface CandidateRequestTracker {
+  start: () => CandidateRequestHandle;
+  clear: () => void;
+}
+
+/** Creates a request tracker that can cancel work even while session files are loading. */
+export const createCandidateRequestTracker = (): CandidateRequestTracker => {
+  const activeRequests = new Set<AbortController>();
+  return {
+    start: () => {
+      const controller = new AbortController();
+      activeRequests.add(controller);
+      return {
+        signal: controller.signal,
+        release: () => activeRequests.delete(controller),
+      };
+    },
+    clear: () => {
+      for (const controller of activeRequests) {
+        controller.abort(new Error("Ninebot candidate request was cancelled"));
+      }
+      activeRequests.clear();
+    },
+  };
 };
 
 interface CandidateConfig {
