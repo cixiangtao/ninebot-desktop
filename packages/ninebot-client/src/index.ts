@@ -56,5 +56,27 @@ export type {
   NinebotVehicleClient,
   NinebotVehicleClientOptions,
 } from "./vehicle-client.ts";
+export {
+  buildTelemetryCandidateHeaders,
+  buildVehicleBatteryEncryptedRequestCandidate,
+  buildVehicleBatteryPlaintextBody,
+  buildVehicleStatusEncryptedRequestCandidate,
+  buildVehicleStatusPlaintextBody,
+  createNinebotTelemetryCandidateClient,
+  decodeTelemetryResponseCandidate,
+  parseTelemetryResponseCandidate,
+  vehicleBatteryPath,
+  vehicleStatusPath,
+} from "./telemetry-node.ts";
+export type {
+  BuildTelemetryCandidateHeadersOptions,
+  BuildTelemetryEncryptedRequestCandidateOptions,
+  CreateNinebotTelemetryCandidateClientOptions,
+  TelemetryCandidateHeaderFields,
+  TelemetryResponseCandidate,
+  VehicleBatteryPlaintextFields,
+  VehicleStatusPlaintextFields,
+  VehicleTelemetryCandidateOptions,
+} from "./telemetry-node.ts";
 export { createNinebotClient, NinebotHttpError } from "./client.ts";
 export type { NinebotClient, NinebotClientOptions } from "./client.ts";

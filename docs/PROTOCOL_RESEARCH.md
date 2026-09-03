@@ -175,3 +175,11 @@ Node 子路径另外提供 `decodeVehicleListResponseCandidateWithCodec`，将�
 继续对同一月份的一条行程运行 `travel --detail`，确认请求进入 `POST /app-api/travel/v6/travel-info`。详情明文沿用月度请求的通用设备/会话字段、`wnumber`、`rnVersion`、`vehicle_type`、`current_version`、`serviceTime`、`nonce` 和大写 MD5 `checkcode`，将 `month`/`page` 替换为 `travel_id`。Node `travel-node` 现已提供详情明文构造器、候选 envelope、详情响应解包器和 `trail` 类型校验。
 
 使用新 nonce/服务时间和同一 Header 映射做了一次真实详情回放，服务端返回 HTTP 200；Node 成功解析 `code=1`，并得到字符串形式的 `trail` 和 `speed` 字段。现有 `parseRideMonth` / `parseRideDetail` 已能直接消费候选 codec 的业务 wrapper，保持渲染层数据模型不变。原始轨迹正文没有写入仓库，Electron 默认仍使用 ninecli；在完成多条行程和车型交叉样本前，不切换默认数据源。
+
+### 2026-09-03 status 与 battery 请求形状
+
+通过本机已有会话对实时状态命令做只读对照，确认 `status` 进入 `POST /vehicle/vehicle/desktop-component`，`battery` 进入 `POST /v6/vehicle/battery-info`。两条请求继续使用 `d/h/k/p/t` 与 `v/s/r` 加密外壳，服务端均返回 HTTP 200；解密后的业务层统一为 `{ code, data, desc, time_cost, extra }`，其中 status 的 `data` 为数组，battery 的 `data` 为对象。
+
+两条明文都沿用通用设备/会话字段、`serviceTime`、`nonce` 和大写 MD5 `checkcode`。status 额外携带 `sn_str`，battery 额外携带 `wnumber`；请求 Header 与车辆列表保持同一组设备、平台、语言、用户、服务时间和 `business-type` 映射。Node 子路径新增 `telemetry-node`，提供两条明文构造器、候选加密 envelope、统一响应 wrapper 解析和 transport-backed client，便于后续用同一账号做字段级对照。
+
+本次 status/battery 请求已用真实服务端完成 HTTP 200 校验，原始账号、令牌、设备标识、密文和响应正文均未写入仓库。该证据只提升候选链的可信度，Electron 默认仍使用内置 ninecli；登录、令牌刷新和短信人机验证继续不在迁移范围内。

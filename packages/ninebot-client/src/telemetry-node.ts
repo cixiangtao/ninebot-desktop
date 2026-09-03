@@ -1,0 +1,348 @@
+import { NinebotHttpError } from "./client.ts";
+import { computeNinebotBodyCheckcode, generateNinebotNonce } from "./crypto-node.ts";
+import {
+  buildNinebotEncryptedRequestCandidate,
+  decryptNinebotResponsePayloadCandidate,
+  generateNinebotCandidateRequestMaterial,
+} from "./crypto-codec.ts";
+import type { NinebotCandidateKeyData } from "./crypto-codec.ts";
+import {
+  parseNinebotEncryptedResponse,
+  serializeNinebotEncryptedRequest,
+  type NinebotEncryptedRequestEnvelope,
+  type NinebotEncryptedResponseEnvelope,
+} from "./crypto-envelope.ts";
+import { ninebotCandidateRsaPublicKeyPem } from "./rsa-node.ts";
+import type { NinebotResponse, NinebotTransport } from "./transport.ts";
+
+export const vehicleStatusPath = "/vehicle/vehicle/desktop-component" as const;
+export const vehicleBatteryPath = "/v6/vehicle/battery-info" as const;
+
+/** Shared device/session fields sent to status and battery endpoints. */
+export interface TelemetryCandidateHeaderFields {
+  sys_language: string;
+  client_ver: string;
+  device_id: string;
+  regionx: string;
+  language: string;
+  ostype: string;
+  lang: string;
+  platform_ver: string;
+  platform: string;
+  login_country: string;
+  access_token: string;
+  uid: string;
+  serviceTime: number;
+  nonce: string;
+}
+
+export interface VehicleStatusPlaintextFields extends TelemetryCandidateHeaderFields {
+  sn_str: string;
+}
+
+export interface VehicleBatteryPlaintextFields extends TelemetryCandidateHeaderFields {
+  wnumber: string;
+}
+
+const telemetryBaseKeys = [
+  "sys_language",
+  "client_ver",
+  "device_id",
+  "regionx",
+  "language",
+  "ostype",
+  "lang",
+  "platform_ver",
+  "platform",
+  "login_country",
+  "access_token",
+  "uid",
+] as const satisfies readonly (keyof TelemetryCandidateHeaderFields)[];
+
+const assertTelemetryBaseFields = (fields: TelemetryCandidateHeaderFields) => {
+  for (const key of telemetryBaseKeys) {
+    const value = fields[key];
+    if (typeof value !== "string" || value.length === 0) {
+      throw new Error(`Ninebot telemetry request field ${key} is invalid`);
+    }
+  }
+  if (!Number.isSafeInteger(fields.serviceTime)) {
+    throw new Error("Ninebot telemetry request field serviceTime must be a safe integer");
+  }
+  if (!/^[0-9A-Fa-f]{32}$/.test(fields.nonce)) {
+    throw new Error("Ninebot telemetry request field nonce must be 32 hexadecimal characters");
+  }
+};
+
+const buildTelemetryBody = <T extends TelemetryCandidateHeaderFields>(
+  fields: T,
+  keys: readonly (keyof T)[],
+  label: string,
+) => {
+  assertTelemetryBaseFields(fields);
+  for (const key of keys) {
+    const value = fields[key];
+    if (typeof value !== "string" && typeof value !== "number") {
+      throw new Error(`Ninebot ${label} request field ${String(key)} is invalid`);
+    }
+    if (typeof value === "string" && value.length === 0) {
+      throw new Error(`Ninebot ${label} request field ${String(key)} is empty`);
+    }
+  }
+  const unsignedFields = Object.fromEntries(keys.map((key) => [key, fields[key]]));
+  const unsignedBody = JSON.stringify(unsignedFields);
+  return new TextEncoder().encode(
+    JSON.stringify({ ...unsignedFields, checkcode: computeNinebotBodyCheckcode(unsignedBody) }),
+  );
+};
+
+const statusKeys = [...telemetryBaseKeys, "sn_str", "serviceTime", "nonce"] as const;
+const batteryKeys = [...telemetryBaseKeys, "wnumber", "serviceTime", "nonce"] as const;
+
+/** Builds the observed status request body and uppercase MD5 checkcode. */
+export const buildVehicleStatusPlaintextBody = (fields: VehicleStatusPlaintextFields) =>
+  buildTelemetryBody(fields, statusKeys, "status");
+
+/** Builds the observed battery request body and uppercase MD5 checkcode. */
+export const buildVehicleBatteryPlaintextBody = (fields: VehicleBatteryPlaintextFields) =>
+  buildTelemetryBody(fields, batteryKeys, "battery");
+
+export interface BuildTelemetryEncryptedRequestCandidateOptions {
+  plaintextBody: Uint8Array;
+  platform: number;
+  p?: string;
+  t?: string;
+  timeStamp?: number;
+  /** Defaults to the public key embedded in ninecli 0.1.7. */
+  rsaPublicKey?: Uint8Array | string;
+}
+
+const buildTelemetryEncryptedRequestCandidate = ({
+  plaintextBody,
+  platform,
+  p = "101",
+  t = "0",
+  timeStamp,
+  rsaPublicKey,
+}: BuildTelemetryEncryptedRequestCandidateOptions) => {
+  const material = generateNinebotCandidateRequestMaterial(
+    timeStamp === undefined ? { platform, p, t } : { platform, p, t, timeStamp },
+  );
+  return {
+    envelope: buildNinebotEncryptedRequestCandidate({
+      plaintextBody,
+      material,
+      rsaPublicKey: rsaPublicKey ?? ninebotCandidateRsaPublicKeyPem,
+    }),
+    keyData: material.keyData,
+  };
+};
+
+export interface VehicleTelemetryEncryptedRequestCandidate {
+  envelope: NinebotEncryptedRequestEnvelope;
+  keyData: NinebotCandidateKeyData;
+}
+
+/** Builds a status request candidate and returns its response key context. */
+export const buildVehicleStatusEncryptedRequestCandidate = ({
+  fields,
+  ...options
+}: BuildTelemetryEncryptedRequestCandidateOptions & { fields: VehicleStatusPlaintextFields }) =>
+  buildTelemetryEncryptedRequestCandidate({
+    ...options,
+    plaintextBody: buildVehicleStatusPlaintextBody(fields),
+  });
+
+/** Builds a battery request candidate and returns its response key context. */
+export const buildVehicleBatteryEncryptedRequestCandidate = ({
+  fields,
+  ...options
+}: BuildTelemetryEncryptedRequestCandidateOptions & { fields: VehicleBatteryPlaintextFields }) =>
+  buildTelemetryEncryptedRequestCandidate({
+    ...options,
+    plaintextBody: buildVehicleBatteryPlaintextBody(fields),
+  });
+
+export interface TelemetryResponseCandidate {
+  code: number | string | null;
+  data: unknown;
+  desc: string | null;
+  time_cost: number | string | null;
+  extra: unknown;
+}
+
+const asRecord = (value: unknown): Record<string, unknown> | null =>
+  value !== null && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+
+const readScalar = (record: Record<string, unknown>, key: string) => {
+  const value = record[key];
+  if (value === null || typeof value === "string" || typeof value === "number")
+    return value ?? null;
+  throw new Error(`Ninebot telemetry response field ${key} is invalid`);
+};
+
+/** Parses the shared business wrapper returned by status and battery endpoints. */
+export const parseTelemetryResponseCandidate = (
+  plaintext: Uint8Array,
+): TelemetryResponseCandidate => {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(new TextDecoder().decode(plaintext));
+  } catch {
+    throw new Error("Ninebot telemetry response payload is not valid JSON");
+  }
+  const record = asRecord(parsed);
+  if (!record || !("data" in record)) {
+    throw new Error("Ninebot telemetry response payload is not a business wrapper");
+  }
+  return {
+    code: readScalar(record, "code"),
+    data: record.data,
+    desc: typeof record.desc === "string" ? record.desc : null,
+    time_cost: readScalar(record, "time_cost"),
+    extra: record.extra ?? null,
+  };
+};
+
+/** Decrypts one telemetry response while retaining its business wrapper metadata. */
+export const decodeTelemetryResponseCandidate = ({
+  envelope,
+  keyData,
+}: {
+  envelope: NinebotEncryptedResponseEnvelope;
+  keyData: NinebotCandidateKeyData;
+}) =>
+  parseTelemetryResponseCandidate(decryptNinebotResponsePayloadCandidate({ envelope, keyData }));
+
+export interface CreateNinebotTelemetryCandidateClientOptions {
+  transport: NinebotTransport;
+  platform: number;
+  p?: string;
+  t?: string;
+  timeStamp?: number;
+  /** Defaults to the public key embedded in ninecli 0.1.7. */
+  rsaPublicKey?: Uint8Array | string;
+  responseBodyDecoder?: (response: NinebotResponse) => Uint8Array | Promise<Uint8Array>;
+}
+
+export interface VehicleTelemetryCandidateOptions {
+  service: "ebike" | "motor";
+  fields: VehicleStatusPlaintextFields | VehicleBatteryPlaintextFields;
+  headers?: Readonly<Record<string, string>>;
+}
+
+/** Creates a transport-backed Node client for status and battery candidates. */
+export const createNinebotTelemetryCandidateClient = ({
+  transport,
+  platform,
+  p = "101",
+  t = "0",
+  timeStamp,
+  rsaPublicKey,
+  responseBodyDecoder = (response) => response.body,
+}: CreateNinebotTelemetryCandidateClientOptions) => {
+  const send = async (
+    service: "ebike" | "motor",
+    path: typeof vehicleStatusPath | typeof vehicleBatteryPath,
+    fields: TelemetryCandidateHeaderFields,
+    plaintextBody: Uint8Array,
+    headers: Readonly<Record<string, string>> | undefined,
+  ) => {
+    const material = generateNinebotCandidateRequestMaterial(
+      timeStamp === undefined ? { platform, p, t } : { platform, p, t, timeStamp },
+    );
+    const envelope = buildNinebotEncryptedRequestCandidate({
+      plaintextBody,
+      material,
+      rsaPublicKey: rsaPublicKey ?? ninebotCandidateRsaPublicKeyPem,
+    });
+    const response = await transport.send({
+      service,
+      method: "POST",
+      path,
+      headers: {
+        ...buildTelemetryCandidateHeaders({ service, fields }),
+        ...headers,
+      },
+      body: new TextEncoder().encode(serializeNinebotEncryptedRequest(envelope)),
+    });
+    if (response.status < 200 || response.status >= 300)
+      throw new NinebotHttpError(response.status);
+    const responseBody = await responseBodyDecoder(response);
+    return decodeTelemetryResponseCandidate({
+      envelope: parseNinebotEncryptedResponse(responseBody),
+      keyData: material.keyData,
+    });
+  };
+  return {
+    status: (
+      options: VehicleTelemetryCandidateOptions & { fields: VehicleStatusPlaintextFields },
+    ) =>
+      send(
+        options.service,
+        vehicleStatusPath,
+        options.fields,
+        buildVehicleStatusPlaintextBody(options.fields),
+        options.headers,
+      ),
+    battery: (
+      options: VehicleTelemetryCandidateOptions & { fields: VehicleBatteryPlaintextFields },
+    ) =>
+      send(
+        options.service,
+        vehicleBatteryPath,
+        options.fields,
+        buildVehicleBatteryPlaintextBody(options.fields),
+        options.headers,
+      ),
+  };
+};
+
+export interface BuildTelemetryCandidateHeadersOptions {
+  service: "ebike" | "motor";
+  fields: TelemetryCandidateHeaderFields;
+  requestId?: string;
+  serviceTime?: number;
+}
+
+/** Builds the observed status/battery request headers. */
+export const buildTelemetryCandidateHeaders = ({
+  service,
+  fields,
+  requestId = generateNinebotNonce(),
+  serviceTime = fields.serviceTime,
+}: BuildTelemetryCandidateHeadersOptions) => {
+  if (!/^[0-9A-Fa-f]{32}$/.test(requestId)) {
+    throw new Error(
+      "Ninebot telemetry request header request-id must be 32 hexadecimal characters",
+    );
+  }
+  if (!Number.isSafeInteger(serviceTime)) {
+    throw new Error("Ninebot telemetry request header service-time must be a safe integer");
+  }
+  const platformVersion = fields.platform_ver.split(" ")[0];
+  if (!platformVersion) throw new Error("Ninebot telemetry request header platform-ver is empty");
+  return {
+    "accept-encoding": "gzip",
+    "business-type": service === "motor" ? "1" : "2",
+    "cache-control": "no-cache",
+    "client-ver": fields.client_ver,
+    "content-type": "text/html;charset=UTF-8",
+    debug: "0",
+    "device-id": fields.device_id,
+    language: fields.language,
+    "login-country": fields.login_country,
+    need_decrypt: "1",
+    "ninebot-version": "2",
+    platform: fields.platform.toLowerCase() === "android" ? "Android" : fields.platform,
+    "platform-ver": platformVersion,
+    regionx: fields.regionx,
+    "request-id": requestId,
+    "service-time": String(serviceTime),
+    "sys-language": fields.sys_language,
+    uid: fields.uid,
+    "user-agent": "okhttp/4.9.1",
+  };
+};

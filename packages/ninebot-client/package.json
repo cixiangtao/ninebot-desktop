@@ -37,6 +37,10 @@
       "types": "./dist/travel-node.d.ts",
       "import": "./dist/travel-node.js"
     },
+    "./telemetry-node": {
+      "types": "./dist/telemetry-node.d.ts",
+      "import": "./dist/telemetry-node.js"
+    },
     "./rsa-node": {
       "types": "./dist/rsa-node.d.ts",
       "import": "./dist/rsa-node.js"
