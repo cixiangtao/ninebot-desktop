@@ -133,6 +133,16 @@ export type {
 } from "./travel-node.ts";
 export { createNinebotClient, NinebotHttpError } from "./client.ts";
 export type { NinebotClient, NinebotClientOptions } from "./client.ts";
+export { createMemoryNinebotAuthSessionStore, NinebotAuthSessionManager } from "./auth.ts";
+export type {
+  NinebotAuthProvider,
+  NinebotAuthSession,
+  NinebotAuthSessionManagerOptions,
+  NinebotAuthSessionStore,
+  NinebotPasswordCredentials,
+  NinebotSmsCodeRequest,
+  NinebotSmsLoginInput,
+} from "./auth.ts";
 export {
   createNinebotCandidateSessionClient,
   createNinebotFetchCandidateSessionClient,
