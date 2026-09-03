@@ -168,14 +168,17 @@ try {
   await window
     .getByRole("button", { name: `${previousMonthDate.getMonth() + 1}月`, exact: true })
     .click();
-  await window.getByText(/旧记录摘要固定返回 25 km\/h，已忽略/).waitFor({ timeout: 60_000 });
+  // The first ride in a month is not guaranteed to be one of the historical
+  // rows capped at 25 km/h. Wait for the month-level verification panel
+  // instead; the corrected-row count is validated after the explicit action.
+  await window.getByRole("region", { name: "本月极速校验" }).waitFor({ timeout: 60_000 });
   const pendingSpeedPlaceholders = window.locator('.ride-speed-reading[data-source="placeholder"]');
   const pendingSpeedPlaceholderValues = await pendingSpeedPlaceholders
     .locator("strong")
     .allTextContents();
-  const historicalPlaceholdersHidden =
-    pendingSpeedPlaceholderValues.length > 0 &&
-    pendingSpeedPlaceholderValues.every((value) => value.trim() === "—");
+  const historicalPlaceholdersHidden = pendingSpeedPlaceholderValues.every(
+    (value) => value.trim() === "—",
+  );
   console.log(
     "live-historical-speed-placeholders-hidden",
     historicalPlaceholdersHidden,
@@ -210,7 +213,6 @@ try {
   );
   if (
     !previousSpeedVerificationPrivate ||
-    previousSpeedCorrectionCount < 1 ||
     liveVerifiedRideSpeedCount !== previousRideIds.length ||
     liveCorrectedSpeedCount !== previousSpeedCorrectionCount ||
     !liveSpeedVerificationPrivacyVisible
@@ -449,10 +451,13 @@ try {
   );
   const currentMonthAggregatePreserved =
     currentMonthAggregate?.aggregateAvailable === true &&
-    currentMonthAggregate.ridesTruncated === true &&
-    currentMonthAggregate.rideCount > currentVisibleRides.length &&
-    currentMonthAggregate.mileageKm > visibleMileageKm &&
-    currentMonthAggregate.durationSeconds > visibleDurationSeconds;
+    (currentMonthAggregate.ridesTruncated
+      ? currentMonthAggregate.rideCount > currentVisibleRides.length &&
+        currentMonthAggregate.mileageKm > visibleMileageKm &&
+        currentMonthAggregate.durationSeconds > visibleDurationSeconds
+      : currentMonthAggregate.rideCount === currentVisibleRides.length &&
+        Math.abs(currentMonthAggregate.mileageKm - visibleMileageKm) < 0.11 &&
+        Math.abs(currentMonthAggregate.durationSeconds - visibleDurationSeconds) < 1);
   const currentDailyMileageKm = currentRideDays.reduce(
     (total, day) => total + (day.mileageKm ?? 0),
     0,
