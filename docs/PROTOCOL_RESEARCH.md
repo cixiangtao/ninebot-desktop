@@ -280,3 +280,7 @@ Electron 主进程已删除 ninecli 运行时分支，正式应用的数据源�
 Node SDK 新增独立的 `business-login-node` 边界：固定重建九号观察到的 19 个明文字段，使用毫秒级 `serviceTime` 和大写 MD5 `checkcode`，沿用 `p=101`、`t=0` 与四段 key-data 加密外壳；请求头补齐 `business-type=0`、`need_decrypt=1` 和 `ninebot-version=2`。使用本机已有会话直连 `POST /user/user/login`，服务端返回 `code=1`、成功描述，解密后的 `data` 为用户资料对象；本次只记录业务码和字段名，没有写入令牌或响应正文。Passport 会话与 SDK 文件存储同步保留可选 `uuid`，为下一步无缓存车辆元数据编排提供输入。该入口仍未把未知车型码写死，也未宣称首次登录车辆列表已完成。
 
 在删除本地 `vehicles.json` 的隔离配置中观察到 ninecli 紧接着向两个业务族各发起一次 `/vehicle/binding/my-vehicle`：电自使用 `vehicle_type=65`，电摩使用 `vehicle_type=64`。这两个值是服务族发现码，不是具体车型码；响应行内的 `vehicle_type` 才是后续行程接口需要的模型码。Node SDK 现已在首次运行或缓存元数据不完整时按同样顺序执行 `65/64` 探测，并直接缓存返回的具体车型元数据，避免重复按具体车型再请求一次。
+
+### 2026-09-03 Passport refresh 响应兼容性
+
+Node fetch 可能已经自动解压 gzip 响应，但仍保留 `content-encoding: gzip` 头。SDK 的 Passport 响应解码器现先检查 gzip 魔数，避免对已解压的 refresh/whoami 响应二次解压。使用当前本机会话验证后，SDK 能稳定解析服务端 `90002 args missing` 业务错误；同一会话经 ninecli 的 refresh 代理也返回 HTTP 502，说明该旧会话的 refresh 失败属于服务端/会话状态，不能当作 SDK 请求解析失败。
