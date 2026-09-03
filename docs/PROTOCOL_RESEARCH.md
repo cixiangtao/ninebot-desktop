@@ -237,7 +237,7 @@ telemetry 候选源现通过 `createNinebotCandidateSessionClient` 生成 status
 
 继续回到 `EncryptRequest` 入口对照后发现，telemetry 明文的 `serviceTime` 使用 13 位 Unix 毫秒，而车辆列表和加密外壳的 `timeStamp` 仍使用已验证的 Unix 秒。Node 默认值已按能力拆开修正为毫秒；使用同一账号连续运行 3 轮 status/battery，并将 Node 数据与 ninecli 明文结果在内存中 parity，3 轮均为 `statusEqual=true`、`batteryEqual=true`，分别比较 25 和 19 个节点且未截断。该结果只证明当前账号、车辆和运行时版本下的只读 telemetry 候选链，Electron 默认仍保留 ninecli，待多车辆、多车型样本后再评估切换。
 
-为继续推进 travel 迁移，主进程新增了独立的 `TravelReader` 边界；默认调用 `travel-node` 的月度/详情客户端，设置 `NINEBOT_TRAVEL_SOURCE=ninecli` 才强制走 oracle。候选源按请求重新读取本地会话，失败时默认直接报告；只有显式开启 `fallbackToLegacy` 才允许对照回退。travel 的 `serviceTime` 与请求 Header 的 `service-time` 均使用 Unix 毫秒，当前 ninecli 0.1.7 的 `rn-ver` 为 `743`。由于 travel 明文需要 `vehicle_type`，候选源优先读取 SDK 自己的 `vehicle-cache.json`，仅在显式 legacy fallback 时读取旧缓存或调用 oracle，不猜测模型值。
+为继续推进 travel 迁移，主进程新增了独立的 `TravelReader` 边界；默认调用 `travel-node` 的月度/详情客户端，设置 `NINEBOT_TRAVEL_SOURCE=ninecli` 才强制走 oracle。候选源按请求重新读取本地会话，失败时默认直接报告；只有显式开启 `fallbackToLegacy` 才允许对照回退。travel 的 `serviceTime` 与请求 Header 的 `service-time` 均使用 Unix 毫秒，当前 ninecli 0.1.7 的 `rn-ver` 为 `743`。由于 travel 明文需要 `vehicle_type`，候选源优先读取 SDK 自己的 `vehicle-cache.json`；首次运行时先由车辆列表的 `65/64` 服务族发现填充该缓存，不猜测模型值。
 
 travel 候选源现通过 `createNinebotCandidateSessionClient` 生成月度和详情请求，主进程只负责从本地会话与车辆元数据解析调用参数；月度、详情默认各自失败即报错，legacy 回退边界必须显式开启。
 
