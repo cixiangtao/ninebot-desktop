@@ -53,12 +53,9 @@ describe("candidate vehicle source", () => {
     let observedService: string | undefined;
     let observedVehicleType: string | undefined;
     const candidateClient: CandidateVehicleClient = {
-      list: async ({ service, fields }) => {
+      listVehicles: async ({ service, vehicleType }) => {
         observedService = service;
-        observedVehicleType = fields.vehicle_type;
-        expect(fields.access_token).toBe("token");
-        expect(fields.serviceTime).toBeGreaterThan(1_000_000_000_000);
-        expect(fields.nonce).toMatch(/^[0-9a-f]{32}$/);
+        observedVehicleType = String(vehicleType);
         return { data: [{ wnumber: "SN1234567890", vehicle_name: "candidate vehicle" }] };
       },
     };
@@ -95,8 +92,8 @@ describe("candidate vehicle source", () => {
     const configDirectory = await createSessionDirectory();
     await addCachedVehicleType(configDirectory);
     const candidateClient: CandidateVehicleClient = {
-      list: async ({ fields }) => {
-        expect(fields.vehicle_type).toBe("14363");
+      listVehicles: async ({ vehicleType }) => {
+        expect(vehicleType).toBe("14363");
         return { data: [{ wnumber: "SN1234567890", vehicle_name: "cached metadata vehicle" }] };
       },
     };

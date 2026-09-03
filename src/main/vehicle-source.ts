@@ -1,10 +1,9 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import {
-  createNinebotVehicleCandidateClient,
-  type VehicleListPlaintextFields,
-} from "../../packages/ninebot-client/src/vehicle-node.ts";
-import { generateNinebotNonce } from "../../packages/ninebot-client/src/crypto-node.ts";
+  createNinebotCandidateSessionClient,
+  type NinebotCandidateSessionFields,
+} from "../../packages/ninebot-client/src/candidate-session.ts";
 import { createFetchNinebotTransport } from "../../packages/ninebot-client/src/transport.ts";
 import type { NineCliClient } from "./ninecli.js";
 
@@ -15,9 +14,9 @@ export interface VehicleReader {
 }
 
 export interface CandidateVehicleClient {
-  list(options: {
+  listVehicles(options: {
     service: CandidateVehicleService;
-    fields: VehicleListPlaintextFields;
+    vehicleType: string | number;
   }): Promise<{ data: unknown }>;
 }
 
@@ -63,22 +62,23 @@ const readService = (row: VehicleRow): CandidateVehicleService | null => {
   return null;
 };
 
-const createCandidateClient = (_service: CandidateVehicleService): CandidateVehicleClient =>
-  createNinebotVehicleCandidateClient({
+const createCandidateClient = (session: NinebotCandidateSessionFields): CandidateVehicleClient =>
+  createNinebotCandidateSessionClient({
+    session,
     transport: createFetchNinebotTransport({
       origins: {
         ebike: "https://ebike.ninebot.com",
         motor: "https://steeldust.ninebot.com",
+        travel: "https://cn-cbu-gateway.ninebot.com",
       },
     }),
     platform: 2,
   });
 
-const buildFields = (
+const buildSession = (
   config: Partial<CandidateConfig>,
   tokens: Partial<CandidateTokens>,
-  vehicleType: unknown,
-): VehicleListPlaintextFields => ({
+): NinebotCandidateSessionFields => ({
   sys_language: "zh-hans-cn",
   client_ver: "610063322",
   device_id: requireText(config.device_id, "candidate device_id"),
@@ -91,9 +91,6 @@ const buildFields = (
   login_country: "CN",
   access_token: requireText(tokens.access_token, "candidate access_token"),
   uid: requireText(tokens.business_uid, "candidate business_uid"),
-  vehicle_type: requireText(vehicleType, "candidate vehicle_type"),
-  serviceTime: Date.now(),
-  nonce: generateNinebotNonce(),
 });
 
 /** Creates an opt-in vehicle reader; candidate service failures fall back atomically. */
@@ -104,7 +101,7 @@ export const createCandidateVehicleReader = ({
 }: {
   legacy: Pick<NineCliClient, "vehicles">;
   configDirectory: string;
-  candidateClientFactory?: (service: CandidateVehicleService) => CandidateVehicleClient;
+  candidateClientFactory?: (session: NinebotCandidateSessionFields) => CandidateVehicleClient;
 }): VehicleReader => ({
   async vehicles() {
     try {
@@ -116,6 +113,10 @@ export const createCandidateVehicleReader = ({
       if (!isRecord(configValue) || !isRecord(tokensValue) || !isRecord(cachedVehiclesValue)) {
         throw new Error("Ninebot candidate vehicle session is invalid");
       }
+      const session = buildSession(
+        configValue as Partial<CandidateConfig>,
+        tokensValue as Partial<CandidateTokens>,
+      );
       const cachedVehicleRows = (cachedVehiclesValue as CachedVehicles).vehicles;
       const cachedRows = Array.isArray(cachedVehicleRows)
         ? cachedVehicleRows.filter((item): item is VehicleRow => isRecord(item))
@@ -153,14 +154,12 @@ export const createCandidateVehicleReader = ({
       const candidateRows: unknown[] = [];
       for (const [service, serviceRows] of grouped) {
         const vehicleType = serviceRows.find((row) => row.vehicle_type !== undefined)?.vehicle_type;
-        const fields = buildFields(
-          configValue as Partial<CandidateConfig>,
-          tokensValue as Partial<CandidateTokens>,
-          vehicleType,
-        );
         // Keep service-family requests sequential during migration to avoid bursting upstream.
         // eslint-disable-next-line no-await-in-loop
-        const result = await candidateClientFactory(service).list({ service, fields });
+        const result = await candidateClientFactory(session).listVehicles({
+          service,
+          vehicleType: requireText(vehicleType, "candidate vehicle_type"),
+        });
         if (!Array.isArray(result.data))
           throw new Error("Ninebot candidate vehicle data is invalid");
         candidateRows.push(...result.data);

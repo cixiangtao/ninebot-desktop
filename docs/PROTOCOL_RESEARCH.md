@@ -222,6 +222,8 @@ SDK 另提供 `createNinebotCandidateSessionClient` 作为只读聚合入口：�
 
 车辆列表现在也有独立的 `VehicleReader` 和 `NINEBOT_VEHICLE_SOURCE=candidate` 试用开关。候选源先调用 ninecli 的只读 `vehicles` 输出取得服务族及 `vehicle_type`，然后按服务族顺序发送 Node 候选列表请求；候选返回非数组或请求失败时整体回退 ninecli。车辆列表候选不会把原始车辆响应写回缓存，默认数据源仍是 ninecli。
 
+车辆列表候选源现同样通过 `createNinebotCandidateSessionClient` 发起请求；缓存完整时直接使用本地服务族和模型码，缓存缺少模型码时才临时向 ninecli 补齐，三类 Electron 候选域因此共享同一个 SDK 会话入口。
+
 会话生命周期也已收口：密码登录、短信登录成功以及退出成功都会清理车辆序列号映射、行程映射和三类读取缓存，并在切换账号时重置本地行程编号。登录失败不会清理仍在使用的会话；候选数据源本身按请求重新读取会话文件，因此不会在模块级别保留令牌或车辆数据。
 
 修正模型码来源和毫秒级 `serviceTime` 后，使用本机现有会话做了独立 Node 直连验证：`travel-list2` 返回 `code=1`、请求月份、31 项日明细和 20 条行程；选取其中一条行程调用 `travel-info` 返回 `code=1`，`trail` 为字符串且包含速度字段。该验证没有经过 Electron 的 ninecli 回退路径，也没有保存响应正文，说明当前账号、车辆和 ninecli 0.1.7 下的 travel 月度/详情候选链已经完成单车型真实服务端校验；多车型和多版本 parity 仍是切换默认源前的门槛。
