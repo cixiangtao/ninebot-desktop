@@ -151,6 +151,23 @@ describe("Node telemetry candidate", () => {
     expect(battery.data).toMatchObject({ electricity: 74, firmware_only: true });
   });
 
+  it("rejects a business error wrapper whose data is null", () => {
+    const payload = new TextEncoder().encode(
+      JSON.stringify({
+        code: 190003,
+        data: null,
+        desc: "通讯异常，请稍后再试(4106)",
+        time_cost: 0,
+      }),
+    );
+    expect(() => parseVehicleStatusResponseCandidate(payload)).toThrow(
+      "business request may have failed",
+    );
+    expect(() => parseVehicleBatteryResponseCandidate(payload)).toThrow(
+      "business request may have failed",
+    );
+  });
+
   it("exports typed encrypted-response decoder entry points", () => {
     expect(decodeVehicleStatusResponseCandidate).toBeTypeOf("function");
     expect(decodeVehicleBatteryResponseCandidate).toBeTypeOf("function");

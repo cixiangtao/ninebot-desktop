@@ -326,7 +326,9 @@ export const parseVehicleStatusResponseCandidate = (
 ): TelemetryResponseCandidate<VehicleStatusCandidateRecord[]> => {
   const response = parseTelemetryResponseCandidate<unknown>(plaintext);
   if (!Array.isArray(response.data)) {
-    throw new Error("Ninebot status response data is not an array");
+    throw new Error(
+      "Ninebot status response data is not an array; business request may have failed",
+    );
   }
   const data = response.data.map((item, index) => {
     const record = asRecord(item);
@@ -342,7 +344,11 @@ export const parseVehicleBatteryResponseCandidate = (
 ): TelemetryResponseCandidate<VehicleBatteryCandidateRecord> => {
   const response = parseTelemetryResponseCandidate<unknown>(plaintext);
   const data = asRecord(response.data);
-  if (!data) throw new Error("Ninebot battery response data is not an object");
+  if (!data) {
+    throw new Error(
+      "Ninebot battery response data is not an object; business request may have failed",
+    );
+  }
   return { ...response, data: data as VehicleBatteryCandidateRecord };
 };
 
