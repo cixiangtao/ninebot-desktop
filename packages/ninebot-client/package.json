@@ -73,6 +73,10 @@
       "types": "./dist/auth.d.ts",
       "import": "./dist/auth.js"
     },
+    "./session-store-node": {
+      "types": "./dist/session-store-node.d.ts",
+      "import": "./dist/session-store-node.js"
+    },
     "./candidate-contracts": {
       "types": "./dist/candidate-contracts.d.ts",
       "import": "./dist/candidate-contracts.js"

@@ -143,6 +143,8 @@ export type {
   NinebotSmsCodeRequest,
   NinebotSmsLoginInput,
 } from "./auth.ts";
+export { createFileNinebotAuthSessionStore } from "./session-store-node.ts";
+export type { FileNinebotAuthSessionStoreOptions } from "./session-store-node.ts";
 export {
   createNinebotCandidateSessionClient,
   createNinebotFetchCandidateSessionClient,
