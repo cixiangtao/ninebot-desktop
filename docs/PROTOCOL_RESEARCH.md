@@ -273,8 +273,10 @@ Electron 主进程已删除 ninecli 运行时分支，正式应用的数据源�
 
 ### 2026-09-03 business login 元数据观察
 
-在隔离副本中移除 `business_uid` 后，仅通过 ninecli oracle 触发了一次 `POST /user/user/login`。服务端返回 HTTP 200，oracle 最终得到完整车辆列表，条目包含 `businessType`、`vehicle_type`、车型名称和序列号等字段；这证明首次登录所需的车型元数据确实来自 business login 链路，而不是 Passport `whoami`。该请求的 Body 与响应均为 `d/h/k/p/t`、`v/s/r` 加密 envelope；本次未把密文、账号或车辆值写入仓库，且未将未经验证的 business-login 解密实现接入 SDK。当前 SDK 对已有 legacy `vehicles.json` 只读复用，对全新账号仍会在缺少 `vehicle_type` 时安全失败，直到该加密链路完成独立服务端 parity。
+在隔离副本中移除 `business_uid` 后，仅通过 ninecli oracle 触发了一次 `POST /user/user/login`。服务端返回 HTTP 200，oracle 最终得到完整车辆列表，条目包含 `businessType`、`vehicle_type`、车型名称和序列号等字段；这证明首次登录所需的车型元数据确实来自 business login 链路，而不是 Passport `whoami`。该请求的 Body 与响应均为 `d/h/k/p/t`、`v/s/r` 加密 envelope；本次未把密文、账号或车辆值写入仓库，且未将未经验证的 business-login 解密实现接入 SDK。首次运行时的服务族发现码已在后续隔离验证中确认并接入车辆读取编排。
 
 ### 2026-09-03 business login SDK 首次服务端验证
 
 Node SDK 新增独立的 `business-login-node` 边界：固定重建九号观察到的 19 个明文字段，使用毫秒级 `serviceTime` 和大写 MD5 `checkcode`，沿用 `p=101`、`t=0` 与四段 key-data 加密外壳；请求头补齐 `business-type=0`、`need_decrypt=1` 和 `ninebot-version=2`。使用本机已有会话直连 `POST /user/user/login`，服务端返回 `code=1`、成功描述，解密后的 `data` 为用户资料对象；本次只记录业务码和字段名，没有写入令牌或响应正文。Passport 会话与 SDK 文件存储同步保留可选 `uuid`，为下一步无缓存车辆元数据编排提供输入。该入口仍未把未知车型码写死，也未宣称首次登录车辆列表已完成。
+
+在删除本地 `vehicles.json` 的隔离配置中观察到 ninecli 紧接着向两个业务族各发起一次 `/vehicle/binding/my-vehicle`：电自使用 `vehicle_type=65`，电摩使用 `vehicle_type=64`。这两个值是服务族发现码，不是具体车型码；响应行内的 `vehicle_type` 才是后续行程接口需要的模型码。Node SDK 现已在首次运行或缓存元数据不完整时按同样顺序执行 `65/64` 探测，并直接缓存返回的具体车型元数据，避免重复按具体车型再请求一次。

@@ -138,10 +138,16 @@ export const readCandidateSession = async (
 
 /** Reads the cached vehicle metadata needed to resolve a candidate service. */
 export const readCandidateVehicles = async (configDirectory: string): Promise<unknown> =>
-  (await createFileNinebotVehicleCacheStore({ directory: configDirectory }).load()) ??
+  (await readCandidateVehiclesIfPresent(configDirectory)) ??
   (() => {
     throw new Error("Ninebot candidate vehicle cache is unavailable");
   })();
+
+/** Reads the SDK vehicle cache without treating a first-run cache miss as a fatal error. */
+export const readCandidateVehiclesIfPresent = async (
+  configDirectory: string,
+): Promise<unknown | null> =>
+  createFileNinebotVehicleCacheStore({ directory: configDirectory }).load();
 
 /** Stores only the SDK vehicle metadata needed to resolve service families and model codes. */
 export const writeCandidateVehicles = async (configDirectory: string, value: unknown) => {

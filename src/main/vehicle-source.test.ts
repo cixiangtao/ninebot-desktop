@@ -60,6 +60,32 @@ afterEach(async () => {
 });
 
 describe("candidate vehicle source", () => {
+  it("discovers service families on a first run without a vehicle cache", async () => {
+    const configDirectory = await createSessionDirectory();
+    await rm(join(configDirectory, "vehicles.json"));
+    const requested: string[] = [];
+    const reader = createCandidateVehicleReader({
+      configDirectory,
+      candidateClientFactory: () => ({
+        listVehicles: async ({ service, vehicleType }) => {
+          requested.push(`${service}:${vehicleType}`);
+          return {
+            data:
+              service === "ebike"
+                ? [{ wnumber: "SN-E", businessType: 2, vehicle_type: 14363 }]
+                : [{ wnumber: "SN-M", businessType: 1, vehicle_type: 14001 }],
+          };
+        },
+      }),
+    });
+
+    await expect(reader.vehicles()).resolves.toEqual([
+      { wnumber: "SN-E", businessType: 2, vehicle_type: 14363 },
+      { wnumber: "SN-M", businessType: 1, vehicle_type: 14001 },
+    ]);
+    expect(requested).toEqual(["ebike:65", "motor:64"]);
+  });
+
   it("uses candidate data for each available service and keeps session fields in memory", async () => {
     const configDirectory = await createSessionDirectory();
     let observedService: string | undefined;

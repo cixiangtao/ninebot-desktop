@@ -3,7 +3,7 @@ import {
   createCandidateRequestTracker,
   readCandidateSession,
   readCandidateService,
-  readCandidateVehicles,
+  readCandidateVehiclesIfPresent,
   type CandidateService,
   writeCandidateVehicles,
 } from "./candidate-context.js";
@@ -74,20 +74,24 @@ export const createCandidateVehicleReader = ({
       try {
         const [session, cachedVehiclesValue] = await Promise.all([
           readCandidateSession(configDirectory),
-          readCandidateVehicles(configDirectory),
+          readCandidateVehiclesIfPresent(configDirectory),
         ]);
-        if (!isRecord(cachedVehiclesValue))
+        if (cachedVehiclesValue !== null && !isRecord(cachedVehiclesValue)) {
           throw new Error("Ninebot candidate vehicle cache is invalid");
+        }
         if (request.signal.aborted) {
           throw new Error("Ninebot candidate request was cancelled");
         }
         try {
           candidateClient = candidateClientFactory(session);
-          const cachedVehicleRows = (cachedVehiclesValue as CachedVehicles).vehicles;
+          const cachedVehicleRows = cachedVehiclesValue
+            ? (cachedVehiclesValue as CachedVehicles).vehicles
+            : undefined;
           const cachedRows = Array.isArray(cachedVehicleRows)
             ? cachedVehicleRows.filter((item): item is VehicleRow => isRecord(item))
             : [];
           let rows = cachedRows;
+          let rowsFromDiscovery = false;
           const cachedGroups = new Map<CandidateVehicleService, VehicleRow[]>();
           for (const row of cachedRows) {
             const service = readCandidateService(row);
@@ -107,6 +111,31 @@ export const createCandidateVehicleReader = ({
               rows = legacyValue.filter((item): item is VehicleRow => isRecord(item));
             }
           }
+          if (!cacheHasCompleteMetadata && !fallbackToLegacy) {
+            // ninecli discovers service families with these stable wildcard model codes.
+            // The response contains the concrete vehicle_type values used by travel calls.
+            rows = [];
+            rowsFromDiscovery = true;
+            for (const [service, vehicleType] of [
+              ["ebike", "65"],
+              ["motor", "64"],
+            ] as const) {
+              if (request.signal.aborted) {
+                throw new Error("Ninebot candidate request was cancelled");
+              }
+              // Keep discovery requests sequential to match the oracle's request cadence.
+              // eslint-disable-next-line no-await-in-loop
+              const result = await candidateClient.listVehicles({
+                service,
+                vehicleType,
+                signal: request.signal,
+              });
+              if (!Array.isArray(result.data)) {
+                throw new Error("Ninebot candidate vehicle discovery data is invalid");
+              }
+              rows.push(...result.data.filter((item): item is VehicleRow => isRecord(item)));
+            }
+          }
           const grouped = new Map<
             string,
             { service: CandidateVehicleService; vehicleType: string }
@@ -122,7 +151,22 @@ export const createCandidateVehicleReader = ({
 
           const candidateRows: unknown[] = [];
           const seenVehicleKeys = new Set<string>();
-          for (const { service, vehicleType } of grouped.values()) {
+          const appendRows = (values: readonly unknown[]) => {
+            for (const row of values) {
+              if (isRecord(row)) {
+                const vehicleKey = row.wnumber ?? row.sn;
+                if (typeof vehicleKey === "string" && vehicleKey.length > 0) {
+                  if (seenVehicleKeys.has(vehicleKey)) continue;
+                  seenVehicleKeys.add(vehicleKey);
+                }
+              }
+              candidateRows.push(row);
+            }
+          };
+          if (rowsFromDiscovery) {
+            appendRows(rows);
+          }
+          for (const { service, vehicleType } of rowsFromDiscovery ? [] : grouped.values()) {
             if (request.signal.aborted) {
               throw new Error("Ninebot candidate request was cancelled");
             }
@@ -135,17 +179,7 @@ export const createCandidateVehicleReader = ({
             });
             if (!Array.isArray(result.data))
               throw new Error("Ninebot candidate vehicle data is invalid");
-            for (const row of result.data) {
-              if (isRecord(row)) {
-                const vehicleKey = row.wnumber ?? row.sn;
-                if (typeof vehicleKey === "string" && vehicleKey.length > 0) {
-                  if (seenVehicleKeys.has(vehicleKey)) continue;
-                  seenVehicleKeys.add(vehicleKey);
-                }
-              }
-              // Preserve opaque rows without identifiers; the renderer parser will discard them.
-              candidateRows.push(row);
-            }
+            appendRows(result.data);
           }
           const cachedValue = { vehicles: candidateRows };
           await writeCandidateVehicles(configDirectory, cachedValue);
