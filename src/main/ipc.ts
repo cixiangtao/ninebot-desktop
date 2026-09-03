@@ -21,7 +21,7 @@ import {
   type VehicleSummary,
   type YearSummaryExportFormat,
 } from "../shared/contracts.js";
-import { NineCliClient, NineCliError } from "./ninecli.js";
+import { NinebotClientError, type NinebotAppClient } from "./app-client.js";
 import { createMonthSummaryExportDocument } from "./month-summary-export.js";
 import { createRideExportDocument } from "./ride-export.js";
 import { loadRideSpeedVerifications } from "./ride-speed-verification.js";
@@ -236,7 +236,7 @@ const handleError = <T>(error: unknown): BridgeResult<T> => {
   if (error instanceof z.ZodError) {
     return fail({ code: "INVALID_INPUT", message: "输入内容格式不正确。" });
   }
-  if (error instanceof NineCliError) {
+  if (error instanceof NinebotClientError) {
     const code =
       error.kind === "missing"
         ? "NINECLI_MISSING"
@@ -256,7 +256,7 @@ const handleError = <T>(error: unknown): BridgeResult<T> => {
 
 /** Registers the complete renderer-facing domain bridge. */
 export const registerIpcHandlers = (
-  client: NineCliClient,
+  client: NinebotAppClient,
   telemetryReader: VehicleTelemetryReader = client,
   travelReader: TravelReader = client,
   vehicleReader: VehicleReader = client,
@@ -311,7 +311,8 @@ export const registerIpcHandlers = (
       await client.whoami();
       return ok({ connected: true });
     } catch (error) {
-      if (error instanceof NineCliError && error.kind === "auth") return ok({ connected: false });
+      if (error instanceof NinebotClientError && error.kind === "auth")
+        return ok({ connected: false });
       return handleError(error);
     }
   });
@@ -525,7 +526,7 @@ export const registerIpcHandlers = (
           return readRideDetail(vehicleId, rideId, serialNumber, ride.travelId, ride.dayMileageKm);
         });
         const fatalFailure = batch.failures.find(
-          ({ error }) => error instanceof NineCliError && error.kind !== "upstream",
+          ({ error }) => error instanceof NinebotClientError && error.kind !== "upstream",
         );
         if (fatalFailure) throw fatalFailure.error;
         if (batch.rides.length === 0 && batch.failures[0]) throw batch.failures[0].error;

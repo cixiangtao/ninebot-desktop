@@ -5,6 +5,7 @@ import { access, chmod, mkdir, readFile, rm, stat } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { candidateRequestTimeoutMs } from "./candidate-client.js";
 import { resolveCandidateSource } from "./data-source.js";
+import { NinebotClientError } from "./app-client.js";
 
 export const ninecliVersion = "0.1.7";
 const commandTimeoutMs = 45_000;
@@ -114,10 +115,10 @@ export const runtimePolicy = {
   },
 } as const satisfies RuntimeSecurityStatus["policy"];
 
-export class NineCliError extends Error {
+export class NineCliError extends NinebotClientError {
   constructor(
     message: string,
-    readonly kind:
+    kind:
       | "missing"
       | "auth"
       | "verification"
@@ -125,7 +126,7 @@ export class NineCliError extends Error {
       | "unsupported"
       | "upstream" = "upstream",
   ) {
-    super(message);
+    super(message, kind);
     this.name = "NineCliError";
   }
 }
