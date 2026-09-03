@@ -13,7 +13,9 @@ export const isCandidateSourceEnabled = (
 ): boolean => {
   const domainValue = environment[`NINEBOT_${domain.toUpperCase()}_SOURCE`];
   if (domainValue !== undefined) return domainValue === "candidate";
-  return environment.NINEBOT_SOURCE === "candidate";
+  // The TypeScript SDK is the primary implementation. Set NINEBOT_SOURCE=ninecli
+  // only when a migration investigation explicitly needs the legacy oracle.
+  return environment.NINEBOT_SOURCE !== "ninecli";
 };
 
 /** Resolves the renderer-safe source label for one domain. */

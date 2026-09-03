@@ -2,10 +2,10 @@ import { describe, expect, it } from "vitest";
 import { isCandidateSourceEnabled, resolveCandidateSource } from "./data-source.js";
 
 describe("candidate source selection", () => {
-  it("keeps every domain on ninecli by default", () => {
-    expect(isCandidateSourceEnabled({}, "vehicle")).toBe(false);
-    expect(isCandidateSourceEnabled({}, "telemetry")).toBe(false);
-    expect(isCandidateSourceEnabled({}, "travel")).toBe(false);
+  it("uses the TypeScript SDK for every domain by default", () => {
+    expect(isCandidateSourceEnabled({}, "vehicle")).toBe(true);
+    expect(isCandidateSourceEnabled({}, "telemetry")).toBe(true);
+    expect(isCandidateSourceEnabled({}, "travel")).toBe(true);
   });
 
   it("enables all domains with the umbrella candidate switch", () => {
@@ -32,11 +32,11 @@ describe("candidate source selection", () => {
     expect(isCandidateSourceEnabled(environment, "travel")).toBe(false);
   });
 
-  it("enables one domain without enabling the others", () => {
+  it("keeps unspecified domains on the SDK", () => {
     const environment = { NINEBOT_TELEMETRY_SOURCE: "candidate" };
-    expect(isCandidateSourceEnabled(environment, "vehicle")).toBe(false);
+    expect(isCandidateSourceEnabled(environment, "vehicle")).toBe(true);
     expect(isCandidateSourceEnabled(environment, "telemetry")).toBe(true);
-    expect(isCandidateSourceEnabled(environment, "travel")).toBe(false);
+    expect(isCandidateSourceEnabled(environment, "travel")).toBe(true);
   });
 
   it("returns a stable renderer-safe source label", () => {
