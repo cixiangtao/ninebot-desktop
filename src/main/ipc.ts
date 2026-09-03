@@ -21,7 +21,11 @@ import {
   type VehicleSummary,
   type YearSummaryExportFormat,
 } from "../shared/contracts.js";
-import { NinebotClientError, type NinebotAppClient } from "./app-client.js";
+import {
+  isNinebotHumanVerificationError,
+  NinebotClientError,
+  type NinebotAppClient,
+} from "./app-client.js";
 import { createMonthSummaryExportDocument } from "./month-summary-export.js";
 import { createRideExportDocument } from "./ride-export.js";
 import { loadRideSpeedVerifications } from "./ride-speed-verification.js";
@@ -235,6 +239,12 @@ const fail = <T>(error: BridgeError): BridgeResult<T> => ({ ok: false, error });
 const handleError = <T>(error: unknown): BridgeResult<T> => {
   if (error instanceof z.ZodError) {
     return fail({ code: "INVALID_INPUT", message: "输入内容格式不正确。" });
+  }
+  if (isNinebotHumanVerificationError(error)) {
+    return fail({
+      code: "HUMAN_VERIFICATION_REQUIRED",
+      message: "九号要求先完成人机验证；请在官方客户端完成验证后再重试。",
+    });
   }
   if (error instanceof NinebotClientError) {
     const code =

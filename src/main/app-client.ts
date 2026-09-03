@@ -23,6 +23,12 @@ export class NinebotClientError extends Error {
   }
 }
 
+/** Recognizes the SDK's deliberate fail-closed SMS verification boundary. */
+export const isNinebotHumanVerificationError = (error: unknown): boolean =>
+  error instanceof Error &&
+  "code" in error &&
+  (error as { code?: unknown }).code === "HUMAN_VERIFICATION_REQUIRED";
+
 /**
  * Renderer-facing application client contract.
  *
