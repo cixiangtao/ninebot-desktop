@@ -18,6 +18,7 @@ describe("Passport login client", () => {
           access_token: "access",
           refresh_token: "refresh",
           business_uid: "business",
+          accessTokenValidity: 1_790_735_062,
         },
       }),
     });
@@ -37,6 +38,7 @@ describe("Passport login client", () => {
       accessToken: "access",
       refreshToken: "refresh",
       businessUid: "business",
+      expiresAtMs: 1_790_735_062_000,
     });
     expect(send).toHaveBeenCalledWith(
       expect.objectContaining({ path: "/v6/user/login", method: "POST" }),
@@ -111,6 +113,46 @@ describe("Passport login client", () => {
     expect(request?.path).toBe("/v5/user");
     expect(request?.headers.authorization).toBe("Bearer access");
     expect(new TextDecoder().decode(request?.body)).toBe("{}");
+  });
+
+  it("uses the raw access token for the default whoami authorization header", async () => {
+    const send = vi.fn().mockResolvedValue({
+      status: 200,
+      headers: {},
+      body: json({ resultCode: 0, data: { username: "user" } }),
+    });
+    const client = createNinebotPassportLoginClient({
+      transport: { send },
+      signer: () => "signature",
+    });
+
+    await client.whoami({
+      accessToken: "raw-access",
+      refreshToken: "refresh",
+      businessUid: "business",
+    });
+    expect(send.mock.calls[0]?.[0]?.headers.authorization).toBe("raw-access");
+  });
+
+  it("accepts Passport's 90000 success code", async () => {
+    const client = createNinebotPassportLoginClient({
+      transport: {
+        send: vi.fn().mockResolvedValue({
+          status: 200,
+          headers: {},
+          body: json({
+            resultCode: "90000",
+            resultDesc: "success",
+            data: { access_token: "a", refresh_token: "r", business_uid: "u" },
+          }),
+        }),
+      },
+      signer: () => "signature",
+    });
+
+    await expect(
+      client.loginWithPassword({ areaCode: "+86", username: "user", password: "password" }),
+    ).resolves.toMatchObject({ accessToken: "a", businessUid: "u" });
   });
 
   it("surfaces non-success business codes without exposing response data", async () => {

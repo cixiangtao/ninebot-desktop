@@ -314,6 +314,7 @@ interface PassportLoginData {
   refresh_token?: unknown;
   business_uid?: unknown;
   uid?: unknown;
+  accessTokenValidity?: unknown;
 }
 
 const requireText = (value: unknown, field: string) => {
@@ -323,6 +324,15 @@ const requireText = (value: unknown, field: string) => {
   return value;
 };
 
+const readExpiry = (value: unknown) => {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
+    throw new Error("Ninebot passport response field accessTokenValidity is invalid");
+  }
+  // The Passport response has appeared in both Unix seconds and milliseconds.
+  return value < 1_000_000_000_000 ? value * 1_000 : value;
+};
+
 /** Converts a verified Passport login data object into the shared session contract. */
 export const parsePassportLoginSession = (data: unknown): NinebotAuthSession => {
   if (!data || typeof data !== "object" || Array.isArray(data)) {
@@ -330,10 +340,12 @@ export const parsePassportLoginSession = (data: unknown): NinebotAuthSession => 
   }
   const record = data as PassportLoginData;
   const businessUid = record.business_uid ?? record.uid;
+  const expiresAtMs = readExpiry(record.accessTokenValidity);
   return {
     accessToken: requireText(record.access_token, "access_token"),
     refreshToken: requireText(record.refresh_token, "refresh_token"),
     businessUid: requireText(businessUid, "business_uid"),
+    ...(expiresAtMs === undefined ? {} : { expiresAtMs }),
   };
 };
 
@@ -347,9 +359,11 @@ export const parsePassportRefreshSession = (
     throw new Error("Ninebot passport refresh response data is invalid");
   }
   const record = data as PassportLoginData;
+  const expiresAtMs = readExpiry(record.accessTokenValidity);
   return {
     accessToken: requireText(record.access_token, "access_token"),
     refreshToken: requireText(record.refresh_token, "refresh_token"),
     businessUid: requireText(record.business_uid ?? previousBusinessUid, "business_uid"),
+    ...(expiresAtMs === undefined ? {} : { expiresAtMs }),
   };
 };

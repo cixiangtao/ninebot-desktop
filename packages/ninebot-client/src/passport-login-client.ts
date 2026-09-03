@@ -89,7 +89,11 @@ const parseResponseEnvelope = (body: Uint8Array): PassportResponseEnvelope => {
 };
 
 const isSuccessCode = (resultCode: number | string | null) =>
-  resultCode === null || resultCode === 0 || resultCode === "0";
+  resultCode === null ||
+  resultCode === 0 ||
+  resultCode === "0" ||
+  resultCode === 90000 ||
+  resultCode === "90000";
 
 /** Creates a transport-backed Passport password-login client. */
 export const createNinebotPassportLoginClient = ({
@@ -104,8 +108,10 @@ export const createNinebotPassportLoginClient = ({
   const loginSigner = signer ?? defaultSigners.login;
   const refreshRequestSigner = refreshSigner ?? defaultSigners.refresh;
   const whoamiRequestSigner = whoamiSigner ?? defaultSigners.whoami;
+  // Passport's /v5/user endpoint expects the JWT as the raw Authorization value.
+  // It is deliberately not prefixed with `Bearer`; ninecli sends the token verbatim.
   const authorization =
-    authorizationFactory ?? ((session: NinebotAuthSession) => `Bearer ${session.accessToken}`);
+    authorizationFactory ?? ((session: NinebotAuthSession) => session.accessToken);
   return {
     async loginWithPassword(
       input: Omit<BuildPasswordLoginRequestOptions, "signer">,
