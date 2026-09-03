@@ -277,6 +277,8 @@ const session = {
   login_country: "CN",
   access_token: authSession.accessToken,
   uid: authSession.businessUid,
+  ...(authSession.uuid === undefined ? {} : { uuid: authSession.uuid }),
+  ...(authSession.refreshToken === undefined ? {} : { refresh_token: authSession.refreshToken }),
 };
 const candidate = createNinebotCandidateSessionClient({
   transport: createFetchNinebotTransport({
