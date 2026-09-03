@@ -212,6 +212,8 @@ Electron 现支持显式设置 `NINEBOT_TELEMETRY_SOURCE=candidate` 来试用 No
 
 `@jiuhao/ninebot-client` 根入口现导出 `travel-node` 的构造器、解析器、transport client 和类型，调用方可以在 Node、Electron 主进程或测试 transport 中复用同一套候选合同。该导出不代表登录、令牌刷新或移动端能力已迁移，也不改变候选请求必须经过多车型 parity 的门槛。
 
+车辆列表现在也有独立的 `VehicleReader` 和 `NINEBOT_VEHICLE_SOURCE=candidate` 试用开关。候选源先调用 ninecli 的只读 `vehicles` 输出取得服务族及 `vehicle_type`，然后按服务族顺序发送 Node 候选列表请求；候选返回非数组或请求失败时整体回退 ninecli。车辆列表候选不会把原始车辆响应写回缓存，默认数据源仍是 ninecli。
+
 修正模型码来源和毫秒级 `serviceTime` 后，使用本机现有会话做了独立 Node 直连验证：`travel-list2` 返回 `code=1`、请求月份、31 项日明细和 20 条行程；选取其中一条行程调用 `travel-info` 返回 `code=1`，`trail` 为字符串且包含速度字段。该验证没有经过 Electron 的 ninecli 回退路径，也没有保存响应正文，说明当前账号、车辆和 ninecli 0.1.7 下的 travel 月度/详情候选链已经完成单车型真实服务端校验；多车型和多版本 parity 仍是切换默认源前的门槛。
 
 随后运行 `pnpm protocol:parity -- --rounds=3 --month=202608`，三轮 status、battery、travel 月度和 travel 详情均 `equal=true` 且未截断；每轮分别比较 25、19、300 和 26 个节点，进程退出码为 0。该门禁只输出结构元数据，不保存或展示响应值；目前证据覆盖本机一台电自和一个月份，仍需其他车辆服务族与月份的连续样本。

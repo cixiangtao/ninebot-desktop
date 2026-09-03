@@ -29,6 +29,7 @@ import { createYearSummaryExportDocument } from "./year-summary-export.js";
 import { SessionReadCache } from "./session-read-cache.js";
 import { loadVehicleSnapshot, type VehicleTelemetryReader } from "./vehicle-snapshot.js";
 import { type TravelReader } from "./travel-source.js";
+import { type VehicleReader } from "./vehicle-source.js";
 import {
   parseAccountProfile,
   parseRideDetail,
@@ -258,6 +259,7 @@ export const registerIpcHandlers = (
   client: NineCliClient,
   telemetryReader: VehicleTelemetryReader = client,
   travelReader: TravelReader = client,
+  vehicleReader: VehicleReader = client,
 ) => {
   const serialNumbers = new Map<string, string>();
   const travelIds = new Map<
@@ -377,7 +379,7 @@ export const registerIpcHandlers = (
 
   ipcMain.handle(ipcChannels.listVehicles, async (): Promise<BridgeResult<VehicleSummary[]>> => {
     try {
-      const vehicles = parseVehicles(await client.vehicles());
+      const vehicles = parseVehicles(await vehicleReader.vehicles());
       serialNumbers.clear();
       travelIds.clear();
       rideIdsByUpstream.clear();
