@@ -27,6 +27,8 @@ NINEBOT_CONFIG_DIR=/absolute/path/to/ninecli-config pnpm dev
 
 迁移期可以分别试用 Node 候选数据源：`NINEBOT_VEHICLE_SOURCE=candidate` 试用车辆列表，`NINEBOT_TELEMETRY_SOURCE=candidate` 试用车辆状态/电池，`NINEBOT_TRAVEL_SOURCE=candidate` 试用骑行月度/详情。三个开关都默认关闭，且候选失败时回退 ninecli。travel 候选会优先从本地 `vehicles.json` 读取私有 `vehicle_type` 模型码；缓存缺少该字段时，只在内存中向 ninecli 的 `vehicles` 输出补齐，不会改写缓存或猜测模型值。
 
+SDK 根入口同时导出 `createNinebotCandidateSessionClient`，把同一份内存会话元数据适配为车辆列表、status、battery、月度和详情五类只读调用。它不提供登录、令牌文件读写或车辆控制；调用方负责会话生命周期和凭据保护，可通过 `@jiuhao/ninebot-client/candidate-session` 单独导入。
+
 轨迹页使用 MapLibre GL JS 渲染，并加载 OpenFreeMap 的 Positron 在线底图。路线按照逐点速度从蓝色、青色、黄色、橙色到红色分段着色，回放支持 0.5×、1×、2×、4× 连续倍速；速度曲线支持点击、拖动以及方向键、Home、End 精确定位，并与地图位置、当前速度和时间共享同一回放状态。页面还会在本地按 GPS 轨迹段距离汇总五档速度区间，点击任一区间可定位到该区间最快轨迹段。侧栏保留整月次数、里程与能耗汇总，并明确显示当前可选择的行程条数；详情卡会展示本次能耗（Wh）和电量消耗（%）。同月行程对比会按需再读取一条详情，并排展示轨迹实测极速、平均速度、里程、用时、能耗、电量消耗及五档速度里程占比。差值只描述数据变化，不判断骑行好坏，返回后保留原行程的回放位置。无需 API Key，断网、VPN 或底图服务异常时会在 10 秒内回退到使用同一套速度颜色的本地轨迹画布，速度曲线和回放仍可使用。`status` 原始响应可能包含位置；普通设备读取会在 Electron 主进程解析时丢弃坐标，不把它交给页面。用户在车辆位置页明确确认后，客户端才把新读取的坐标交给页面并加载位置区域瓦片；停止显示或切换车辆会立即清除页面中的坐标。共享车辆若通过 `permissions.see_location` 明确拒绝位置访问，客户端会剥离坐标、不创建地图、不请求瓦片，并提示让车主调整共享权限后重新检查。
 
 在线地图默认使用 ninecli 接口原值。中国大陆范围内可显式切换本地 `GCJ-02 → WGS84` 校准预览并查看大约位移，用道路贴合情况判断坐标基准。预览只改变地图覆盖物副本，不修改原始轨迹、速度、里程、统计或导出，也不调用外部坐标转换服务。

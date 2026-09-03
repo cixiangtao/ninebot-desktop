@@ -212,6 +212,8 @@ Electron 现支持显式设置 `NINEBOT_TELEMETRY_SOURCE=candidate` 来试用 No
 
 `@jiuhao/ninebot-client` 根入口现导出 `travel-node` 的构造器、解析器、transport client 和类型，调用方可以在 Node、Electron 主进程或测试 transport 中复用同一套候选合同。该导出不代表登录、令牌刷新或移动端能力已迁移，也不改变候选请求必须经过多车型 parity 的门槛。
 
+SDK 另提供 `createNinebotCandidateSessionClient` 作为只读聚合入口：调用方只需提供共享会话字段、车型编码和可注入 transport，即可访问车辆列表、status、battery、月度和详情候选。该封装在内存中生成每次请求的 nonce 与服务时间，默认使用已验证的 `rnVersion=743` 和 `current_version=610063322`；不执行登录、不读写令牌文件、不暴露控制能力，凭据生命周期仍由上层负责。
+
 车辆列表现在也有独立的 `VehicleReader` 和 `NINEBOT_VEHICLE_SOURCE=candidate` 试用开关。候选源先调用 ninecli 的只读 `vehicles` 输出取得服务族及 `vehicle_type`，然后按服务族顺序发送 Node 候选列表请求；候选返回非数组或请求失败时整体回退 ninecli。车辆列表候选不会把原始车辆响应写回缓存，默认数据源仍是 ninecli。
 
 会话生命周期也已收口：密码登录、短信登录成功以及退出成功都会清理车辆序列号映射、行程映射和三类读取缓存，并在切换账号时重置本地行程编号。登录失败不会清理仍在使用的会话；候选数据源本身按请求重新读取会话文件，因此不会在模块级别保留令牌或车辆数据。

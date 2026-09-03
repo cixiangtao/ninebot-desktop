@@ -48,6 +48,10 @@
     "./rsa-node": {
       "types": "./dist/rsa-node.d.ts",
       "import": "./dist/rsa-node.js"
+    },
+    "./candidate-session": {
+      "types": "./dist/candidate-session.d.ts",
+      "import": "./dist/candidate-session.js"
     }
   },
   "scripts": {
