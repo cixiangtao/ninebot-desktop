@@ -3,8 +3,8 @@ import { join } from "node:path";
 import {
   createNinebotCandidateSessionClient,
   type NinebotCandidateSessionFields,
-} from "../../packages/ninebot-client/src/candidate-session.ts";
-import { createFetchNinebotTransport } from "../../packages/ninebot-client/src/transport.ts";
+} from "@jiuhao/ninebot-client/candidate-session";
+import { createFetchNinebotTransport } from "@jiuhao/ninebot-client";
 import type { NineCliClient } from "./ninecli.js";
 
 export type CandidateTravelService = "ebike" | "motor";

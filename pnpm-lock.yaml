@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      '@jiuhao/ninebot-client':
+        specifier: workspace:*
+        version: link:packages/ninebot-client
       gcoord:
         specifier: 1.0.7
         version: 1.0.7

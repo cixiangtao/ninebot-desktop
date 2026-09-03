@@ -18,14 +18,15 @@
   "type": "module",
   "main": "./out/main/index.js",
   "scripts": {
-    "dev": "pnpm run prepare:ninecli-runtime && electron-vite dev",
-    "build": "pnpm run build:sdk && pnpm run typecheck && electron-vite build",
+    "dev": "pnpm run build:sdk && pnpm run prepare:ninecli-runtime && electron-vite dev",
+    "build": "pnpm run typecheck && electron-vite build",
     "build:sdk": "pnpm --filter @jiuhao/ninebot-client build",
-    "preview": "pnpm run prepare:ninecli-runtime && electron-vite preview",
+    "preview": "pnpm run build:sdk && pnpm run prepare:ninecli-runtime && electron-vite preview",
     "prepare:ninecli-runtime": "node scripts/prepare-ninecli-runtime.mjs",
     "protocol:record": "node scripts/protocol-recorder.ts",
     "protocol:report": "node scripts/protocol-capture-report.ts",
     "protocol:parity": "node scripts/protocol-parity.ts",
+    "pretypecheck": "pnpm run build:sdk",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
     "lint": "oxlint .",
     "format": "oxfmt . --write",
@@ -40,6 +41,7 @@
     "dist": "pnpm run package:mac:local"
   },
   "dependencies": {
+    "@jiuhao/ninebot-client": "workspace:*",
     "gcoord": "1.0.7",
     "lucide-react": "1.34.0",
     "maplibre-gl": "6.6.0",
