@@ -15,6 +15,10 @@ import {
   type TravelDetailPlaintextFields,
   type TravelMonthPlaintextFields,
 } from "../packages/ninebot-client/src/travel-node.ts";
+import {
+  createNinebotVehicleCandidateClient,
+  type VehicleListPlaintextFields,
+} from "../packages/ninebot-client/src/vehicle-node.ts";
 import { createFetchNinebotTransport } from "../packages/ninebot-client/src/transport.ts";
 
 const execFileAsync = promisify(execFile);
@@ -142,6 +146,15 @@ const travelCandidate = createNinebotTravelCandidateClient({
   }),
   platform: 2,
 });
+const vehicleCandidate = createNinebotVehicleCandidateClient({
+  transport: createFetchNinebotTransport({
+    origins: {
+      ebike: "https://ebike.ninebot.com",
+      motor: "https://steeldust.ninebot.com",
+    },
+  }),
+  platform: 2,
+});
 const ninecliBinary = join(
   projectRoot,
   "build/generated/runtime/ninecli",
@@ -161,8 +174,7 @@ const runOracle = async (
   return JSON.parse(result.stdout) as unknown;
 };
 
-const vehicleType = async () => {
-  const payload = await runOracle("vehicles");
+const vehicleType = (payload: unknown) => {
   const rows = Array.isArray(payload) ? payload : [];
   const row = rows.find(
     (item): item is Record<string, unknown> =>
@@ -227,7 +239,8 @@ const summarizeReport = (report: ReturnType<typeof compareNinebotPayloads>) => (
   differences: report.differences,
 });
 
-const selectedVehicleType = await vehicleType();
+const initialVehicles = await runOracle("vehicles");
+const selectedVehicleType = vehicleType(initialVehicles);
 const samples = [];
 for (let index = 0; index < rounds; index += 1) {
   const sample: Record<string, unknown> = { index: index + 1 };
@@ -251,6 +264,22 @@ for (let index = 0; index < rounds; index += 1) {
     ]);
     sample.status = summarizeReport(compareNinebotPayloads(oracleStatus, candidateStatus.data[0]));
     sample.battery = summarizeReport(compareNinebotPayloads(oracleBattery, candidateBattery.data));
+    // Keep the vehicle-list oracle and candidate calls sequential with the other domains.
+    // eslint-disable-next-line no-await-in-loop
+    const oracleVehicles = await runOracle("vehicles");
+    // eslint-disable-next-line no-await-in-loop
+    const candidateVehicles = await vehicleCandidate.list({
+      service,
+      fields: {
+        ...session,
+        vehicle_type: selectedVehicleType,
+        serviceTime: Date.now(),
+        nonce: generateNinebotNonce(),
+      } as VehicleListPlaintextFields,
+    });
+    sample.vehicleList = summarizeReport(
+      compareNinebotPayloads(oracleVehicles, candidateVehicles.data),
+    );
     const travelBase = {
       ...session,
       wnumber: vehicle.wnumber,
@@ -322,11 +351,12 @@ const successfulSamples = samples.filter(
   ): sample is {
     status: ReturnType<typeof summarizeReport>;
     battery: ReturnType<typeof summarizeReport>;
+    vehicleList: ReturnType<typeof summarizeReport>;
     travel: {
       month: ReturnType<typeof summarizeReport>;
       detail: ReturnType<typeof summarizeReport> | { skipped: true; reason: string };
     };
-  } => "status" in sample && "battery" in sample && "travel" in sample,
+  } => "status" in sample && "battery" in sample && "vehicleList" in sample && "travel" in sample,
 );
 const allEqual =
   successfulSamples.length === rounds &&
@@ -334,6 +364,7 @@ const allEqual =
     (sample) =>
       sample.status.equal &&
       sample.battery.equal &&
+      sample.vehicleList.equal &&
       sample.travel.month.equal &&
       ("skipped" in sample.travel.detail || sample.travel.detail.equal),
   );
