@@ -11,6 +11,7 @@ import { getBundledNineCliBinaryPath, NineCliClient } from "./ninecli.js";
 import { createCandidateTelemetryReader } from "./telemetry-source.js";
 import { createCandidateTravelReader } from "./travel-source.js";
 import { createCandidateVehicleReader } from "./vehicle-source.js";
+import { isCandidateSourceEnabled } from "./data-source.js";
 
 protocol.registerSchemesAsPrivileged([
   {
@@ -116,18 +117,15 @@ app.whenReady().then(async () => {
     resourcesPath: process.resourcesPath,
   });
   const nineCliClient = new NineCliClient(configDirectory, bundledBinaryPath);
-  const telemetryReader =
-    process.env.NINEBOT_TELEMETRY_SOURCE === "candidate"
-      ? createCandidateTelemetryReader({ legacy: nineCliClient, configDirectory })
-      : nineCliClient;
-  const travelReader =
-    process.env.NINEBOT_TRAVEL_SOURCE === "candidate"
-      ? createCandidateTravelReader({ legacy: nineCliClient, configDirectory })
-      : nineCliClient;
-  const vehicleReader =
-    process.env.NINEBOT_VEHICLE_SOURCE === "candidate"
-      ? createCandidateVehicleReader({ legacy: nineCliClient, configDirectory })
-      : nineCliClient;
+  const telemetryReader = isCandidateSourceEnabled(process.env, "telemetry")
+    ? createCandidateTelemetryReader({ legacy: nineCliClient, configDirectory })
+    : nineCliClient;
+  const travelReader = isCandidateSourceEnabled(process.env, "travel")
+    ? createCandidateTravelReader({ legacy: nineCliClient, configDirectory })
+    : nineCliClient;
+  const vehicleReader = isCandidateSourceEnabled(process.env, "vehicle")
+    ? createCandidateVehicleReader({ legacy: nineCliClient, configDirectory })
+    : nineCliClient;
   registerIpcHandlers(nineCliClient, telemetryReader, travelReader, vehicleReader);
   await createWindow();
 
