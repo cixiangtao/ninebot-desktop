@@ -84,6 +84,24 @@ describe("candidate context", () => {
     });
   });
 
+  it("uses the authenticated session supplied by the lifecycle manager", async () => {
+    const directory = await createSessionDirectory();
+
+    await expect(
+      readCandidateSession(directory, {
+        accessToken: "fresh-token",
+        businessUid: "fresh-uid",
+        uuid: "fresh-uuid",
+        refreshToken: "fresh-refresh",
+      }),
+    ).resolves.toMatchObject({
+      access_token: "fresh-token",
+      uid: "fresh-uid",
+      uuid: "fresh-uuid",
+      refresh_token: "fresh-refresh",
+    });
+  });
+
   it("keeps vehicle metadata loading separate from session credentials", async () => {
     const directory = await createSessionDirectory();
 

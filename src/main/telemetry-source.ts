@@ -1,3 +1,4 @@
+import type { NinebotAuthSession } from "@jiuhao/ninebot-client";
 import type { NinebotCandidateSessionFields } from "@jiuhao/ninebot-client/candidate-session";
 import {
   createCandidateRequestTracker,
@@ -41,9 +42,19 @@ interface CandidateContext {
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === "object" && !Array.isArray(value);
 
-const readContext = async (configDirectory: string, serialNumber: string) => {
+const readContext = async (
+  configDirectory: string,
+  serialNumber: string,
+  sessionProvider?: () => Promise<NinebotAuthSession>,
+) => {
+  const sessionPromise =
+    sessionProvider === undefined
+      ? readCandidateSession(configDirectory)
+      : sessionProvider().then((authenticatedSession) =>
+          readCandidateSession(configDirectory, authenticatedSession),
+        );
   const [session, vehiclesValue] = await Promise.all([
-    readCandidateSession(configDirectory),
+    sessionPromise,
     readCandidateVehicles(configDirectory),
   ]);
   if (!isRecord(vehiclesValue)) {
@@ -65,11 +76,14 @@ const readContext = async (configDirectory: string, serialNumber: string) => {
 export const createCandidateTelemetryReader = ({
   legacy,
   configDirectory,
+  sessionProvider,
   candidateClientFactory = createCandidateSessionClient,
   fallbackToLegacy = false,
 }: {
   legacy?: VehicleTelemetryReader;
   configDirectory: string;
+  /** Supplies a fresh authenticated session before each candidate request. */
+  sessionProvider?: () => Promise<NinebotAuthSession>;
   candidateClientFactory?: (session: NinebotCandidateSessionFields) => CandidateTelemetryClient;
   /** Legacy oracle fallback is migration-only and must be explicitly enabled. */
   fallbackToLegacy?: boolean;
@@ -86,7 +100,7 @@ export const createCandidateTelemetryReader = ({
       const request = requestTracker.start();
       let candidateClient: CandidateTelemetryClient | undefined;
       try {
-        const context = await readContext(configDirectory, serialNumber);
+        const context = await readContext(configDirectory, serialNumber, sessionProvider);
         if (request.signal.aborted) {
           throw new Error("Ninebot candidate request was cancelled");
         }
@@ -112,7 +126,7 @@ export const createCandidateTelemetryReader = ({
       const request = requestTracker.start();
       let candidateClient: CandidateTelemetryClient | undefined;
       try {
-        const context = await readContext(configDirectory, serialNumber);
+        const context = await readContext(configDirectory, serialNumber, sessionProvider);
         if (request.signal.aborted) {
           throw new Error("Ninebot candidate request was cancelled");
         }

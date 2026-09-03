@@ -144,6 +144,11 @@ export class NinebotAuthSessionManager {
     return this.session !== null;
   }
 
+  /** Returns a current session, refreshing and persisting it when it is near expiry. */
+  async ensureSession(): Promise<NinebotAuthSession> {
+    return this.ensureFreshSession();
+  }
+
   async loginWithPassword(credentials: NinebotPasswordCredentials) {
     const nextSession = validateSession(await this.options.provider.loginWithPassword(credentials));
     await this.replaceSession(nextSession);
@@ -165,7 +170,7 @@ export class NinebotAuthSessionManager {
    * An expired session without a refresh implementation fails closed.
    */
   async whoami<T = unknown>(): Promise<T> {
-    const session = await this.ensureFreshSession();
+    const session = await this.ensureSession();
     return this.options.provider.whoami<T>(session);
   }
 

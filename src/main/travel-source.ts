@@ -1,3 +1,4 @@
+import type { NinebotAuthSession } from "@jiuhao/ninebot-client";
 import type { NinebotCandidateSessionFields } from "@jiuhao/ninebot-client/candidate-session";
 import {
   createCandidateRequestTracker,
@@ -71,9 +72,16 @@ const readContext = async (
   configDirectory: string,
   serialNumber: string,
   loadLegacyVehicles?: () => Promise<unknown>,
+  sessionProvider?: () => Promise<NinebotAuthSession>,
 ) => {
+  const sessionPromise =
+    sessionProvider === undefined
+      ? readCandidateSession(configDirectory)
+      : sessionProvider().then((authenticatedSession) =>
+          readCandidateSession(configDirectory, authenticatedSession),
+        );
   const [session, vehiclesValue] = await Promise.all([
-    readCandidateSession(configDirectory),
+    sessionPromise,
     readCandidateVehicles(configDirectory),
   ]);
   if (!isRecord(vehiclesValue)) {
@@ -112,11 +120,14 @@ const readContext = async (
 export const createCandidateTravelReader = ({
   legacy,
   configDirectory,
+  sessionProvider,
   candidateClientFactory = createCandidateSessionClient,
   fallbackToLegacy = false,
 }: {
   legacy?: LegacyTravelClient;
   configDirectory: string;
+  /** Supplies a fresh authenticated session before each candidate request. */
+  sessionProvider?: () => Promise<NinebotAuthSession>;
   candidateClientFactory?: (session: NinebotCandidateSessionFields) => CandidateTravelClient;
   /** Legacy oracle fallback is migration-only and must be explicitly enabled. */
   fallbackToLegacy?: boolean;
@@ -137,6 +148,7 @@ export const createCandidateTravelReader = ({
           configDirectory,
           serialNumber,
           fallbackToLegacy ? requireLegacy().vehicles : undefined,
+          sessionProvider,
         );
         if (request.signal.aborted) {
           throw new Error("Ninebot candidate request was cancelled");
@@ -169,6 +181,7 @@ export const createCandidateTravelReader = ({
           configDirectory,
           serialNumber,
           fallbackToLegacy ? requireLegacy().vehicles : undefined,
+          sessionProvider,
         );
         if (request.signal.aborted) {
           throw new Error("Ninebot candidate request was cancelled");

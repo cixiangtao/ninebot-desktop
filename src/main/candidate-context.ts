@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
+import type { NinebotAuthSession } from "@jiuhao/ninebot-client";
 import type { NinebotCandidateSessionFields } from "@jiuhao/ninebot-client/candidate-session";
 import {
   createFileNinebotDeviceContextStore,
@@ -98,12 +99,25 @@ export const readCandidateService = (
 /** Reads the local session files and builds the shared in-memory candidate fields. */
 export const readCandidateSession = async (
   configDirectory: string,
+  authenticatedSession?: NinebotAuthSession,
 ): Promise<NinebotCandidateSessionFields> => {
   const [configValue, authSessionValue] = await Promise.all([
     createFileNinebotDeviceContextStore({ directory: configDirectory }).load(),
-    readJsonIfPresent(join(configDirectory, "auth-session.json")),
+    authenticatedSession === undefined
+      ? readJsonIfPresent(join(configDirectory, "auth-session.json"))
+      : Promise.resolve(null),
   ]);
-  const tokensValue = authSessionValue ?? (await readJson(join(configDirectory, "tokens.json")));
+  const tokensValue =
+    authenticatedSession === undefined
+      ? (authSessionValue ?? (await readJson(join(configDirectory, "tokens.json"))))
+      : {
+          accessToken: authenticatedSession.accessToken,
+          businessUid: authenticatedSession.businessUid,
+          ...(authenticatedSession.uuid === undefined ? {} : { uuid: authenticatedSession.uuid }),
+          ...(authenticatedSession.refreshToken === undefined
+            ? {}
+            : { refreshToken: authenticatedSession.refreshToken }),
+        };
   if (!isRecord(configValue) || !isRecord(tokensValue)) {
     throw new Error("Ninebot candidate session files are invalid");
   }

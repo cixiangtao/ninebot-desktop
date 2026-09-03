@@ -157,9 +157,10 @@ app.whenReady().then(async () => {
     store: createFileNinebotAuthSessionStore({ directory: configDirectory }),
   });
   await auth.restore();
-  const telemetryReader = createCandidateTelemetryReader({ configDirectory });
-  const travelReader = createCandidateTravelReader({ configDirectory });
-  const vehicleReader = createCandidateVehicleReader({ configDirectory });
+  const sessionProvider = () => auth.ensureSession();
+  const telemetryReader = createCandidateTelemetryReader({ configDirectory, sessionProvider });
+  const travelReader = createCandidateTravelReader({ configDirectory, sessionProvider });
+  const vehicleReader = createCandidateVehicleReader({ configDirectory, sessionProvider });
   const appClient: NinebotAppClient = createNinebotSdkAppClient({
     auth,
     diagnostics: createSdkRuntimeDiagnostics({ configDirectory, auth }),

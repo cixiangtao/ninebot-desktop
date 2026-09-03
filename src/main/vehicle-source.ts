@@ -1,3 +1,4 @@
+import type { NinebotAuthSession } from "@jiuhao/ninebot-client";
 import type { NinebotCandidateSessionFields } from "@jiuhao/ninebot-client/candidate-session";
 import {
   createCandidateRequestTracker,
@@ -51,11 +52,14 @@ const requireText = (value: unknown, label: string) => {
 export const createCandidateVehicleReader = ({
   legacy,
   configDirectory,
+  sessionProvider,
   candidateClientFactory = createCandidateSessionClient,
   fallbackToLegacy = false,
 }: {
   legacy?: Pick<NineCliClient, "vehicles">;
   configDirectory: string;
+  /** Supplies a fresh authenticated session before each candidate request. */
+  sessionProvider?: () => Promise<NinebotAuthSession>;
   candidateClientFactory?: (session: NinebotCandidateSessionFields) => CandidateVehicleClient;
   /** Legacy oracle fallback is migration-only and must be explicitly enabled. */
   fallbackToLegacy?: boolean;
@@ -72,8 +76,14 @@ export const createCandidateVehicleReader = ({
       const request = requestTracker.start();
       let candidateClient: CandidateVehicleClient | undefined;
       try {
+        const sessionPromise =
+          sessionProvider === undefined
+            ? readCandidateSession(configDirectory)
+            : sessionProvider().then((authenticatedSession) =>
+                readCandidateSession(configDirectory, authenticatedSession),
+              );
         const [session, cachedVehiclesValue] = await Promise.all([
-          readCandidateSession(configDirectory),
+          sessionPromise,
           readCandidateVehiclesIfPresent(configDirectory),
         ]);
         if (cachedVehiclesValue !== null && !isRecord(cachedVehiclesValue)) {

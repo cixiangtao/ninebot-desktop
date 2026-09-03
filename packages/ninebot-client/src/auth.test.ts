@@ -50,6 +50,23 @@ describe("Ninebot auth session manager", () => {
     });
   });
 
+  it("exposes the fresh session for domain clients", async () => {
+    const provider = createProvider();
+    const manager = new NinebotAuthSessionManager({
+      provider,
+      store: createMemoryNinebotAuthSessionStore(session),
+      now: () => 1_500,
+      refreshSkewMs: 600,
+    });
+    await manager.restore();
+
+    await expect(manager.ensureSession()).resolves.toEqual({
+      ...session,
+      accessToken: "refreshed",
+    });
+    expect(provider.refresh).toHaveBeenCalledWith(session);
+  });
+
   it("fails closed when an expired session cannot refresh", async () => {
     const provider: NinebotAuthProvider = createProvider();
     delete provider.refresh;
