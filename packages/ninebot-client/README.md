@@ -67,7 +67,8 @@ Every request receives a generated request id and per-request nonce by
 default. Tests or protocol fixtures can inject `clock`, `nonceFactory`, and
 `requestIdFactory` for deterministic values. A custom `fetch` implementation
 or partial `origins` map can be supplied to the fetch factory for a proxy,
-test double, or another runtime:
+test double, or another runtime. `timeoutMs` optionally bounds each request;
+the caller can still cancel sooner with `AbortSignal`:
 
 ```ts
 const client = createNinebotFetchCandidateSessionClient({
@@ -75,6 +76,7 @@ const client = createNinebotFetchCandidateSessionClient({
   session,
   origins: { travel: "https://example.test" },
   fetch: myFetch,
+  timeoutMs: 15_000,
 });
 ```
 
