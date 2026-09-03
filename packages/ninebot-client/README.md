@@ -10,6 +10,13 @@ Node crypto implementation for AES, RSA, MD5, and secure randomness. A browser
 or mobile host cannot import this build directly; it needs a future compatible
 crypto provider/build before it can reuse the session client.
 
+The platform-neutral orchestration is available from
+`@jiuhao/ninebot-client/candidate-session-core`. It has no Node crypto import:
+browser, React Native, and other hosts can inject their own encrypted vehicle,
+telemetry, and travel clients while sharing field assembly, request-id
+propagation, cancellation, and session cleanup. Hosts without Web Crypto must
+also provide a `nonceFactory`.
+
 The package is currently private (`0.0.0`) and is not an official Ninebot SDK.
 It does not implement account login, vehicle control, data persistence, or
 server-side credential storage. Callers must obtain credentials through an
@@ -88,6 +95,27 @@ const client = createNinebotFetchCandidateSessionClient({
 The client keeps the session only in an in-memory closure. Calling `clear()`
 cancels in-flight requests and makes all future operations fail closed until a
 new client is created.
+
+For a non-Node runtime, compose the same lifecycle around platform-specific
+clients:
+
+```ts
+import { createNinebotCandidateSessionClientFromClients } from "@jiuhao/ninebot-client/candidate-session-core";
+
+const client = createNinebotCandidateSessionClientFromClients({
+  session,
+  clients: {
+    vehicles: browserVehicleClient,
+    telemetry: browserTelemetryClient,
+    travel: browserTravelClient,
+  },
+  nonceFactory: securePlatformNonce,
+});
+```
+
+The injected clients own encryption and transport details; the core only
+assembles the observed plaintext fields and controls the in-memory session
+lifecycle.
 
 All five read-only methods also accept an optional `AbortSignal`. Hosts can
 cancel a request when the user switches vehicles or leaves a page:

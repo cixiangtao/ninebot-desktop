@@ -18,6 +18,8 @@ scripts/protocol-recorder.ts
 
 `pnpm build:sdk` 会把 `@jiuhao/ninebot-client` 编译为可供 Node.js 导入的 ESM JavaScript 和 `.d.ts` 类型声明。当前包保持 `private`，避免协议尚未稳定时被误发布。
 
+会话编排另外拆在 `candidate-session-core` 子路径。它不导入 Node 加密模块，只接收平台提供的车辆、telemetry 和 travel 客户端，统一负责字段组装、request-id、取消信号和会话清理；因此 Web 或 React Native 可以先复用生命周期，再单独实现符合平台能力的加密 provider。Node/Electron 继续通过 `candidate-session` 使用内置的 Node crypto 实现，两条路径共享同一份调用契约。
+
 当前已落地的核心边界：
 
 - `buildWhoamiRequest` 固化已验证的 `POST /v5/user`、空 JSON Body 和请求 Header 形状。
