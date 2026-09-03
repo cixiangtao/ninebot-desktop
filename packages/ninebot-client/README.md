@@ -33,6 +33,11 @@ The lifecycle layer can be imported without pulling in Node-only crypto:
 import { NinebotAuthSessionManager } from "@jiuhao/ninebot-client/auth";
 ```
 
+The Passport client also exposes the verified password-login and refresh
+request boundaries. Both require a runtime-supplied signer; this package does
+not claim that the sign algorithm is solved until it passes an upstream parity
+check.
+
 ## Build
 
 From the repository root:
