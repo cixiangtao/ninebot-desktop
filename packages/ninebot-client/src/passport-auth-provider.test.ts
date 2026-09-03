@@ -4,6 +4,7 @@ import {
   NinebotHumanVerificationRequiredError,
 } from "./passport-auth-provider.ts";
 import type { NinebotAuthSession } from "./auth.ts";
+import type { NinebotPassportAuthClient } from "./passport-auth-provider.ts";
 
 const session: NinebotAuthSession = {
   accessToken: "access",
@@ -16,8 +17,8 @@ describe("Passport auth provider", () => {
     const client = {
       loginWithPassword: vi.fn(async () => session),
       refresh: vi.fn(async () => ({ ...session, accessToken: "next-access" })),
-      whoami: vi.fn(async () => ({ username: "rider" })),
-    };
+      whoami: vi.fn(async () => ({ username: "rider" })) as NinebotPassportAuthClient["whoami"],
+    } satisfies NinebotPassportAuthClient;
     const provider = createNinebotPassportAuthProvider(client);
 
     await expect(
@@ -40,7 +41,7 @@ describe("Passport auth provider", () => {
     const provider = createNinebotPassportAuthProvider({
       loginWithPassword: async () => session,
       refresh: async () => session,
-      whoami: async () => null,
+      whoami: async <T>() => null as T,
     });
 
     await expect(
