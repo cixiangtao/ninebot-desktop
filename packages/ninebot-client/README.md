@@ -3,7 +3,12 @@
 `@jiuhao/ninebot-client` is a read-only TypeScript client for the Ninebot
 candidate protocol used by this project. It packages the request construction,
 encryption, response decoding, and service routing behind one small session
-client so an Electron, Node.js, or browser host can provide its own transport.
+client so an Electron or Node.js host can provide its own transport.
+
+The current build is Node-oriented: the public candidate entry imports the
+Node crypto implementation for AES, RSA, MD5, and secure randomness. A browser
+or mobile host cannot import this build directly; it needs a future compatible
+crypto provider/build before it can reuse the session client.
 
 The package is currently private (`0.0.0`) and is not an official Ninebot SDK.
 It does not implement account login, vehicle control, data persistence, or
