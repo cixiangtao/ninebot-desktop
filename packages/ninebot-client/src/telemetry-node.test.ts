@@ -9,6 +9,7 @@ import {
   createNinebotTelemetryCandidateClient,
   decodeVehicleBatteryResponseCandidate,
   decodeVehicleStatusResponseCandidate,
+  NinebotTelemetryBusinessError,
   parseTelemetryResponseCandidate,
   parseVehicleBatteryResponseCandidate,
   parseVehicleStatusResponseCandidate,
@@ -166,6 +167,16 @@ describe("Node telemetry candidate", () => {
     expect(() => parseVehicleBatteryResponseCandidate(payload)).toThrow(
       "business request may have failed",
     );
+    try {
+      parseVehicleStatusResponseCandidate(payload);
+    } catch (error) {
+      expect(error).toBeInstanceOf(NinebotTelemetryBusinessError);
+      expect(error).toMatchObject({
+        code: 190003,
+        desc: "通讯异常，请稍后再试(4106)",
+        dataKind: "null",
+      });
+    }
   });
 
   it("exports typed encrypted-response decoder entry points", () => {

@@ -231,6 +231,46 @@ export interface TelemetryResponseCandidate<TData = unknown, TExtra = unknown> {
   extra: TExtra;
 }
 
+export type NinebotTelemetryDataKind =
+  | "array"
+  | "boolean"
+  | "null"
+  | "number"
+  | "object"
+  | "string"
+  | "undefined";
+
+const getTelemetryDataKind = (value: unknown): NinebotTelemetryDataKind => {
+  if (value === null) return "null";
+  if (Array.isArray(value)) return "array";
+  const kind = typeof value;
+  if (
+    kind === "boolean" ||
+    kind === "number" ||
+    kind === "object" ||
+    kind === "string" ||
+    kind === "undefined"
+  ) {
+    return kind;
+  }
+  return "undefined";
+};
+
+/** Business-level telemetry failure without retaining the response body. */
+export class NinebotTelemetryBusinessError extends Error {
+  readonly code: number | string | null;
+  readonly desc: string | null;
+  readonly dataKind: NinebotTelemetryDataKind;
+
+  constructor(message: string, response: TelemetryResponseCandidate<unknown>) {
+    super(message);
+    this.name = "NinebotTelemetryBusinessError";
+    this.code = response.code;
+    this.desc = response.desc;
+    this.dataKind = getTelemetryDataKind(response.data);
+  }
+}
+
 export interface VehicleStatusLocationCandidate {
   acc?: number | string | boolean;
   lat?: number | string;
@@ -326,8 +366,9 @@ export const parseVehicleStatusResponseCandidate = (
 ): TelemetryResponseCandidate<VehicleStatusCandidateRecord[]> => {
   const response = parseTelemetryResponseCandidate<unknown>(plaintext);
   if (!Array.isArray(response.data)) {
-    throw new Error(
+    throw new NinebotTelemetryBusinessError(
       "Ninebot status response data is not an array; business request may have failed",
+      response,
     );
   }
   const data = response.data.map((item, index) => {
@@ -345,8 +386,9 @@ export const parseVehicleBatteryResponseCandidate = (
   const response = parseTelemetryResponseCandidate<unknown>(plaintext);
   const data = asRecord(response.data);
   if (!data) {
-    throw new Error(
+    throw new NinebotTelemetryBusinessError(
       "Ninebot battery response data is not an object; business request may have failed",
+      response,
     );
   }
   return { ...response, data: data as VehicleBatteryCandidateRecord };
