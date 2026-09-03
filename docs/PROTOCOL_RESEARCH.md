@@ -270,3 +270,7 @@ SDK 另提供 `createNinebotCandidateSessionClient` 和 `createNinebotFetchCandi
 Electron 主进程已删除 ninecli 运行时分支，正式应用的数据源和认证入口固定为 TypeScript SDK；安装包的 `extraResources` 不再包含 Python、uv 或 ninecli 原生文件。ninecli 仍只由协议 parity 工具按需准备，不会被生产包加载。macOS Apple Silicon 成品已验证 SDK-only 诊断、ASAR/Fuses、崩溃恢复和月度导出；Windows x64 NSIS/ZIP 已在 macOS 上完成跨平台生成及资源静态检查，原生验收脚本仍必须在 Windows 上执行。
 
 `protocol-parity` 新增 `--all-configs` 门禁，用逗号分隔的 `NINEBOT_PARITY_CONFIG_DIRS` 顺序执行多个已认证配置目录；每个目录仍分别比较车辆列表、status、battery、travel 月度和详情，并只输出目录名、节点数、差异元数据和 `allEqual`，不打印账号、令牌、车辆序列号或响应正文。车辆服务族解析同时接受 `business_line` 与 ninecli 可能返回的数值 `businessType`，便于覆盖电自和电摩缓存。该工具提升了多账号/多车型验证的可执行性，但在获得对应真实配置前不把门禁结果预先宣称为完成。
+
+### 2026-09-03 business login 元数据观察
+
+在隔离副本中移除 `business_uid` 后，仅通过 ninecli oracle 触发了一次 `POST /user/user/login`。服务端返回 HTTP 200，oracle 最终得到完整车辆列表，条目包含 `businessType`、`vehicle_type`、车型名称和序列号等字段；这证明首次登录所需的车型元数据确实来自 business login 链路，而不是 Passport `whoami`。该请求的 Body 与响应均为 `d/h/k/p/t`、`v/s/r` 加密 envelope；本次未把密文、账号或车辆值写入仓库，且未将未经验证的 business-login 解密实现接入 SDK。当前 SDK 对已有 legacy `vehicles.json` 只读复用，对全新账号仍会在缺少 `vehicle_type` 时安全失败，直到该加密链路完成独立服务端 parity。
