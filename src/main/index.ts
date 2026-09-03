@@ -144,7 +144,10 @@ app.whenReady().then(async () => {
     legacyDirectoryExists,
   });
   let appClient: NinebotAppClient;
-  if (process.env.NINEBOT_AUTH_SOURCE === "sdk") {
+  // The pure TypeScript Passport/session client is the default. The legacy
+  // process boundary remains an explicit recovery switch during migration.
+  const useSdkAuth = process.env.NINEBOT_AUTH_SOURCE !== "legacy";
+  if (useSdkAuth) {
     const passportOrigin =
       process.env.NINEBOT_PASSPORT_ORIGIN ??
       defaultNinebotServiceEndpoints.find(({ service }) => service === "passport")?.upstreamOrigin;
@@ -191,7 +194,7 @@ app.whenReady().then(async () => {
     appClient = nineCliClient;
     registerIpcHandlers(appClient, telemetryReader, travelReader, vehicleReader);
   }
-  if (process.env.NINEBOT_AUTH_SOURCE === "sdk") registerIpcHandlers(appClient);
+  if (useSdkAuth) registerIpcHandlers(appClient);
   await createWindow();
 
   app.on("activate", () => {
