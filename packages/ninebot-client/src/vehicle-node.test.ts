@@ -46,8 +46,17 @@ describe("Node vehicle request body candidate", () => {
 
   it("rejects a nonce outside the observed shape", () => {
     expect(() => buildVehicleListPlaintextBody({ ...fields, nonce: "invalid" })).toThrow(
-      "nonce must be 32 lowercase hexadecimal characters",
+      "nonce must be 32 hexadecimal characters",
     );
+  });
+
+  it("accepts the mixed-case hexadecimal nonce emitted by the oracle", () => {
+    expect(
+      buildVehicleListPlaintextBody({
+        ...fields,
+        nonce: "0123ABCdef4567890123ABCdef456789",
+      }),
+    ).toHaveLength(369);
   });
 
   it("returns request envelope and per-request response key context", () => {

@@ -149,3 +149,7 @@ Node 子路径另外提供 `decodeVehicleListResponseCandidateWithCodec`，将�
 车辆列表候选构造器和候选 codec 在未提供 `rsaPublicKey` 时会使用上述固定公钥；调用方仍可传入覆盖值做版本或环境差分。这个默认值只减少回放样板代码，不改变“候选、未服务端验证、不能替换默认 ninecli”的边界。
 
 候选请求在加密前会校验公钥必须是 1024-bit、指数 65537；这与捕获到的 128 字节 `k`/`s` 外壳一致，错误的 2048-bit 或损坏材料会在本地直接失败。
+
+2026-09-03 使用本机已有会话做了一次不保存 Body 原文的 `vehicles` 回放：`ebike` 的 `POST /vehicle/binding/my-vehicle` 返回 HTTP 200，响应外壳 `v=101`、`s` 解码 128 字节、`r` 解码 2256 字节；ninecli 输出 1 条车辆记录。请求 `d` 解码 1616 字节、`k` 解码 128 字节，和候选请求的 AES/RSA 外壳长度一致。该回放只保留在 `.ninebot-private`，未把账号、车辆或密文写入仓库。
+
+同日通过 lldb 在 `EncryptRequest` 入口捕获了 3 组脱敏前的本机临时明文（只留在 `/tmp`）：`nonce` 均为 32 位十六进制，但字母大小写可为全大写或混合大小写；按固定 15 个字段重建的 JSON 计算出的 32 位大写 MD5 均与 `checkcode` 一致。因此 Node 候选只约束十六进制字符集，不再错误限定 nonce 必须小写。

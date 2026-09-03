@@ -68,10 +68,8 @@ const assertVehicleListPlaintextFields = (fields: VehicleListPlaintextFields) =>
   if (!Number.isSafeInteger(fields.serviceTime)) {
     throw new Error("Ninebot vehicle request field serviceTime must be a safe integer");
   }
-  if (!/^[0-9a-f]{32}$/.test(fields.nonce)) {
-    throw new Error(
-      "Ninebot vehicle request field nonce must be 32 lowercase hexadecimal characters",
-    );
+  if (!/^[0-9A-Fa-f]{32}$/.test(fields.nonce)) {
+    throw new Error("Ninebot vehicle request field nonce must be 32 hexadecimal characters");
   }
 };
 
