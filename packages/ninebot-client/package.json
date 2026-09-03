@@ -29,6 +29,10 @@
       "types": "./dist/crypto-web.d.ts",
       "import": "./dist/crypto-web.js"
     },
+    "./crypto-web-codec": {
+      "types": "./dist/crypto-web-codec.d.ts",
+      "import": "./dist/crypto-web-codec.js"
+    },
     "./crypto-codec": {
       "types": "./dist/crypto-codec.d.ts",
       "import": "./dist/crypto-codec.js"
