@@ -2,7 +2,11 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { readCandidateSession, readCandidateVehicles } from "./candidate-context.js";
+import {
+  readCandidateSession,
+  readCandidateService,
+  readCandidateVehicles,
+} from "./candidate-context.js";
 
 const temporaryDirectories: string[] = [];
 
@@ -35,6 +39,13 @@ const createSessionDirectory = async () => {
 };
 
 describe("candidate context", () => {
+  it("normalizes textual and numeric service-family fields", () => {
+    expect(readCandidateService({ business_line: "ebike" })).toBe("ebike");
+    expect(readCandidateService({ businessType: 1 })).toBe("motor");
+    expect(readCandidateService({ businessType: "2" })).toBe("ebike");
+    expect(readCandidateService({ businessType: "unknown" })).toBeNull();
+  });
+
   it("builds the shared session fields from local files", async () => {
     const directory = await createSessionDirectory();
 

@@ -66,6 +66,32 @@ describe("candidate telemetry source", () => {
     await expect(reader.battery("SN1234567890")).resolves.toEqual({ data: { electricity: 80 } });
   });
 
+  it("accepts numeric businessType values from the vehicle cache", async () => {
+    const configDirectory = await createSessionDirectory();
+    await writeFile(
+      join(configDirectory, "vehicles.json"),
+      JSON.stringify({ vehicles: [{ wnumber: "SN1234567890", businessType: 2 }] }),
+    );
+    const candidateClient: CandidateTelemetryClient = {
+      status: async () => ({ data: [{ pwr: 1 }] }),
+      battery: async () => ({ data: { electricity: 80 } }),
+    };
+    const reader = createCandidateTelemetryReader({
+      legacy: {
+        vehicleStatus: async () => {
+          throw new Error("legacy status should not be called");
+        },
+        battery: async () => {
+          throw new Error("legacy battery should not be called");
+        },
+      },
+      configDirectory,
+      candidateClientFactory: () => candidateClient,
+    });
+
+    await expect(reader.vehicleStatus("SN1234567890")).resolves.toEqual({ data: [{ pwr: 1 }] });
+  });
+
   it("falls back independently when a candidate request fails", async () => {
     const configDirectory = await createSessionDirectory();
     const reader = createCandidateTelemetryReader({

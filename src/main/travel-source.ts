@@ -1,9 +1,14 @@
 import type { NinebotCandidateSessionFields } from "@jiuhao/ninebot-client/candidate-session";
-import { readCandidateSession, readCandidateVehicles } from "./candidate-context.js";
+import {
+  readCandidateSession,
+  readCandidateService,
+  readCandidateVehicles,
+  type CandidateService,
+} from "./candidate-context.js";
 import { createCandidateSessionClient } from "./candidate-client.js";
 import type { NineCliClient } from "./ninecli.js";
 
-export type CandidateTravelService = "ebike" | "motor";
+export type CandidateTravelService = CandidateService;
 
 export interface TravelReader {
   rides(serialNumber: string, month: string): Promise<unknown>;
@@ -57,23 +62,6 @@ const requireText = (value: unknown, label: string) => {
   return String(value);
 };
 
-const readService = (
-  value:
-    | {
-        business_line?: unknown;
-        businessType?: unknown;
-      }
-    | null
-    | undefined,
-): CandidateTravelService | null => {
-  if (value?.business_line === "ebike" || value?.business_line === "motor") {
-    return value.business_line;
-  }
-  if (value?.businessType === 1 || value?.businessType === "1") return "motor";
-  if (value?.businessType === 2 || value?.businessType === "2") return "ebike";
-  return null;
-};
-
 const readContext = async (
   configDirectory: string,
   serialNumber: string,
@@ -99,7 +87,7 @@ const readContext = async (
       }) ?? null;
   }
   const vehicle = cachedVehicle ?? (legacyVehicle as CachedVehicle | null);
-  const service = readService(cachedVehicle) ?? readService(legacyVehicle);
+  const service = readCandidateService(cachedVehicle) ?? readCandidateService(legacyVehicle);
   if (!service) {
     throw new Error("Ninebot candidate travel vehicle service is unavailable");
   }

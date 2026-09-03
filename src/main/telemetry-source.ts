@@ -1,9 +1,12 @@
 import type { NinebotCandidateSessionFields } from "@jiuhao/ninebot-client/candidate-session";
-import { readCandidateSession, readCandidateVehicles } from "./candidate-context.js";
+import {
+  readCandidateSession,
+  readCandidateService,
+  readCandidateVehicles,
+  type CandidateService,
+} from "./candidate-context.js";
 import { createCandidateSessionClient } from "./candidate-client.js";
 import type { VehicleTelemetryReader } from "./vehicle-snapshot.js";
-
-export type CandidateService = "ebike" | "motor";
 
 export interface CandidateTelemetryClient {
   status(options: { service: CandidateService; serialNumber: string }): Promise<unknown>;
@@ -13,6 +16,7 @@ export interface CandidateTelemetryClient {
 interface CachedVehicle {
   wnumber: string;
   business_line?: string;
+  businessType?: string | number;
 }
 
 interface CachedVehicles {
@@ -37,8 +41,8 @@ const readContext = async (configDirectory: string, serialNumber: string) => {
   }
   const vehicles = vehiclesValue as CachedVehicles;
   const vehicle = vehicles.vehicles?.find((item) => item.wnumber === serialNumber);
-  const service = vehicle?.business_line;
-  if (service !== "ebike" && service !== "motor") {
+  const service = readCandidateService(vehicle);
+  if (!service) {
     throw new Error("Ninebot candidate vehicle service is unavailable");
   }
   return {

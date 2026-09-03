@@ -1,9 +1,14 @@
 import type { NinebotCandidateSessionFields } from "@jiuhao/ninebot-client/candidate-session";
-import { readCandidateSession, readCandidateVehicles } from "./candidate-context.js";
+import {
+  readCandidateSession,
+  readCandidateService,
+  readCandidateVehicles,
+  type CandidateService,
+} from "./candidate-context.js";
 import { createCandidateSessionClient } from "./candidate-client.js";
 import type { NineCliClient } from "./ninecli.js";
 
-export type CandidateVehicleService = "ebike" | "motor";
+export type CandidateVehicleService = CandidateService;
 
 export interface VehicleReader {
   vehicles(): Promise<unknown>;
@@ -37,13 +42,6 @@ const requireText = (value: unknown, label: string) => {
   return String(value);
 };
 
-const readService = (row: VehicleRow): CandidateVehicleService | null => {
-  if (row.business_line === "ebike" || row.business_line === "motor") return row.business_line;
-  if (row.businessType === 1 || row.businessType === "1") return "motor";
-  if (row.businessType === 2 || row.businessType === "2") return "ebike";
-  return null;
-};
-
 /** Creates an opt-in vehicle reader; candidate service failures fall back atomically. */
 export const createCandidateVehicleReader = ({
   legacy,
@@ -70,7 +68,7 @@ export const createCandidateVehicleReader = ({
       let rows = cachedRows;
       const cachedGroups = new Map<CandidateVehicleService, VehicleRow[]>();
       for (const row of cachedRows) {
-        const service = readService(row);
+        const service = readCandidateService(row);
         if (!service) continue;
         const serviceRows = cachedGroups.get(service) ?? [];
         serviceRows.push(row);
@@ -89,7 +87,7 @@ export const createCandidateVehicleReader = ({
       }
       const grouped = new Map<string, { service: CandidateVehicleService; vehicleType: string }>();
       for (const row of rows) {
-        const service = readService(row);
+        const service = readCandidateService(row);
         if (!service) continue;
         const vehicleType = requireText(row.vehicle_type, "candidate vehicle_type");
         grouped.set(`${service}\0${vehicleType}`, { service, vehicleType });

@@ -2,6 +2,8 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { NinebotCandidateSessionFields } from "@jiuhao/ninebot-client/candidate-session";
 
+export type CandidateService = "ebike" | "motor";
+
 interface CandidateConfig {
   device_id: string;
   region: string;
@@ -24,6 +26,24 @@ const requireText = (value: unknown, label: string) => {
     throw new Error(`Ninebot ${label} is incomplete`);
   }
   return String(value);
+};
+
+/** Resolves the service family from either ninecli's textual or numeric field. */
+export const readCandidateService = (
+  value:
+    | {
+        business_line?: unknown;
+        businessType?: unknown;
+      }
+    | null
+    | undefined,
+): CandidateService | null => {
+  if (value?.business_line === "ebike" || value?.business_line === "motor") {
+    return value.business_line;
+  }
+  if (value?.businessType === 1 || value?.businessType === "1") return "motor";
+  if (value?.businessType === 2 || value?.businessType === "2") return "ebike";
+  return null;
 };
 
 /** Reads the local session files and builds the shared in-memory candidate fields. */
