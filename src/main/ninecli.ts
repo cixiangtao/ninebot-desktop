@@ -55,7 +55,12 @@ const environmentKeys = [
   "SSL_CERT_DIR",
 ] as const;
 
-const tokenFiles = ["tokens.json", "vehicles.json"] as const;
+const tokenFiles = [
+  "tokens.json",
+  "auth-session.json",
+  "vehicles.json",
+  "vehicle-cache.json",
+] as const;
 const restrictedFiles = ["config.json", ...tokenFiles] as const;
 
 export interface RuntimeSecurityStatus {
@@ -386,13 +391,18 @@ export class NineCliClient {
   }
 
   private async hasTokens() {
-    try {
-      await stat(join(this.configDirectory, "tokens.json"));
-      return true;
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === "ENOENT") return false;
-      throw error;
-    }
+    const presence = await Promise.all(
+      ["tokens.json", "auth-session.json"].map(async (file) => {
+        try {
+          await stat(join(this.configDirectory, file));
+          return true;
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code === "ENOENT") return false;
+          throw error;
+        }
+      }),
+    );
+    return presence.some(Boolean);
   }
 
   private async getStoragePermissions(): Promise<RuntimeSecurityStatus["storage"]["permissions"]> {
