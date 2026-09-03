@@ -152,6 +152,37 @@ const protocolOptions = ({
   ...(responseBodyDecoder === undefined ? {} : { responseBodyDecoder }),
 });
 
+const mergeAbortSignals = (signals: readonly AbortSignal[]): AbortSignal => {
+  const nativeAny = (
+    AbortSignal as typeof AbortSignal & {
+      any?: (signals: readonly AbortSignal[]) => AbortSignal;
+    }
+  ).any;
+  if (typeof nativeAny === "function") return nativeAny(signals);
+
+  const controller = new AbortController();
+  const listeners = new Map<AbortSignal, () => void>();
+  const cleanup = () => {
+    for (const [signal, listener] of listeners) signal.removeEventListener("abort", listener);
+    listeners.clear();
+  };
+  const abort = (signal: AbortSignal) => {
+    cleanup();
+    controller.abort(signal.reason);
+  };
+  for (const signal of signals) {
+    if (signal.aborted) {
+      abort(signal);
+      return controller.signal;
+    }
+    const listener = () => abort(signal);
+    listeners.set(signal, listener);
+    signal.addEventListener("abort", listener, { once: true });
+  }
+  controller.signal.addEventListener("abort", cleanup, { once: true });
+  return controller.signal;
+};
+
 /**
  * Creates one read-only candidate client over the validated vehicle, telemetry, and travel APIs.
  *
@@ -189,7 +220,7 @@ export const createNinebotCandidateSessionClient = ({
   const requestSignal = (callerSignal: AbortSignal | undefined) =>
     callerSignal === undefined
       ? sessionAbortController.signal
-      : AbortSignal.any([sessionAbortController.signal, callerSignal]);
+      : mergeAbortSignals([sessionAbortController.signal, callerSignal]);
 
   const listVehicles = async ({
     service,

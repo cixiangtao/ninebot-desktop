@@ -149,6 +149,35 @@ describe("candidate session client", () => {
     await expect(pending).rejects.toThrow("session client was cleared");
   });
 
+  it("merges signals when the runtime lacks AbortSignal.any", async () => {
+    const abortSignalConstructor = AbortSignal as unknown as { any?: unknown };
+    const nativeAny = abortSignalConstructor.any;
+    abortSignalConstructor.any = undefined;
+    try {
+      const transport: NinebotTransport = {
+        send: async (request) =>
+          await new Promise<never>((_resolve, reject) => {
+            request.signal?.addEventListener("abort", () => reject(request.signal?.reason), {
+              once: true,
+            });
+          }),
+      };
+      const client = createNinebotCandidateSessionClient({ transport, platform: 2, session });
+      const controller = new AbortController();
+      const pending = client.status({
+        service: "ebike",
+        serialNumber: "SN1234567890",
+        signal: controller.signal,
+      });
+
+      controller.abort(new Error("legacy runtime cancelled"));
+
+      await expect(pending).rejects.toThrow("legacy runtime cancelled");
+    } finally {
+      abortSignalConstructor.any = nativeAny;
+    }
+  });
+
   it("uses validated default origins through the fetch convenience factory", async () => {
     let observedUrl = "";
     const client = createNinebotFetchCandidateSessionClient({
