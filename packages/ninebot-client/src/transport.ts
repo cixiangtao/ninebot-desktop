@@ -9,6 +9,8 @@ export interface NinebotRequest {
   path: string;
   headers: Readonly<Record<string, string>>;
   body?: Uint8Array;
+  /** Optional caller-owned cancellation signal for this read-only request. */
+  signal?: AbortSignal;
 }
 
 /** The raw response returned by a transport implementation. */
@@ -43,6 +45,7 @@ export const createFetchNinebotTransport = ({
       method: request.method,
       headers: request.headers,
       ...(request.body ? { body: new Uint8Array(request.body) } : {}),
+      ...(request.signal ? { signal: request.signal } : {}),
     });
     return {
       status: response.status,

@@ -433,12 +433,14 @@ export interface ListTravelMonthCandidateOptions {
   fields: TravelMonthPlaintextFields;
   businessType: "1" | "2";
   headers?: Readonly<Record<string, string>>;
+  signal?: AbortSignal;
 }
 
 export interface GetTravelDetailCandidateOptions {
   fields: TravelDetailPlaintextFields;
   businessType: "1" | "2";
   headers?: Readonly<Record<string, string>>;
+  signal?: AbortSignal;
 }
 
 /** Creates a transport-backed Node client for the validated travel endpoints. */
@@ -457,6 +459,7 @@ export const createNinebotTravelCandidateClient = ({
     businessType: "1" | "2",
     plaintextBody: Uint8Array,
     headers: Readonly<Record<string, string>> | undefined,
+    signal: AbortSignal | undefined,
     decode: (payload: Uint8Array) => T,
   ) => {
     const material = generateNinebotCandidateRequestMaterial(
@@ -476,6 +479,7 @@ export const createNinebotTravelCandidateClient = ({
         ...headers,
       },
       body: new TextEncoder().encode(serializeNinebotEncryptedRequest(envelope)),
+      ...(signal === undefined ? {} : { signal }),
     });
     if (response.status < 200 || response.status >= 300) {
       throw new NinebotHttpError(response.status);
@@ -497,6 +501,7 @@ export const createNinebotTravelCandidateClient = ({
         options.businessType,
         buildTravelMonthPlaintextBody(options.fields),
         options.headers,
+        options.signal,
         parseTravelMonthResponseCandidate,
       ),
     detail: (options: GetTravelDetailCandidateOptions) =>
@@ -506,6 +511,7 @@ export const createNinebotTravelCandidateClient = ({
         options.businessType,
         buildTravelDetailPlaintextBody(options.fields),
         options.headers,
+        options.signal,
         parseTravelDetailResponseCandidate,
       ),
   };

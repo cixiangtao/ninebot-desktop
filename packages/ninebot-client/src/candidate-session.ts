@@ -83,6 +83,8 @@ export interface CreateNinebotFetchCandidateSessionClientOptions extends Omit<
 export interface CandidateServiceRequestOptions {
   service: NinebotCandidateService;
   headers?: Readonly<Record<string, string>>;
+  /** Optional caller-owned cancellation signal for this read-only request. */
+  signal?: AbortSignal;
 }
 
 export interface CandidateVehicleRequestOptions extends CandidateServiceRequestOptions {
@@ -186,6 +188,7 @@ export const createNinebotCandidateSessionClient = ({
     service,
     vehicleType,
     headers,
+    signal,
   }: CandidateVehicleRequestOptions): Promise<NinebotVehicleResponseCandidate<unknown>> => {
     const fields: VehicleListPlaintextFields = {
       ...getSession(),
@@ -193,27 +196,52 @@ export const createNinebotCandidateSessionClient = ({
       serviceTime: clock(),
       nonce: nonceFactory(),
     };
-    return vehicles.list({ service, fields, headers: withRequestId(headers) });
+    return vehicles.list({
+      service,
+      fields,
+      headers: withRequestId(headers),
+      ...(signal === undefined ? {} : { signal }),
+    });
   };
 
-  const status = async ({ service, serialNumber, headers }: CandidateTelemetryRequestOptions) => {
+  const status = async ({
+    service,
+    serialNumber,
+    headers,
+    signal,
+  }: CandidateTelemetryRequestOptions) => {
     const fields: VehicleStatusCandidateOptions["fields"] = buildVehicleStatusFields({
       session: getSession(),
       sn_str: serialNumber,
       serviceTime: clock(),
       nonce: nonceFactory(),
     });
-    return telemetry.status({ service, fields, headers: withRequestId(headers) });
+    return telemetry.status({
+      service,
+      fields,
+      headers: withRequestId(headers),
+      ...(signal === undefined ? {} : { signal }),
+    });
   };
 
-  const battery = async ({ service, serialNumber, headers }: CandidateTelemetryRequestOptions) => {
+  const battery = async ({
+    service,
+    serialNumber,
+    headers,
+    signal,
+  }: CandidateTelemetryRequestOptions) => {
     const fields: VehicleBatteryCandidateOptions["fields"] = buildVehicleBatteryFields({
       session: getSession(),
       wnumber: serialNumber,
       serviceTime: clock(),
       nonce: nonceFactory(),
     });
-    return telemetry.battery({ service, fields, headers: withRequestId(headers) });
+    return telemetry.battery({
+      service,
+      fields,
+      headers: withRequestId(headers),
+      ...(signal === undefined ? {} : { signal }),
+    });
   };
 
   const travelFields = ({
@@ -238,6 +266,7 @@ export const createNinebotCandidateSessionClient = ({
     vehicleType,
     month: monthKey,
     headers,
+    signal,
   }: CandidateTravelMonthRequestOptions) => {
     const fields = {
       ...travelFields({ serialNumber, vehicleType }),
@@ -248,6 +277,7 @@ export const createNinebotCandidateSessionClient = ({
       fields,
       businessType: businessTypeFor(service),
       headers: withRequestId(headers),
+      ...(signal === undefined ? {} : { signal }),
     });
   };
 
@@ -257,6 +287,7 @@ export const createNinebotCandidateSessionClient = ({
     vehicleType,
     travelId,
     headers,
+    signal,
   }: CandidateTravelDetailRequestOptions) => {
     const fields = {
       ...travelFields({ serialNumber, vehicleType }),
@@ -266,6 +297,7 @@ export const createNinebotCandidateSessionClient = ({
       fields,
       businessType: businessTypeFor(service),
       headers: withRequestId(headers),
+      ...(signal === undefined ? {} : { signal }),
     });
   };
 

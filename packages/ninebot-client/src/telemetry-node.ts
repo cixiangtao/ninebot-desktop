@@ -443,6 +443,7 @@ export interface CreateNinebotTelemetryCandidateClientOptions {
 interface VehicleTelemetryCandidateOptionsBase {
   service: "ebike" | "motor";
   headers?: Readonly<Record<string, string>>;
+  signal?: AbortSignal;
 }
 
 export interface VehicleStatusCandidateOptions extends VehicleTelemetryCandidateOptionsBase {
@@ -469,6 +470,7 @@ export const createNinebotTelemetryCandidateClient = ({
     fields: TelemetryCandidateHeaderFields,
     plaintextBody: Uint8Array,
     headers: Readonly<Record<string, string>> | undefined,
+    signal: AbortSignal | undefined,
     decode: (plaintext: Uint8Array) => TelemetryResponseCandidate<TData>,
   ): Promise<TelemetryResponseCandidate<TData>> => {
     const material = generateNinebotCandidateRequestMaterial(
@@ -488,6 +490,7 @@ export const createNinebotTelemetryCandidateClient = ({
         ...headers,
       },
       body: new TextEncoder().encode(serializeNinebotEncryptedRequest(envelope)),
+      ...(signal === undefined ? {} : { signal }),
     });
     if (response.status < 200 || response.status >= 300)
       throw new NinebotHttpError(response.status);
@@ -507,6 +510,7 @@ export const createNinebotTelemetryCandidateClient = ({
         options.fields,
         buildVehicleStatusPlaintextBody(options.fields),
         options.headers,
+        options.signal,
         parseVehicleStatusResponseCandidate,
       ),
     battery: (options: VehicleBatteryCandidateOptions) =>
@@ -516,6 +520,7 @@ export const createNinebotTelemetryCandidateClient = ({
         options.fields,
         buildVehicleBatteryPlaintextBody(options.fields),
         options.headers,
+        options.signal,
         parseVehicleBatteryResponseCandidate,
       ),
   };

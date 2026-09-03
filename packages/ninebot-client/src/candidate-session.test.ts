@@ -105,6 +105,23 @@ describe("candidate session client", () => {
     expect(sendCount).toBe(0);
   });
 
+  it("forwards a caller cancellation signal to the transport", async () => {
+    const signals: Array<AbortSignal | undefined> = [];
+    const transport: NinebotTransport = {
+      send: async (request) => {
+        signals.push(request.signal);
+        return { status: 500, headers: {}, body: new Uint8Array() };
+      },
+    };
+    const client = createNinebotCandidateSessionClient({ transport, platform: 2, session });
+    const controller = new AbortController();
+
+    await expect(
+      client.status({ service: "ebike", serialNumber: "SN1234567890", signal: controller.signal }),
+    ).rejects.toThrow("Ninebot request failed with HTTP 500");
+    expect(signals).toEqual([controller.signal]);
+  });
+
   it("uses validated default origins through the fetch convenience factory", async () => {
     let observedUrl = "";
     const client = createNinebotFetchCandidateSessionClient({

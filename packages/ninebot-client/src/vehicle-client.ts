@@ -17,6 +17,7 @@ export interface ListVehiclesOptions {
   service: VehicleServiceName;
   plaintextBody: Uint8Array;
   headers?: Readonly<Record<string, string>>;
+  signal?: AbortSignal;
 }
 
 /** High-level vehicle-list facade; the codec remains responsible for all cryptography. */
@@ -25,14 +26,17 @@ export const createNinebotVehicleClient = ({
   codec,
   responseBodyDecoder = (response) => response.body,
 }: NinebotVehicleClientOptions) => ({
-  async list({ service, plaintextBody, headers = {} }: ListVehiclesOptions) {
+  async list({ service, plaintextBody, headers = {}, signal }: ListVehiclesOptions) {
     const prepared = await prepareVehicleListRequestWithCodec({
       service,
       plaintextBody,
       headers,
       codec,
     });
-    const response = await transport.send(prepared.request);
+    const response = await transport.send({
+      ...prepared.request,
+      ...(signal === undefined ? {} : { signal }),
+    });
     if (response.status < 200 || response.status >= 300) {
       throw new NinebotHttpError(response.status);
     }

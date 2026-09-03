@@ -315,6 +315,7 @@ export interface ListNinebotVehicleCandidateOptions {
   service: "ebike" | "motor";
   fields: VehicleListPlaintextFields;
   headers?: Readonly<Record<string, string>>;
+  signal?: AbortSignal;
 }
 
 /**
@@ -336,12 +337,18 @@ export const createNinebotVehicleCandidateClient = ({
     ...(responseBodyDecoder ? { responseBodyDecoder } : {}),
   });
   return {
-    async list<T = unknown>({ service, fields, headers = {} }: ListNinebotVehicleCandidateOptions) {
+    async list<T = unknown>({
+      service,
+      fields,
+      headers = {},
+      signal,
+    }: ListNinebotVehicleCandidateOptions) {
       const plaintextBody = buildVehicleListPlaintextBody(fields);
       const payload = await client.list({
         service,
         plaintextBody,
         headers: { ...buildVehicleListCandidateHeaders({ service, fields }), ...headers },
+        ...(signal === undefined ? {} : { signal }),
       });
       return parseVehicleListResponseCandidate<T>(payload);
     },
