@@ -1,15 +1,23 @@
 import {
   createMemoryNinebotAuthSessionStore,
   NinebotAuthSessionManager,
+  PassportLoginBusinessError,
 } from "@jiuhao/ninebot-client";
 import type { NinebotAuthProvider, NinebotAuthSession } from "@jiuhao/ninebot-client";
 import type { RuntimeSecurityStatus } from "../shared/contracts.js";
 import { describe, expect, it, vi } from "vitest";
-import { createNinebotSdkAppClient } from "./sdk-app-client.js";
+import { createNinebotSdkAppClient, normalizeSdkAuthError } from "./sdk-app-client.js";
+import { NinebotClientError } from "./app-client.js";
 
 const session = { accessToken: "access", businessUid: "uid" };
 
 describe("createNinebotSdkAppClient", () => {
+  it("maps Passport expiry failures to the auth error contract", () => {
+    const error = normalizeSdkAuthError(new PassportLoginBusinessError("90016", "expired"));
+    expect(error).toBeInstanceOf(NinebotClientError);
+    expect(error).toMatchObject({ kind: "auth" });
+  });
+
   it("maps application calls to injected SDK boundaries", async () => {
     const provider = {
       loginWithPassword: vi.fn(async () => session),
