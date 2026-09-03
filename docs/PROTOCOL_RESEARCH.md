@@ -214,6 +214,8 @@ telemetry 候选源现通过 `createNinebotCandidateSessionClient` 生成 status
 
 为继续推进 travel 迁移，主进程新增了独立的 `TravelReader` 边界和 `NINEBOT_TRAVEL_SOURCE=candidate` 试用开关。候选源按请求重新读取本地会话，调用 `travel-node` 的月度/详情客户端；月度读取或详情读取失败时分别回退到 ninecli，不影响另一个域。travel 的 `serviceTime` 与请求 Header 的 `service-time` 均使用 Unix 毫秒，当前 ninecli 0.1.7 的 `rn-ver` 为 `743`。由于 travel 明文需要 `vehicle_type`，候选源会优先读本地 `vehicles.json`，缺失时仅在内存中调用 ninecli 的 `vehicles` 输出补齐，不写回缓存；若仍无法取得模型码则安全回退，不会猜测该值。默认行为仍是 ninecli。
 
+travel 候选源现通过 `createNinebotCandidateSessionClient` 生成月度和详情请求，主进程只负责从本地会话与车辆元数据解析调用参数；月度、详情仍各自拥有失败回退边界。
+
 `@jiuhao/ninebot-client` 根入口现导出 `travel-node` 的构造器、解析器、transport client 和类型，调用方可以在 Node、Electron 主进程或测试 transport 中复用同一套候选合同。该导出不代表登录、令牌刷新或移动端能力已迁移，也不改变候选请求必须经过多车型 parity 的门槛。
 
 SDK 另提供 `createNinebotCandidateSessionClient` 作为只读聚合入口：调用方只需提供共享会话字段、车型编码和可注入 transport，即可访问车辆列表、status、battery、月度和详情候选。该封装在内存中生成每次请求的 nonce 与服务时间，默认使用已验证的 `rnVersion=743` 和 `current_version=610063322`；不执行登录、不读写令牌文件、不暴露控制能力，凭据生命周期仍由上层负责。

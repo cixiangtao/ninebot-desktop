@@ -1,12 +1,9 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import {
-  createNinebotTravelCandidateClient,
-  type TravelCandidateHeaderFields,
-  type TravelDetailPlaintextFields,
-  type TravelMonthPlaintextFields,
-} from "../../packages/ninebot-client/src/travel-node.ts";
-import { generateNinebotNonce } from "../../packages/ninebot-client/src/crypto-node.ts";
+  createNinebotCandidateSessionClient,
+  type NinebotCandidateSessionFields,
+} from "../../packages/ninebot-client/src/candidate-session.ts";
 import { createFetchNinebotTransport } from "../../packages/ninebot-client/src/transport.ts";
 import type { NineCliClient } from "./ninecli.js";
 
@@ -18,10 +15,17 @@ export interface TravelReader {
 }
 
 export interface CandidateTravelClient {
-  month(options: { fields: TravelMonthPlaintextFields; businessType: "1" | "2" }): Promise<unknown>;
+  month(options: {
+    service: CandidateTravelService;
+    serialNumber: string;
+    vehicleType: string;
+    month: string;
+  }): Promise<unknown>;
   detail(options: {
-    fields: TravelDetailPlaintextFields;
-    businessType: "1" | "2";
+    service: CandidateTravelService;
+    serialNumber: string;
+    vehicleType: string;
+    travelId: string;
   }): Promise<unknown>;
 }
 
@@ -52,7 +56,7 @@ interface CachedVehicles {
 interface CandidateTravelContext {
   service: CandidateTravelService;
   vehicleType: string;
-  fields: Omit<TravelMonthPlaintextFields, "month" | "page" | "travel_id">;
+  session: NinebotCandidateSessionFields;
 }
 
 type LegacyTravelClient = Pick<NineCliClient, "rides" | "rideDetail"> & {
@@ -134,7 +138,7 @@ const readContext = async (
   return {
     service,
     vehicleType,
-    fields: {
+    session: {
       sys_language: "zh-hans-cn",
       client_ver: "610063322",
       device_id: deviceId,
@@ -147,33 +151,22 @@ const readContext = async (
       login_country: "CN",
       access_token: accessToken,
       uid: businessUid,
-      wnumber: serialNumber,
-      // Observed in the ninecli 0.1.7 travel request header (`rn-ver: 743`).
-      rnVersion: "743",
-      vehicle_type: vehicleType,
-      current_version: "610063322",
-      serviceTime: Date.now(),
-      nonce: generateNinebotNonce(),
     },
   } satisfies CandidateTravelContext;
 };
 
-const createCandidateClient = (_service: CandidateTravelService): CandidateTravelClient =>
-  createNinebotTravelCandidateClient({
+const createCandidateClient = (session: NinebotCandidateSessionFields): CandidateTravelClient =>
+  createNinebotCandidateSessionClient({
+    session,
     transport: createFetchNinebotTransport({
-      origins: { travel: "https://cn-cbu-gateway.ninebot.com" },
+      origins: {
+        ebike: "https://ebike.ninebot.com",
+        motor: "https://steeldust.ninebot.com",
+        travel: "https://cn-cbu-gateway.ninebot.com",
+      },
     }),
     platform: 2,
   });
-
-const businessTypeFor = (service: CandidateTravelService): "1" | "2" =>
-  service === "motor" ? "1" : "2";
-
-const requestBaseFields = (context: CandidateTravelContext): TravelCandidateHeaderFields => ({
-  ...context.fields,
-  serviceTime: Date.now(),
-  nonce: generateNinebotNonce(),
-});
 
 /** Creates an opt-in travel reader; each domain falls back to ninecli independently. */
 export const createCandidateTravelReader = ({
@@ -183,20 +176,16 @@ export const createCandidateTravelReader = ({
 }: {
   legacy: LegacyTravelClient;
   configDirectory: string;
-  candidateClientFactory?: (service: CandidateTravelService) => CandidateTravelClient;
+  candidateClientFactory?: (session: NinebotCandidateSessionFields) => CandidateTravelClient;
 }): TravelReader => ({
   async rides(serialNumber, month) {
     try {
       const context = await readContext(configDirectory, serialNumber, legacy.vehicles);
-      const fields = {
-        ...requestBaseFields(context),
+      return await candidateClientFactory(context.session).month({
+        service: context.service,
+        serialNumber,
+        vehicleType: context.vehicleType,
         month,
-        page: "1",
-        vehicle_type: context.vehicleType,
-      } as TravelMonthPlaintextFields;
-      return await candidateClientFactory(context.service).month({
-        fields,
-        businessType: businessTypeFor(context.service),
       });
     } catch {
       return legacy.rides(serialNumber, month);
@@ -205,14 +194,11 @@ export const createCandidateTravelReader = ({
   async rideDetail(serialNumber, travelId) {
     try {
       const context = await readContext(configDirectory, serialNumber, legacy.vehicles);
-      const fields = {
-        ...requestBaseFields(context),
-        travel_id: travelId,
-        vehicle_type: context.vehicleType,
-      } as TravelDetailPlaintextFields;
-      return await candidateClientFactory(context.service).detail({
-        fields,
-        businessType: businessTypeFor(context.service),
+      return await candidateClientFactory(context.session).detail({
+        service: context.service,
+        serialNumber,
+        vehicleType: context.vehicleType,
+        travelId,
       });
     } catch {
       return legacy.rideDetail(serialNumber, travelId);

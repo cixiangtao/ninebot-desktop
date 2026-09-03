@@ -52,18 +52,14 @@ describe("candidate travel source", () => {
     const calls: Array<{ kind: string; month?: string; travelId?: string; businessType: string }> =
       [];
     const candidateClient: CandidateTravelClient = {
-      month: async ({ fields, businessType }) => {
-        calls.push({ kind: "month", month: fields.month, businessType });
-        expect(fields.vehicle_type).toBe("14363");
-        expect(fields.access_token).toBe("token");
-        expect(fields.rnVersion).toBe("743");
-        expect(fields.serviceTime).toBeGreaterThan(1_000_000_000_000);
-        expect(fields.nonce).toMatch(/^[0-9a-f]{32}$/);
-        return { data: { month: fields.month, list: [] } };
+      month: async ({ month, service, vehicleType }) => {
+        calls.push({ kind: "month", month, businessType: service === "motor" ? "1" : "2" });
+        expect(vehicleType).toBe("14363");
+        return { data: { month, list: [] } };
       },
-      detail: async ({ fields, businessType }) => {
-        calls.push({ kind: "detail", travelId: fields.travel_id, businessType });
-        expect(fields.vehicle_type).toBe("14363");
+      detail: async ({ travelId, service, vehicleType }) => {
+        calls.push({ kind: "detail", travelId, businessType: service === "motor" ? "1" : "2" });
+        expect(vehicleType).toBe("14363");
         return { data: { trail: "" } };
       },
     };
@@ -135,9 +131,9 @@ describe("candidate travel source", () => {
       },
       configDirectory,
       candidateClientFactory: () => ({
-        month: async ({ fields }) => {
-          observedVehicleType = fields.vehicle_type;
-          return { data: { month: fields.month, list: [] } };
+        month: async ({ vehicleType, month }) => {
+          observedVehicleType = vehicleType;
+          return { data: { month, list: [] } };
         },
         detail: async () => ({ data: { trail: "" } }),
       }),
