@@ -41,6 +41,18 @@ const addCachedVehicleType = async (directory: string) => {
   );
 };
 
+const addCachedVehicleTypes = async (directory: string) => {
+  await writeFile(
+    join(directory, "vehicles.json"),
+    JSON.stringify({
+      vehicles: [
+        { wnumber: "SN-E-1", business_line: "ebike", vehicle_type: 14363 },
+        { wnumber: "SN-E-2", business_line: "ebike", vehicle_type: 14364 },
+      ],
+    }),
+  );
+};
+
 afterEach(async () => {
   await Promise.all(
     temporaryDirectories.splice(0).map((directory) => rm(directory, { recursive: true })),
@@ -110,5 +122,36 @@ describe("candidate vehicle source", () => {
     await expect(reader.vehicles()).resolves.toEqual([
       { wnumber: "SN1234567890", vehicle_name: "cached metadata vehicle" },
     ]);
+  });
+
+  it("requests each model code once and de-duplicates overlapping service responses", async () => {
+    const configDirectory = await createSessionDirectory();
+    await addCachedVehicleTypes(configDirectory);
+    const requestedTypes: Array<string | number> = [];
+    const reader = createCandidateVehicleReader({
+      configDirectory,
+      legacy: {
+        vehicles: async () => {
+          throw new Error("legacy vehicles should not be called");
+        },
+      },
+      candidateClientFactory: () => ({
+        listVehicles: async ({ vehicleType }) => {
+          requestedTypes.push(vehicleType);
+          return {
+            data: [
+              { wnumber: "SN-E-1", vehicle_name: "first" },
+              { wnumber: "SN-E-2", vehicle_name: "second" },
+            ],
+          };
+        },
+      }),
+    });
+
+    await expect(reader.vehicles()).resolves.toEqual([
+      { wnumber: "SN-E-1", vehicle_name: "first" },
+      { wnumber: "SN-E-2", vehicle_name: "second" },
+    ]);
+    expect(requestedTypes).toEqual(["14363", "14364"]);
   });
 });
