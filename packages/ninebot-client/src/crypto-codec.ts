@@ -10,6 +10,7 @@ import {
   generateNinebotKReq,
   generateNinebotKeyData,
 } from "./crypto-node.ts";
+import { assertNinebotCandidateRsaPublicKey } from "./rsa-node.ts";
 import type {
   NinebotEncryptedRequestEnvelope,
   NinebotEncryptedResponseEnvelope,
@@ -123,6 +124,7 @@ export const buildNinebotEncryptedRequestCandidate = ({
   material,
   rsaPublicKey,
 }: BuildNinebotEncryptedRequestCandidateOptions): NinebotEncryptedRequestEnvelope => {
+  assertNinebotCandidateRsaPublicKey(rsaPublicKey);
   const wrapper = encodeWrapper(plaintextBody, material);
   const encryptedBody = encryptAesCbcPkcs7({ plaintext: wrapper, key: material.kReq });
   const encryptedKReq = encryptRsaPkcs1v15(material.kReq, rsaPublicKey);

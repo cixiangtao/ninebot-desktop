@@ -1,3 +1,5 @@
+import { createPublicKey } from "node:crypto";
+
 /**
  * RSA public key embedded in the bundled ninecli 0.1.7 binary.
  *
@@ -11,3 +13,16 @@ MIGJAoGBANPebRz/zL1zXc/NoVsBMSD5nB2Sk9wLLRXbVUoEFLHXpyRW0sREBDsQ
 fx3oOqARvLNrIDCVB3WAOFSbHbuENZp9ev3969RmSQF6Byw2cqsiWH3eU8pxyOT4
 sNdLVOcMggWJOVJs2dpjB6Ej/2lRsoIjeHvITSm6bqEmH/1C0Y+XAgMBAAE=
 -----END RSA PUBLIC KEY-----`;
+
+/** Validates the RSA shape observed in ninecli's 128-byte `k`/`s` fields. */
+export const assertNinebotCandidateRsaPublicKey = (publicKey: Uint8Array | string) => {
+  let details: ReturnType<typeof createPublicKey>["asymmetricKeyDetails"];
+  try {
+    details = createPublicKey(publicKey).asymmetricKeyDetails;
+  } catch {
+    throw new Error("Ninebot candidate RSA public key is invalid");
+  }
+  if (details?.modulusLength !== 1024 || details.publicExponent !== 65_537n) {
+    throw new Error("Ninebot candidate RSA public key must be 1024-bit with exponent 65537");
+  }
+};
