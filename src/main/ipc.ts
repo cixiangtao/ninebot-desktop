@@ -89,7 +89,7 @@ const rideSpeedVerificationSchema = z.object({
   rideIds: z
     .array(z.string().regex(/^ride-\d+$/))
     .min(1)
-    .max(20)
+    .max(10_000)
     .refine((rideIds) => new Set(rideIds).size === rideIds.length),
 });
 
@@ -167,7 +167,9 @@ const monthSummaryExportSchema = z.object({
       mileageKm: z.number().finite().nonnegative(),
       durationSeconds: z.number().finite().nonnegative(),
       energyWh: z.number().finite().nonnegative().nullable(),
-      visibleRideCount: z.number().int().min(0).max(20),
+      // The upstream endpoint is paginated in batches of 20, but a month may contain
+      // many pages. Keep a generous safety bound while allowing the SDK to return all rows.
+      visibleRideCount: z.number().int().min(0).max(10_000),
       aggregateAvailable: z.boolean(),
       ridesTruncated: z.boolean(),
       activeDayCount: z.number().int().min(0).max(31).nullable(),
@@ -195,7 +197,7 @@ const monthSummaryExportSchema = z.object({
           dayMileageKm: z.number().finite().nonnegative().nullable(),
         }),
       )
-      .max(20)
+      .max(10_000)
       .refine((rides) => new Set(rides.map(({ id }) => id)).size === rides.length),
   }),
   speedVerifications: z
@@ -206,7 +208,7 @@ const monthSummaryExportSchema = z.object({
         sampledMaxSpeed: z.number().finite().nonnegative().nullable(),
       }),
     )
-    .max(20)
+    .max(10_000)
     .refine(
       (verifications) => new Set(verifications.map(({ id }) => id)).size === verifications.length,
     ),

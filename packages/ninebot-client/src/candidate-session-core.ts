@@ -116,6 +116,8 @@ export interface CreateNinebotCandidateSessionClientFromClientsOptions {
   nonceFactory?: () => string;
   /** Request-id source used for transport headers; defaults to the nonce source. */
   requestIdFactory?: () => string;
+  /** Fetch all monthly travel pages instead of returning only the first page. */
+  paginateTravelMonths?: boolean;
 }
 
 export interface NinebotCandidateSessionClient {
@@ -197,6 +199,9 @@ const assertRequestActive = (signal: AbortSignal) => {
   }
 };
 
+const travelPageSize = 20;
+const maxTravelPages = 100;
+
 /**
  * Composes runtime-specific candidate clients behind one platform-neutral session API.
  *
@@ -210,6 +215,7 @@ export const createNinebotCandidateSessionClientFromClients = ({
   clock = Date.now,
   nonceFactory = generateWebNonce,
   requestIdFactory = nonceFactory,
+  paginateTravelMonths = true,
 }: CreateNinebotCandidateSessionClientFromClientsOptions): NinebotCandidateSessionClient => {
   let sessionRef: NinebotCandidateSessionFields | null = session;
   const sessionAbortController = new AbortController();
@@ -342,12 +348,51 @@ export const createNinebotCandidateSessionClientFromClients = ({
         month: monthKey,
         page: "1",
       };
-      return await clients.travel.month({
+      const firstPage = await clients.travel.month({
         fields,
         businessType: businessTypeFor(service),
         headers: withRequestId(headers),
         signal: request.signal,
       });
+      if (!paginateTravelMonths || firstPage.list.length < travelPageSize) return firstPage;
+
+      const pages = [...firstPage.list];
+      const declaredTotal = Number(firstPage.times);
+      let lastPageCount = firstPage.list.length;
+      for (let page = 2; page <= maxTravelPages; page += 1) {
+        if (lastPageCount < travelPageSize) break;
+        if (
+          Number.isSafeInteger(declaredTotal) &&
+          declaredTotal >= 0 &&
+          pages.length >= declaredTotal
+        ) {
+          break;
+        }
+        assertRequestActive(request.signal);
+        // Page N depends on whether page N-1 was full; keep requests sequential and cancellable.
+        // eslint-disable-next-line no-await-in-loop
+        const nextPage = await clients.travel.month({
+          fields: {
+            ...travelFields({ session: currentSession, serialNumber, vehicleType }),
+            month: monthKey,
+            page: String(page),
+          },
+          businessType: businessTypeFor(service),
+          headers: withRequestId(headers),
+          signal: request.signal,
+        });
+        pages.push(...nextPage.list);
+        lastPageCount = nextPage.list.length;
+      }
+      if (
+        Number.isSafeInteger(declaredTotal) &&
+        declaredTotal >= 0 &&
+        lastPageCount >= travelPageSize &&
+        pages.length < declaredTotal
+      ) {
+        throw new Error(`Ninebot travel month exceeded the safe page limit (${maxTravelPages})`);
+      }
+      return { ...firstPage, list: pages };
     } finally {
       request.cleanup();
     }

@@ -149,6 +149,56 @@ describe("platform-neutral candidate session core", () => {
     });
   });
 
+  it("automatically fetches every monthly travel page", async () => {
+    const requestedPages: string[] = [];
+    const pageLengths = [20, 20, 5];
+    const client = createNinebotCandidateSessionClientFromClients({
+      session,
+      clients: {
+        vehicles: {
+          list: async () => ({ code: 1, data: [], desc: null, time_cost: 0, extra: null }),
+        },
+        telemetry: {
+          status: async () => ({ code: 1, data: [], desc: null, time_cost: 0, extra: null }),
+          battery: async () => ({ code: 1, data: {}, desc: null, time_cost: 0, extra: null }),
+        },
+        travel: {
+          month: async ({ fields }) => {
+            requestedPages.push(fields.page);
+            const page = Number(fields.page);
+            return {
+              code: 1,
+              detail: [],
+              desc: null,
+              duration: 0,
+              ec: 0,
+              first_time: null,
+              list: Array.from({ length: pageLengths[page - 1] ?? 0 }, (_, index) => ({
+                travel_id: `ride-${page}-${index}`,
+              })),
+              month: "202608",
+              times: 45,
+              total_mileages: 12,
+            };
+          },
+          detail: async () => ({ code: 1, desc: null, trail: "" }),
+        },
+      },
+      nonceFactory: () => "0123456789abcdef0123456789abcdef",
+    });
+
+    const result = await client.month({
+      service: "ebike",
+      serialNumber: "SN1234567890",
+      vehicleType: 14363,
+      month: "202608",
+    });
+
+    expect(requestedPages).toEqual(["1", "2", "3"]);
+    expect(result.list).toHaveLength(45);
+    expect(result.times).toBe(45);
+  });
+
   it("does not require Node crypto when nonce and service clients are injected", async () => {
     let signal: AbortSignal | undefined;
     const client = createNinebotCandidateSessionClientFromClients({

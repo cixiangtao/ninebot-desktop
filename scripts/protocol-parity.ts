@@ -290,6 +290,9 @@ const candidate = createNinebotCandidateSessionClient({
   }),
   platform: 2,
   session,
+  // ninecli's public travel command exposes only page 1; compare the common
+  // page with the SDK while production callers keep automatic pagination enabled.
+  paginateTravelMonths: false,
 });
 const ninecliBinary = join(
   projectRoot,

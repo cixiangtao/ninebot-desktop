@@ -22,7 +22,7 @@ describe("RideSpeedVerificationPanel", () => {
     const markup = renderPanel(19);
 
     expect(markup).toContain("发现 19 条 25 km/h 旧摘要，校验后显示轨迹极速");
-    expect(markup).toContain("仅在你操作后读取最多 20 条轨迹详情");
+    expect(markup).toContain("仅在你操作后读取本月行程轨迹详情");
     expect(markup).toContain("校验全部");
   });
 

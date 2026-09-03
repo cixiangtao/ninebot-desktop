@@ -53,6 +53,8 @@ export interface CreateNinebotCandidateSessionClientOptions extends CandidatePro
   nonceFactory?: () => string;
   /** Request-id source used for transport headers; defaults to the secure generator. */
   requestIdFactory?: () => string;
+  /** Fetch all monthly travel pages instead of returning only the first page. */
+  paginateTravelMonths?: boolean;
 }
 
 export const defaultNinebotCandidateOrigins = {
@@ -102,6 +104,7 @@ export const createNinebotCandidateSessionClient = ({
   clock = Date.now,
   nonceFactory = generateNinebotNonce,
   requestIdFactory = generateNinebotNonce,
+  paginateTravelMonths = true,
   ...options
 }: CreateNinebotCandidateSessionClientOptions): NinebotCandidateSessionClient => {
   const sharedOptions = protocolOptions(options);
@@ -120,6 +123,7 @@ export const createNinebotCandidateSessionClient = ({
     clock,
     nonceFactory,
     requestIdFactory,
+    paginateTravelMonths,
   });
 };
 

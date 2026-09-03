@@ -194,7 +194,9 @@ try {
   await window
     .getByText(new RegExp(`已校验 ${previousRideIds.length}\\/${previousRideIds.length} 条`))
     .waitFor({
-      timeout: 60_000,
+      // Monthly travel is now fully paginated; allow roughly two seconds per
+      // detail at the existing three-request concurrency, with a 60s minimum.
+      timeout: Math.max(60_000, previousRideIds.length * 2_000),
     });
   const liveVerifiedRideSpeedCount = await window
     .locator('.ride-speed-reading[data-source="track"]')

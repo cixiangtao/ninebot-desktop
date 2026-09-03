@@ -292,3 +292,7 @@ Electron 的三个 SDK reader 现在通过 `NinebotAuthSessionManager.ensureSess
 ### 2026-09-03 默认 SDK 路径真实 Electron 回归
 
 使用本机既有认证配置启动临时 Electron userData，并运行 `scripts/qa-live-readonly.mjs`。认证恢复为 connected，车辆列表、车辆快照（status/battery）、月度汇总、详情轨迹、速度校验、月度/年度导出、地图坐标校准预览、年度统计和状态自动监看均通过；脚本只打印脱敏布尔值、计数、指标类型和来源，不保存令牌、序列号、坐标或九号原始响应。该回归直接经过当前 Electron 默认的 TypeScript SDK reader，未启用 legacy fallback；因此它补强了“生产默认入口已切换”的运行时证据，但仍不替代真实电摩和第二账号的 parity 门禁。
+
+### 2026-09-03 travel 月度分页验证
+
+直接使用当前真实会话请求 `travel-list2` 的 `page=1..10`，202608 月分别返回 20、20、20、20、20、20、10 条行程，顶层 `times=130`；各页行程指纹无重叠，说明“20 条”是单页大小而不是当月上限。SDK 月度读取现会在首页达到 20 条时继续请求后续页，直到累计数量达到 `times` 或最后一页不足 20 条，并设置 100 页安全上限且遵循调用方取消信号。`ninecli travel` 命令行没有暴露 `--page` 参数，因此协议 parity 工具显式关闭 SDK 自动分页，只比较双方共有的第一页；生产 Electron 默认保持自动分页。

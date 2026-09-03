@@ -49,7 +49,7 @@ export const RideSpeedVerificationPanel = ({
       <p className={error ? "ride-speed-verification-error" : undefined} role="status">
         {statusText}
       </p>
-      <small>仅在你操作后读取最多 20 条轨迹详情；页面只接收速度摘要。</small>
+      <small>仅在你操作后读取本月行程轨迹详情；页面只接收速度摘要。</small>
     </section>
   );
 };
