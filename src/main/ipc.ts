@@ -296,6 +296,9 @@ export const registerIpcHandlers = (
     rideDetailCache.clear();
   };
   const clearSessionState = (resetRideSequence = false) => {
+    telemetryReader.clear?.();
+    travelReader.clear?.();
+    vehicleReader.clear?.();
     serialNumbers.clear();
     travelIds.clear();
     rideIdsByUpstream.clear();

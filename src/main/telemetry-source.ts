@@ -1,5 +1,7 @@
 import type { NinebotCandidateSessionFields } from "@jiuhao/ninebot-client/candidate-session";
 import {
+  beginCandidateRequest,
+  cancelCandidateRequests,
   readCandidateSession,
   readCandidateService,
   readCandidateVehicles,
@@ -9,8 +11,16 @@ import { createCandidateSessionClient } from "./candidate-client.js";
 import type { VehicleTelemetryReader } from "./vehicle-snapshot.js";
 
 export interface CandidateTelemetryClient {
-  status(options: { service: CandidateService; serialNumber: string }): Promise<unknown>;
-  battery(options: { service: CandidateService; serialNumber: string }): Promise<unknown>;
+  status(options: {
+    service: CandidateService;
+    serialNumber: string;
+    signal?: AbortSignal;
+  }): Promise<unknown>;
+  battery(options: {
+    service: CandidateService;
+    serialNumber: string;
+    signal?: AbortSignal;
+  }): Promise<unknown>;
   clear?: () => void;
 }
 
@@ -61,37 +71,53 @@ export const createCandidateTelemetryReader = ({
   legacy: VehicleTelemetryReader;
   configDirectory: string;
   candidateClientFactory?: (session: NinebotCandidateSessionFields) => CandidateTelemetryClient;
-}): VehicleTelemetryReader => ({
-  async vehicleStatus(serialNumber) {
-    try {
-      const context = await readContext(configDirectory, serialNumber);
-      const candidateClient = candidateClientFactory(context.session);
+}): VehicleTelemetryReader => {
+  const activeRequests = new Set<AbortController>();
+  return {
+    clear: () => cancelCandidateRequests(activeRequests),
+    async vehicleStatus(serialNumber) {
+      let requestController: AbortController | undefined;
       try {
-        return await candidateClient.status({
-          service: context.service,
-          serialNumber,
-        });
-      } finally {
-        candidateClient.clear?.();
+        const context = await readContext(configDirectory, serialNumber);
+        requestController = beginCandidateRequest(activeRequests);
+        let candidateClient: CandidateTelemetryClient | undefined;
+        try {
+          candidateClient = candidateClientFactory(context.session);
+          return await candidateClient.status({
+            service: context.service,
+            serialNumber,
+            signal: requestController.signal,
+          });
+        } finally {
+          activeRequests.delete(requestController);
+          candidateClient?.clear?.();
+        }
+      } catch (error) {
+        if (requestController?.signal.aborted) throw error;
+        return legacy.vehicleStatus(serialNumber);
       }
-    } catch {
-      return legacy.vehicleStatus(serialNumber);
-    }
-  },
-  async battery(serialNumber) {
-    try {
-      const context = await readContext(configDirectory, serialNumber);
-      const candidateClient = candidateClientFactory(context.session);
+    },
+    async battery(serialNumber) {
+      let requestController: AbortController | undefined;
       try {
-        return await candidateClient.battery({
-          service: context.service,
-          serialNumber,
-        });
-      } finally {
-        candidateClient.clear?.();
+        const context = await readContext(configDirectory, serialNumber);
+        requestController = beginCandidateRequest(activeRequests);
+        let candidateClient: CandidateTelemetryClient | undefined;
+        try {
+          candidateClient = candidateClientFactory(context.session);
+          return await candidateClient.battery({
+            service: context.service,
+            serialNumber,
+            signal: requestController.signal,
+          });
+        } finally {
+          activeRequests.delete(requestController);
+          candidateClient?.clear?.();
+        }
+      } catch (error) {
+        if (requestController?.signal.aborted) throw error;
+        return legacy.battery(serialNumber);
       }
-    } catch {
-      return legacy.battery(serialNumber);
-    }
-  },
-});
+    },
+  };
+};

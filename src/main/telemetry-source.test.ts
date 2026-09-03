@@ -97,6 +97,38 @@ describe("candidate telemetry source", () => {
     await expect(reader.vehicleStatus("SN1234567890")).resolves.toEqual({ data: [{ pwr: 1 }] });
   });
 
+  it("cancels an in-flight candidate request without falling back", async () => {
+    const configDirectory = await createSessionDirectory();
+    let signalReceived: (() => void) | undefined;
+    const started = new Promise<void>((resolve) => {
+      signalReceived = resolve;
+    });
+    const reader = createCandidateTelemetryReader({
+      legacy: {
+        vehicleStatus: async () => {
+          throw new Error("legacy status should not be called after cancellation");
+        },
+        battery: async () => ({ pwr: 1 }),
+      },
+      configDirectory,
+      candidateClientFactory: () => ({
+        status: ({ signal }) => {
+          signalReceived?.();
+          return new Promise((_resolve, reject) => {
+            signal?.addEventListener("abort", () => reject(signal.reason), { once: true });
+          });
+        },
+        battery: async () => ({ data: { electricity: 80 } }),
+      }),
+    });
+
+    const pending = reader.vehicleStatus("SN1234567890");
+    await started;
+    reader.clear?.();
+
+    await expect(pending).rejects.toThrow("candidate request was cancelled");
+  });
+
   it("falls back independently when a candidate request fails", async () => {
     const configDirectory = await createSessionDirectory();
     const reader = createCandidateTelemetryReader({

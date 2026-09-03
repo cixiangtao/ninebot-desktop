@@ -5,6 +5,7 @@ import { parseVehicleSnapshot } from "./parsers.js";
 export interface VehicleTelemetryReader {
   vehicleStatus: (serialNumber: string) => Promise<unknown>;
   battery: (serialNumber: string) => Promise<unknown>;
+  clear?: () => void;
 }
 
 const isDegradableFailure = (reason: unknown) =>

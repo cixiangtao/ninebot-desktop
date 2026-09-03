@@ -1,5 +1,7 @@
 import type { NinebotCandidateSessionFields } from "@jiuhao/ninebot-client/candidate-session";
 import {
+  beginCandidateRequest,
+  cancelCandidateRequests,
   readCandidateSession,
   readCandidateService,
   readCandidateVehicles,
@@ -13,6 +15,7 @@ export type CandidateTravelService = CandidateService;
 export interface TravelReader {
   rides(serialNumber: string, month: string): Promise<unknown>;
   rideDetail(serialNumber: string, travelId: string): Promise<unknown>;
+  clear?: () => void;
 }
 
 export interface CandidateTravelClient {
@@ -21,12 +24,14 @@ export interface CandidateTravelClient {
     serialNumber: string;
     vehicleType: string;
     month: string;
+    signal?: AbortSignal;
   }): Promise<unknown>;
   detail(options: {
     service: CandidateTravelService;
     serialNumber: string;
     vehicleType: string;
     travelId: string;
+    signal?: AbortSignal;
   }): Promise<unknown>;
   clear?: () => void;
 }
@@ -113,41 +118,57 @@ export const createCandidateTravelReader = ({
   legacy: LegacyTravelClient;
   configDirectory: string;
   candidateClientFactory?: (session: NinebotCandidateSessionFields) => CandidateTravelClient;
-}): TravelReader => ({
-  async rides(serialNumber, month) {
-    try {
-      const context = await readContext(configDirectory, serialNumber, legacy.vehicles);
-      const candidateClient = candidateClientFactory(context.session);
+}): TravelReader => {
+  const activeRequests = new Set<AbortController>();
+  return {
+    clear: () => cancelCandidateRequests(activeRequests),
+    async rides(serialNumber, month) {
+      let requestController: AbortController | undefined;
       try {
-        return await candidateClient.month({
-          service: context.service,
-          serialNumber,
-          vehicleType: context.vehicleType,
-          month,
-        });
-      } finally {
-        candidateClient.clear?.();
+        const context = await readContext(configDirectory, serialNumber, legacy.vehicles);
+        requestController = beginCandidateRequest(activeRequests);
+        let candidateClient: CandidateTravelClient | undefined;
+        try {
+          candidateClient = candidateClientFactory(context.session);
+          return await candidateClient.month({
+            service: context.service,
+            serialNumber,
+            vehicleType: context.vehicleType,
+            month,
+            signal: requestController.signal,
+          });
+        } finally {
+          activeRequests.delete(requestController);
+          candidateClient?.clear?.();
+        }
+      } catch (error) {
+        if (requestController?.signal.aborted) throw error;
+        return legacy.rides(serialNumber, month);
       }
-    } catch {
-      return legacy.rides(serialNumber, month);
-    }
-  },
-  async rideDetail(serialNumber, travelId) {
-    try {
-      const context = await readContext(configDirectory, serialNumber, legacy.vehicles);
-      const candidateClient = candidateClientFactory(context.session);
+    },
+    async rideDetail(serialNumber, travelId) {
+      let requestController: AbortController | undefined;
       try {
-        return await candidateClient.detail({
-          service: context.service,
-          serialNumber,
-          vehicleType: context.vehicleType,
-          travelId,
-        });
-      } finally {
-        candidateClient.clear?.();
+        const context = await readContext(configDirectory, serialNumber, legacy.vehicles);
+        requestController = beginCandidateRequest(activeRequests);
+        let candidateClient: CandidateTravelClient | undefined;
+        try {
+          candidateClient = candidateClientFactory(context.session);
+          return await candidateClient.detail({
+            service: context.service,
+            serialNumber,
+            vehicleType: context.vehicleType,
+            travelId,
+            signal: requestController.signal,
+          });
+        } finally {
+          activeRequests.delete(requestController);
+          candidateClient?.clear?.();
+        }
+      } catch (error) {
+        if (requestController?.signal.aborted) throw error;
+        return legacy.rideDetail(serialNumber, travelId);
       }
-    } catch {
-      return legacy.rideDetail(serialNumber, travelId);
-    }
-  },
-});
+    },
+  };
+};
