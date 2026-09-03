@@ -9,6 +9,7 @@ import type {
   NinebotEncryptedRequestEnvelope,
   NinebotEncryptedResponseEnvelope,
 } from "./crypto-envelope.ts";
+import { ninebotCandidateRsaPublicKeyPem } from "./rsa-node.ts";
 import {
   decodeVehicleListResponseWithCodec,
   type DecodeVehicleListResponseWithCodecOptions,
@@ -89,7 +90,8 @@ export interface BuildVehicleListEncryptedRequestCandidateOptions {
   p: string;
   t: string;
   timeStamp?: number;
-  rsaPublicKey: Uint8Array | string;
+  /** Defaults to the public key embedded in ninecli 0.1.7. */
+  rsaPublicKey?: Uint8Array | string;
 }
 
 export interface VehicleListEncryptedRequestCandidate {
@@ -113,7 +115,7 @@ export const buildVehicleListEncryptedRequestCandidate = ({
     envelope: buildNinebotEncryptedRequestCandidate({
       plaintextBody: buildVehicleListPlaintextBody(fields),
       material,
-      rsaPublicKey,
+      rsaPublicKey: rsaPublicKey ?? ninebotCandidateRsaPublicKeyPem,
     }),
     keyData: material.keyData,
   };
@@ -202,7 +204,8 @@ export interface CreateNinebotVehicleCandidateCodecOptions {
   p: string;
   t: string;
   timeStamp?: number;
-  rsaPublicKey: Uint8Array | string;
+  /** Defaults to the public key embedded in ninecli 0.1.7. */
+  rsaPublicKey?: Uint8Array | string;
 }
 
 const readResponseKeyData = (context: unknown) => {
@@ -243,7 +246,7 @@ export const createNinebotVehicleCandidateCodec = ({
       envelope: buildNinebotEncryptedRequestCandidate({
         plaintextBody,
         material,
-        rsaPublicKey,
+        rsaPublicKey: rsaPublicKey ?? ninebotCandidateRsaPublicKeyPem,
       }),
       responseContext: material.keyData,
     };

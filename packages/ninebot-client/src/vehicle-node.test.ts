@@ -10,6 +10,7 @@ import {
 } from "./vehicle-node.ts";
 import type { NinebotVehicleCodec } from "./vehicle-codec.ts";
 import {
+  decodeNinebotBase64,
   deriveNinebotKeyCandidate,
   encodeNinebotBase64,
   encryptAesCbcPkcs7,
@@ -65,6 +66,18 @@ describe("Node vehicle request body candidate", () => {
     expect(result.keyData.keyDataTwo).toMatch(/^[0-9a-f]{11}$/);
     expect(result.keyData.keyDataThree).toMatch(/^[0-9a-f]{10}$/);
     expect(result.keyData.keyDataFour).toHaveLength(8);
+  });
+
+  it("uses the pinned ninecli public key when no override is supplied", () => {
+    const result = buildVehicleListEncryptedRequestCandidate({
+      fields,
+      platform: 2,
+      p: "100",
+      t: "1",
+      timeStamp: 1_725_000_000,
+    });
+
+    expect(decodeNinebotBase64(result.envelope.k, "request k")).toHaveLength(128);
   });
 
   it("parses the decrypted business response envelope", () => {
