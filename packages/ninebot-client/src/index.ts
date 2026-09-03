@@ -145,6 +145,13 @@ export type {
 } from "./auth.ts";
 export { createFileNinebotAuthSessionStore } from "./session-store-node.ts";
 export type { FileNinebotAuthSessionStoreOptions } from "./session-store-node.ts";
+export { buildPasswordLoginRequest, parsePassportLoginSession } from "./passport-auth.ts";
+export type {
+  BuildPasswordLoginRequestOptions,
+  PassportRequest,
+  PassportRequestSigner,
+  PassportSigningInput,
+} from "./passport-auth.ts";
 export {
   createNinebotCandidateSessionClient,
   createNinebotFetchCandidateSessionClient,
