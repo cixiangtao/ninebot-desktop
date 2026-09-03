@@ -32,6 +32,7 @@ export interface TelemetryCandidateHeaderFields {
   login_country: string;
   access_token: string;
   uid: string;
+  /** Milliseconds since Unix epoch, as required by status/battery endpoints. */
   serviceTime: number;
   nonce: string;
 }
@@ -96,7 +97,7 @@ const assertTelemetryBaseFields = (fields: TelemetryCandidateHeaderFields) => {
 
 const buildTelemetryHeaderFields = ({
   session,
-  serviceTime = Math.floor(Date.now() / 1000),
+  serviceTime = Date.now(),
   nonce = generateNinebotNonce(),
 }: {
   session: TelemetryCandidateSessionFields;
@@ -137,7 +138,7 @@ export const buildVehicleStatusPlaintextBody = (fields: VehicleStatusPlaintextFi
 export const buildVehicleBatteryPlaintextBody = (fields: VehicleBatteryPlaintextFields) =>
   buildTelemetryBody(fields, batteryKeys, "battery");
 
-/** Builds validated status fields from one session and a vehicle serial number. */
+/** Builds validated status fields with a millisecond `serviceTime`. */
 export const buildVehicleStatusFields = ({
   session,
   sn_str,
@@ -152,7 +153,7 @@ export const buildVehicleStatusFields = ({
   sn_str,
 });
 
-/** Builds validated battery fields from one session and a vehicle serial number. */
+/** Builds validated battery fields with a millisecond `serviceTime`. */
 export const buildVehicleBatteryFields = ({
   session,
   wnumber,

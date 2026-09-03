@@ -190,7 +190,7 @@ Node 子路径另外提供 `decodeVehicleListResponseCandidateWithCodec`，将�
 
 当服务端返回 HTTP 2xx 但业务 `data` 为空或类型不符时，两个类型入口会抛出 `NinebotTelemetryBusinessError`。错误只携带 `code`、`desc` 和 `dataKind`，不保留原始响应正文，调用方可以据此记录 `190003` 等业务失败并继续走 ninecli 回退路径。
 
-为减少接入方手工拼接请求字段，`buildVehicleStatusFields` / `buildVehicleBatteryFields` 接收共享会话元数据和车辆序列号，自动补齐 Unix 秒级 `serviceTime` 与随机 nonce；测试或回放可显式传入两者。会话元数据只停留在调用方内存中，SDK 不负责从 ninecli 私有配置文件读取令牌。
+为减少接入方手工拼接请求字段，`buildVehicleStatusFields` / `buildVehicleBatteryFields` 接收共享会话元数据和车辆序列号，自动补齐 Unix 毫秒级 `serviceTime` 与随机 nonce；测试或回放可显式传入两者。注意，这里的明文 `serviceTime` 与加密外壳的 `timeStamp` 是两个字段：前者经 oracle 确认为毫秒，后者仍按已验证的 Unix 秒建模。会话元数据只停留在调用方内存中，SDK 不负责从 ninecli 私有配置文件读取令牌。
 
 客户端方法参数也按能力拆成 `VehicleStatusCandidateOptions` 与 `VehicleBatteryCandidateOptions`，避免调用方把两种不同的明文字段误混在一起；两者仍共享 `service` 和可选 Header 覆盖。
 
@@ -199,3 +199,5 @@ Node 子路径另外提供 `decodeVehicleListResponseCandidateWithCodec`，将�
 首次使用本机配置自动拼装 status/battery 候选请求的回放显示：真实服务端返回 HTTP 200，但业务 wrapper 为 `code=190003`、`data=null`、通讯异常描述。由此确认 HTTP 层成功不等于业务协议已验证；类型化解析器会拒绝这类空数据，Electron 继续保留 ninecli 默认路径，后续需要用 oracle 明文/Header 做字段级修正。
 
 随后对同一账号运行了一次私有 oracle 采集：status 与 battery 的请求 `d` 均为解码后 1616 字节，响应 `r` 分别为 1296 和 880 字节，均保持 AES 块对齐。将 oracle 的 Header 名称和值指纹与 Node 生成结果在内存中对照后，18 个非敏感、非随机 Header 全部一致；差异只剩每次调用都会重新生成的 `request-id`。因此当前剩余不确定性已收敛到 telemetry 的业务调用上下文或服务端字段语义，不能再通过修改通用加密外壳解决。
+
+继续回到 `EncryptRequest` 入口对照后发现，telemetry 明文的 `serviceTime` 使用 13 位 Unix 毫秒，而车辆列表和加密外壳的 `timeStamp` 仍使用已验证的 Unix 秒。Node 默认值已按能力拆开修正为毫秒；使用同一账号连续运行 3 轮 status/battery，并将 Node 数据与 ninecli 明文结果在内存中 parity，3 轮均为 `statusEqual=true`、`batteryEqual=true`，分别比较 25 和 19 个节点且未截断。该结果只证明当前账号、车辆和运行时版本下的只读 telemetry 候选链，Electron 默认仍保留 ninecli，待多车辆、多车型样本后再评估切换。

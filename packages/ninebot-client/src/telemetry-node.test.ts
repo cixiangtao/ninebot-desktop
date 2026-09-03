@@ -38,7 +38,7 @@ const common = {
   login_country: "CN",
   access_token: "token",
   uid: "12345678",
-  serviceTime: 1_725_000_000,
+  serviceTime: 1_725_000_000_000,
   nonce: "0123456789abcdef0123456789abcdef",
 } as const;
 
@@ -50,8 +50,12 @@ describe("Node telemetry candidate", () => {
   it("builds ordered status and battery bodies with uppercase checkcodes", () => {
     const status = new TextDecoder().decode(buildVehicleStatusPlaintextBody(statusFields));
     const battery = new TextDecoder().decode(buildVehicleBatteryPlaintextBody(batteryFields));
-    expect(status).toContain('"uid":"12345678","sn_str":"SN1234567890","serviceTime":1725000000');
-    expect(battery).toContain('"uid":"12345678","wnumber":"SN1234567890","serviceTime":1725000000');
+    expect(status).toContain(
+      '"uid":"12345678","sn_str":"SN1234567890","serviceTime":1725000000000',
+    );
+    expect(battery).toContain(
+      '"uid":"12345678","wnumber":"SN1234567890","serviceTime":1725000000000',
+    );
     expect(status).toMatch(/,"checkcode":"[0-9A-F]{32}"}$/);
     expect(battery).toMatch(/,"checkcode":"[0-9A-F]{32}"}$/);
   });
@@ -61,7 +65,7 @@ describe("Node telemetry candidate", () => {
       buildVehicleStatusFields({
         session: sessionFields,
         sn_str: "SN1234567890",
-        serviceTime: 1_725_000_000,
+        serviceTime: 1_725_000_000_000,
         nonce: common.nonce,
       }),
     ).toEqual(statusFields);
@@ -69,10 +73,17 @@ describe("Node telemetry candidate", () => {
       buildVehicleBatteryFields({
         session: sessionFields,
         wnumber: "SN1234567890",
-        serviceTime: 1_725_000_000,
+        serviceTime: 1_725_000_000_000,
         nonce: common.nonce,
       }),
     ).toEqual(batteryFields);
+  });
+
+  it("defaults telemetry serviceTime to milliseconds", () => {
+    const status = buildVehicleStatusFields({ session: sessionFields, sn_str: "SN1234567890" });
+    const battery = buildVehicleBatteryFields({ session: sessionFields, wnumber: "SN1234567890" });
+    expect(String(status.serviceTime)).toHaveLength(13);
+    expect(String(battery.serviceTime)).toHaveLength(13);
   });
 
   it("maps observed telemetry headers and service business type", () => {
