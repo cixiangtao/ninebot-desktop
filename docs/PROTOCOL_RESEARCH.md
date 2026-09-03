@@ -288,3 +288,7 @@ Node fetch 可能已经自动解压 gzip 响应，但仍保留 `content-encoding
 ### 2026-09-03 领域请求会话 freshness 接线
 
 Electron 的三个 SDK reader 现在通过 `NinebotAuthSessionManager.ensureSession()` 获取会话，而不是仅从磁盘读取旧令牌。该入口在会话接近过期时执行 provider refresh、持久化替换后的 access token/uuid/refresh token，再把同一份内存会话字段交给车辆列表、telemetry 和 travel 请求；并发请求与协议工具仍可使用各自注入的文件读取边界。这样登录、刷新、退出和领域请求共享同一生命周期合同，生产主进程不需要创建 ninecli 客户端。
+
+### 2026-09-03 默认 SDK 路径真实 Electron 回归
+
+使用本机既有认证配置启动临时 Electron userData，并运行 `scripts/qa-live-readonly.mjs`。认证恢复为 connected，车辆列表、车辆快照（status/battery）、月度汇总、详情轨迹、速度校验、月度/年度导出、地图坐标校准预览、年度统计和状态自动监看均通过；脚本只打印脱敏布尔值、计数、指标类型和来源，不保存令牌、序列号、坐标或九号原始响应。该回归直接经过当前 Electron 默认的 TypeScript SDK reader，未启用 legacy fallback；因此它补强了“生产默认入口已切换”的运行时证据，但仍不替代真实电摩和第二账号的 parity 门禁。
