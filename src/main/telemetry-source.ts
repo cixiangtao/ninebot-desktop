@@ -68,12 +68,17 @@ export const createCandidateTelemetryReader = ({
   candidateClientFactory = createCandidateSessionClient,
   fallbackToLegacy = false,
 }: {
-  legacy: VehicleTelemetryReader;
+  legacy?: VehicleTelemetryReader;
   configDirectory: string;
   candidateClientFactory?: (session: NinebotCandidateSessionFields) => CandidateTelemetryClient;
   /** Legacy oracle fallback is migration-only and must be explicitly enabled. */
   fallbackToLegacy?: boolean;
 }): VehicleTelemetryReader => {
+  const legacyClient = legacy;
+  const requireLegacy = () => {
+    if (!legacyClient) throw new Error("Ninebot legacy telemetry client is not configured");
+    return legacyClient;
+  };
   const requestTracker = createCandidateRequestTracker();
   return {
     clear: requestTracker.clear,
@@ -98,7 +103,7 @@ export const createCandidateTelemetryReader = ({
       } catch (error) {
         if (request.signal.aborted) throw error;
         if (!fallbackToLegacy) throw error;
-        return legacy.vehicleStatus(serialNumber);
+        return requireLegacy().vehicleStatus(serialNumber);
       } finally {
         request.release();
       }
@@ -124,7 +129,7 @@ export const createCandidateTelemetryReader = ({
       } catch (error) {
         if (request.signal.aborted) throw error;
         if (!fallbackToLegacy) throw error;
-        return legacy.battery(serialNumber);
+        return requireLegacy().battery(serialNumber);
       } finally {
         request.release();
       }

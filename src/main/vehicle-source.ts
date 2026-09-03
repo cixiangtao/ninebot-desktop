@@ -54,12 +54,17 @@ export const createCandidateVehicleReader = ({
   candidateClientFactory = createCandidateSessionClient,
   fallbackToLegacy = false,
 }: {
-  legacy: Pick<NineCliClient, "vehicles">;
+  legacy?: Pick<NineCliClient, "vehicles">;
   configDirectory: string;
   candidateClientFactory?: (session: NinebotCandidateSessionFields) => CandidateVehicleClient;
   /** Legacy oracle fallback is migration-only and must be explicitly enabled. */
   fallbackToLegacy?: boolean;
 }): VehicleReader => {
+  const legacyClient = legacy;
+  const requireLegacy = () => {
+    if (!legacyClient) throw new Error("Ninebot legacy vehicle client is not configured");
+    return legacyClient;
+  };
   const requestTracker = createCandidateRequestTracker();
   return {
     clear: requestTracker.clear,
@@ -97,7 +102,7 @@ export const createCandidateVehicleReader = ({
               serviceRows.every((row) => row.vehicle_type !== undefined),
             );
           if (!cacheHasCompleteMetadata && fallbackToLegacy) {
-            const legacyValue = await legacy.vehicles();
+            const legacyValue = await requireLegacy().vehicles();
             if (Array.isArray(legacyValue)) {
               rows = legacyValue.filter((item): item is VehicleRow => isRecord(item));
             }
@@ -151,7 +156,7 @@ export const createCandidateVehicleReader = ({
       } catch (error) {
         if (request.signal.aborted) throw error;
         if (!fallbackToLegacy) throw error;
-        return legacy.vehicles();
+        return requireLegacy().vehicles();
       } finally {
         request.release();
       }
