@@ -191,3 +191,5 @@ Node 子路径另外提供 `decodeVehicleListResponseCandidateWithCodec`，将�
 为减少接入方手工拼接请求字段，`buildVehicleStatusFields` / `buildVehicleBatteryFields` 接收共享会话元数据和车辆序列号，自动补齐 Unix 秒级 `serviceTime` 与随机 nonce；测试或回放可显式传入两者。会话元数据只停留在调用方内存中，SDK 不负责从 ninecli 私有配置文件读取令牌。
 
 客户端方法参数也按能力拆成 `VehicleStatusCandidateOptions` 与 `VehicleBatteryCandidateOptions`，避免调用方把两种不同的明文字段误混在一起；两者仍共享 `service` 和可选 Header 覆盖。
+
+为支持迁移期的字段级对照，`@jiuhao/ninebot-client` 新增 `compareNinebotPayloads`。它只在内存比较 ninecli 与 Node 结果，报告路径、类型、长度和差异原因，不返回任何字段值；数组和嵌套对象达到比较上限时会标记 `truncated`，不会把不完整比较误报为一致。

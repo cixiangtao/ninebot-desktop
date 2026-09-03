@@ -15,6 +15,14 @@ export type {
   WhoamiSigningInput,
 } from "./whoami.ts";
 export { createFetchNinebotTransport } from "./transport.ts";
+export { compareNinebotPayloads } from "./parity-node.ts";
+export type {
+  NinebotParityDifference,
+  NinebotParityDifferenceReason,
+  NinebotParityKind,
+  NinebotParityOptions,
+  NinebotParityReport,
+} from "./parity-node.ts";
 export type {
   FetchNinebotTransportOptions,
   NinebotHttpMethod,
