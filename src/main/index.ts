@@ -137,13 +137,13 @@ app.whenReady().then(async () => {
   });
   const nineCliClient = new NineCliClient(configDirectory, bundledBinaryPath);
   const telemetryReader = isCandidateSourceEnabled(process.env, "telemetry")
-    ? createCandidateTelemetryReader({ legacy: nineCliClient, configDirectory })
+    ? createCandidateTelemetryReader({ configDirectory })
     : nineCliClient;
   const travelReader = isCandidateSourceEnabled(process.env, "travel")
-    ? createCandidateTravelReader({ legacy: nineCliClient, configDirectory })
+    ? createCandidateTravelReader({ configDirectory })
     : nineCliClient;
   const vehicleReader = isCandidateSourceEnabled(process.env, "vehicle")
-    ? createCandidateVehicleReader({ legacy: nineCliClient, configDirectory })
+    ? createCandidateVehicleReader({ configDirectory })
     : nineCliClient;
   registerIpcHandlers(nineCliClient, telemetryReader, travelReader, vehicleReader);
   await createWindow();
