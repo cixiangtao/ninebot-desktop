@@ -23,6 +23,20 @@ const readText = (value: unknown, key: string) => {
   return value;
 };
 
+const readExpiry = (value: unknown) => {
+  if (value === undefined || value === null) return undefined;
+  const parsed =
+    typeof value === "number"
+      ? value
+      : typeof value === "string" && /^\d+(?:\.\d+)?$/.test(value.trim())
+        ? Number(value)
+        : Number.NaN;
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    throw new Error("Ninebot auth session field expiresAtMs is invalid");
+  }
+  return parsed < 1_000_000_000_000 ? parsed * 1_000 : parsed;
+};
+
 const parseSessionFile = (value: unknown): NinebotAuthSession => {
   if (!isRecord(value)) throw new Error("Ninebot auth session file must contain an object");
   const accessToken = value.accessToken ?? value.access_token;
@@ -31,12 +45,20 @@ const parseSessionFile = (value: unknown): NinebotAuthSession => {
     accessToken: readText(accessToken, "accessToken"),
     businessUid: readText(businessUid, "businessUid"),
   };
-  if (value.expiresAtMs !== undefined) {
-    if (typeof value.expiresAtMs !== "number" || !Number.isFinite(value.expiresAtMs)) {
-      throw new Error("Ninebot auth session field expiresAtMs is invalid");
-    }
-    session.expiresAtMs = value.expiresAtMs;
-  }
+  const expiresAtMs =
+    value.expiresAtMs !== undefined
+      ? (() => {
+          if (
+            typeof value.expiresAtMs !== "number" ||
+            !Number.isFinite(value.expiresAtMs) ||
+            value.expiresAtMs <= 0
+          ) {
+            throw new Error("Ninebot auth session field expiresAtMs is invalid");
+          }
+          return value.expiresAtMs;
+        })()
+      : readExpiry(value.accessTokenValidity);
+  if (expiresAtMs !== undefined) session.expiresAtMs = expiresAtMs;
   if (value.refreshToken !== undefined) {
     session.refreshToken = readText(value.refreshToken, "refreshToken");
   }

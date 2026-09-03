@@ -52,6 +52,24 @@ describe("file-backed Ninebot auth session store", () => {
     await expect(readFile(join(directory, "tokens.json"), "utf8")).resolves.toBe(legacy);
   });
 
+  it("normalizes legacy access-token validity for refresh-aware restore", async () => {
+    const { directory, store } = await createStore();
+    await writeFile(
+      join(directory, "tokens.json"),
+      JSON.stringify({
+        access_token: "legacy-token",
+        business_uid: "legacy-uid",
+        accessTokenValidity: "1790735062000",
+      }),
+    );
+
+    await expect(store.load()).resolves.toMatchObject({
+      accessToken: "legacy-token",
+      businessUid: "legacy-uid",
+      expiresAtMs: 1_790_735_062_000,
+    });
+  });
+
   it("clears only the new session file", async () => {
     const { directory, store } = await createStore();
     await store.save({ accessToken: "token", businessUid: "uid" });
