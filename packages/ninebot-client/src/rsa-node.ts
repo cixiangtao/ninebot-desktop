@@ -2,8 +2,8 @@
  * RSA public key embedded in the bundled ninecli 0.1.7 binary.
  *
  * This is a public, 1024-bit PKCS#1 key recovered from the binary's static
- * data. It is exposed only for the Node candidate codec; callers must still
- * pass it explicitly and validate the complete request against the ninecli
+ * data. It is exposed only for the Node candidate codec; callers may override
+ * it explicitly, but must validate the complete request against the ninecli
  * oracle before using it for a service request.
  */
 export const ninebotCandidateRsaPublicKeyPem = `-----BEGIN RSA PUBLIC KEY-----
