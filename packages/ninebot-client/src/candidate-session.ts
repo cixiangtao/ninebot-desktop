@@ -44,6 +44,12 @@ interface CandidateProtocolOptions {
 
 export interface CreateNinebotCandidateSessionClientOptions extends CandidateProtocolOptions {
   session: NinebotCandidateSessionFields;
+  /** Clock used for per-request serviceTime values; defaults to Date.now. */
+  clock?: () => number;
+  /** Nonce source used for per-request request/body values; defaults to the secure generator. */
+  nonceFactory?: () => string;
+  /** Request-id source used for transport headers; defaults to the secure generator. */
+  requestIdFactory?: () => string;
 }
 
 export interface CandidateServiceRequestOptions {
@@ -108,6 +114,9 @@ const protocolOptions = ({
  */
 export const createNinebotCandidateSessionClient = ({
   session,
+  clock = Date.now,
+  nonceFactory = generateNinebotNonce,
+  requestIdFactory = generateNinebotNonce,
   ...options
 }: CreateNinebotCandidateSessionClientOptions) => {
   const sharedOptions = protocolOptions(options);
@@ -120,6 +129,10 @@ export const createNinebotCandidateSessionClient = ({
   const vehicles = createNinebotVehicleCandidateClient(
     sharedOptions as CreateNinebotVehicleCandidateClientOptions,
   );
+  const withRequestId = (headers: Readonly<Record<string, string>> | undefined) => ({
+    "request-id": requestIdFactory(),
+    ...headers,
+  });
 
   const listVehicles = async ({
     service,
@@ -129,26 +142,30 @@ export const createNinebotCandidateSessionClient = ({
     const fields: VehicleListPlaintextFields = {
       ...session,
       vehicle_type: asVehicleType(vehicleType),
-      serviceTime: Date.now(),
-      nonce: generateNinebotNonce(),
+      serviceTime: clock(),
+      nonce: nonceFactory(),
     };
-    return vehicles.list({ service, fields, ...(headers === undefined ? {} : { headers }) });
+    return vehicles.list({ service, fields, headers: withRequestId(headers) });
   };
 
   const status = async ({ service, serialNumber, headers }: CandidateTelemetryRequestOptions) => {
     const fields: VehicleStatusCandidateOptions["fields"] = buildVehicleStatusFields({
       session,
       sn_str: serialNumber,
+      serviceTime: clock(),
+      nonce: nonceFactory(),
     });
-    return telemetry.status({ service, fields, ...(headers === undefined ? {} : { headers }) });
+    return telemetry.status({ service, fields, headers: withRequestId(headers) });
   };
 
   const battery = async ({ service, serialNumber, headers }: CandidateTelemetryRequestOptions) => {
     const fields: VehicleBatteryCandidateOptions["fields"] = buildVehicleBatteryFields({
       session,
       wnumber: serialNumber,
+      serviceTime: clock(),
+      nonce: nonceFactory(),
     });
-    return telemetry.battery({ service, fields, ...(headers === undefined ? {} : { headers }) });
+    return telemetry.battery({ service, fields, headers: withRequestId(headers) });
   };
 
   const travelFields = ({
@@ -163,8 +180,8 @@ export const createNinebotCandidateSessionClient = ({
     rnVersion: session.rnVersion ?? "743",
     vehicle_type: asVehicleType(vehicleType),
     current_version: session.current_version ?? "610063322",
-    serviceTime: Date.now(),
-    nonce: generateNinebotNonce(),
+    serviceTime: clock(),
+    nonce: nonceFactory(),
   });
 
   const month = async ({
@@ -182,7 +199,7 @@ export const createNinebotCandidateSessionClient = ({
     return travel.month({
       fields,
       businessType: businessTypeFor(service),
-      ...(headers === undefined ? {} : { headers }),
+      headers: withRequestId(headers),
     });
   };
 
@@ -200,7 +217,7 @@ export const createNinebotCandidateSessionClient = ({
     return travel.detail({
       fields,
       businessType: businessTypeFor(service),
-      ...(headers === undefined ? {} : { headers }),
+      headers: withRequestId(headers),
     });
   };
 

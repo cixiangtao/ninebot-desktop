@@ -29,7 +29,14 @@ describe("candidate session client", () => {
         return { status: 500, headers: {}, body: new Uint8Array() };
       },
     };
-    const client = createNinebotCandidateSessionClient({ transport, platform: 2, session });
+    const client = createNinebotCandidateSessionClient({
+      transport,
+      platform: 2,
+      session,
+      clock: () => 1_725_000_000_000,
+      nonceFactory: () => "0123456789abcdef0123456789abcdef",
+      requestIdFactory: () => "fedcba9876543210fedcba9876543210",
+    });
     await expectUpstreamFailure(client.status({ service: "ebike", serialNumber: "SN1234567890" }));
     await expectUpstreamFailure(client.battery({ service: "ebike", serialNumber: "SN1234567890" }));
     await expectUpstreamFailure(client.listVehicles({ service: "ebike", vehicleType: 14363 }));
@@ -60,7 +67,10 @@ describe("candidate session client", () => {
     expect(requests[0]?.headers["business-type"]).toBe("2");
     expect(requests[3]?.headers["business-type"]).toBe("2");
     expect(requests[3]?.headers["rn-ver"]).toBe("743");
-    expect(requests[3]?.headers["service-time"]).toMatch(/^\d{13}$/);
+    expect(requests.every(({ headers }) => headers["service-time"] === "1725000000000")).toBe(true);
+    expect(
+      requests.every(({ headers }) => headers["request-id"] === "fedcba9876543210fedcba9876543210"),
+    ).toBe(true);
     expect(requests.every(({ body }) => body !== undefined && body.byteLength > 0)).toBe(true);
   });
 
