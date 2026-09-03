@@ -25,7 +25,7 @@ NINEBOT_CONFIG_DIR=/absolute/path/to/ninecli-config pnpm dev
 
 仓库正在把现有只读能力逐步迁移为 Node.js/TypeScript SDK。当前已经加入仅监听本机、默认不保存 Body 原文的协议记录器，以 ninecli 作为迁移期行为对照；使用方式、私有样本边界和实现顺序见[九号协议研究计划](docs/PROTOCOL_RESEARCH.md)。
 
-迁移期可以分别试用 Node 候选数据源：`NINEBOT_VEHICLE_SOURCE=candidate` 试用车辆列表，`NINEBOT_TELEMETRY_SOURCE=candidate` 试用车辆状态/电池，`NINEBOT_TRAVEL_SOURCE=candidate` 试用骑行月度/详情。三个开关都默认关闭，且候选失败时回退 ninecli。travel 候选会优先从本地 `vehicles.json` 读取私有 `vehicle_type` 模型码；缓存缺少该字段时，只在内存中向 ninecli 的 `vehicles` 输出补齐，不会改写缓存或猜测模型值。
+迁移期可以试用 Node 候选数据源：`NINEBOT_SOURCE=candidate` 会同时启用车辆列表、车辆状态/电池和骑行月度/详情；也可以继续分别设置 `NINEBOT_VEHICLE_SOURCE`、`NINEBOT_TELEMETRY_SOURCE` 或 `NINEBOT_TRAVEL_SOURCE`。单域变量优先级更高，显式设为 `ninecli` 可在全域候选试用时关闭该域。所有开关默认关闭，且候选失败时回退 ninecli。travel 候选会优先从本地 `vehicles.json` 读取私有 `vehicle_type` 模型码；缓存缺少该字段时，只在内存中向 ninecli 的 `vehicles` 输出补齐，不会改写缓存或猜测模型值。
 
 SDK 根入口同时导出 `createNinebotCandidateSessionClient` 和 `createNinebotFetchCandidateSessionClient`，把同一份内存会话元数据适配为车辆列表、status、battery、月度和详情五类只读调用；fetch 工厂默认使用已验证的九号服务地址，也支持局部覆盖 origin（未覆盖的服务仍保留默认地址）和 fetch 实现。它不提供登录、令牌文件读写或车辆控制；调用方负责会话生命周期和凭据保护，退出登录时可调用返回对象的 `clear()` 阻止后续请求并释放会话引用，可通过 `@jiuhao/ninebot-client/candidate-session` 单独导入。协议回放或测试可注入 `clock`、`nonceFactory` 和 `requestIdFactory`，生产环境默认仍使用系统时间与安全随机值。
 
