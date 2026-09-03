@@ -17,8 +17,6 @@ const appDirectory = resolve(projectRoot, "release/win-unpacked");
 const executablePath = resolve(appDirectory, "韭号出行.exe");
 const resourcesPath = resolve(appDirectory, "resources");
 const asarPath = resolve(resourcesPath, "app.asar");
-const ninecliPath = resolve(resourcesPath, "runtime/ninecli/ninecli.exe");
-const expectedNinecliSha256 = "94338e423b1d5219a2f6bfeda9af34271b83814ef725220c2598676ac18d650e";
 const verifyArtifacts = process.argv.includes("--artifacts");
 
 const require = createRequire(import.meta.url);
@@ -57,11 +55,8 @@ const readPeMachine = async (path) => {
   }
 };
 
-await Promise.all([access(executablePath), access(asarPath), access(ninecliPath)]);
+await Promise.all([access(executablePath), access(asarPath)]);
 assert((await readPeMachine(executablePath)) === 0x8664, "Windows executable is not x64");
-assert((await readPeMachine(ninecliPath)) === 0x8664, "Bundled ninecli executable is not x64");
-const ninecliSha256 = await sha256(ninecliPath);
-assert(ninecliSha256 === expectedNinecliSha256, "Bundled ninecli binary hash does not match");
 
 const versionResult = await run(
   "pwsh.exe",
@@ -124,11 +119,7 @@ const summary = {
   signature: "unsigned",
   asarFiles: asarFiles.length,
   fuses: "hardened",
-  bundledNinecli: {
-    architecture: "x64",
-    sha256: ninecliSha256,
-    verified: true,
-  },
+  runtime: "typescript-sdk",
   thirdPartyNotices: true,
 };
 

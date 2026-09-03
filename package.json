@@ -18,11 +18,11 @@
   "type": "module",
   "main": "./out/main/index.js",
   "scripts": {
-    "dev": "pnpm run build:sdk && pnpm run prepare:ninecli-runtime && electron-vite dev",
+    "dev": "pnpm run build:sdk && electron-vite dev",
     "build": "pnpm run typecheck && electron-vite build",
     "build:sdk": "pnpm --filter @jiuhao/ninebot-client build",
     "typecheck:sdk:browser": "pnpm --filter @jiuhao/ninebot-client typecheck:browser",
-    "preview": "pnpm run build:sdk && pnpm run prepare:ninecli-runtime && electron-vite preview",
+    "preview": "pnpm run build:sdk && electron-vite preview",
     "prepare:ninecli-runtime": "node scripts/prepare-ninecli-runtime.mjs",
     "preprotocol:record": "pnpm run build:sdk",
     "protocol:record": "node scripts/protocol-recorder.ts",
@@ -38,10 +38,10 @@
     "test": "vitest run",
     "check": "pnpm run format:check && pnpm run lint && pnpm run typecheck && pnpm run typecheck:sdk:browser && pnpm run test",
     "qa:recovery": "pnpm run build && node scripts/qa-recovery.mjs",
-    "package:mac:dir": "pnpm run build && node scripts/qa-recovery.mjs && pnpm run prepare:ninecli-runtime -- --platform=darwin --arch=arm64 && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac dir --arm64 --publish never -c.mac.identity=- -c.mac.hardenedRuntime=false && node scripts/verify-package.mjs && node scripts/qa-packaged.mjs",
-    "package:mac:local": "pnpm run build && node scripts/qa-recovery.mjs && pnpm run prepare:ninecli-runtime -- --platform=darwin --arch=arm64 && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac dmg zip --arm64 --publish never -c.mac.identity=- -c.mac.hardenedRuntime=false && node scripts/verify-package.mjs --artifacts && node scripts/qa-packaged.mjs",
-    "package:win:local": "pnpm run build && pnpm run prepare:ninecli-runtime -- --platform=win32 --arch=x64 && electron-builder --win nsis zip --x64 --publish never && node scripts/verify-package-windows.mjs --artifacts && node scripts/qa-packaged.mjs && node scripts/qa-windows-installer.mjs",
-    "release:mac": "pnpm run check && pnpm run build && node scripts/qa-recovery.mjs && pnpm run prepare:ninecli-runtime -- --platform=darwin --arch=arm64 && electron-builder --mac dmg zip --arm64 --publish never -c.forceCodeSigning=true && node scripts/verify-package.mjs --release && node scripts/qa-packaged.mjs",
+    "package:mac:dir": "pnpm run build && node scripts/qa-recovery.mjs && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac dir --arm64 --publish never -c.mac.identity=- -c.mac.hardenedRuntime=false && node scripts/verify-package.mjs && node scripts/qa-packaged.mjs",
+    "package:mac:local": "pnpm run build && node scripts/qa-recovery.mjs && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac dmg zip --arm64 --publish never -c.mac.identity=- -c.mac.hardenedRuntime=false && node scripts/verify-package.mjs --artifacts && node scripts/qa-packaged.mjs",
+    "package:win:local": "pnpm run build && electron-builder --win nsis zip --x64 --publish never && node scripts/verify-package-windows.mjs --artifacts && node scripts/qa-packaged.mjs && node scripts/qa-windows-installer.mjs",
+    "release:mac": "pnpm run check && pnpm run build && node scripts/qa-recovery.mjs && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac dmg zip --arm64 --publish never -c.forceCodeSigning=true && node scripts/verify-package.mjs --release && node scripts/qa-packaged.mjs",
     "dist": "pnpm run package:mac:local"
   },
   "dependencies": {
@@ -87,16 +87,6 @@
       "out/**/*",
       "package.json",
       "THIRD_PARTY_NOTICES.md"
-    ],
-    "extraResources": [
-      {
-        "from": "build/generated/runtime",
-        "to": "runtime",
-        "filter": [
-          "ninecli/ninecli",
-          "ninecli/ninecli.exe"
-        ]
-      }
     ],
     "electronFuses": {
       "runAsNode": false,

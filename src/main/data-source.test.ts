@@ -8,43 +8,20 @@ describe("candidate source selection", () => {
     expect(isCandidateSourceEnabled({}, "travel")).toBe(true);
   });
 
-  it("enables all domains with the umbrella candidate switch", () => {
-    const environment = { NINEBOT_SOURCE: "candidate" };
-    expect(isCandidateSourceEnabled(environment, "vehicle")).toBe(true);
-    expect(isCandidateSourceEnabled(environment, "telemetry")).toBe(true);
-    expect(isCandidateSourceEnabled(environment, "travel")).toBe(true);
-  });
-
-  it("lets a domain-specific value override the umbrella switch", () => {
+  it("keeps every domain on the SDK even when legacy switches are present", () => {
     const environment = {
-      NINEBOT_SOURCE: "candidate",
+      NINEBOT_SOURCE: "ninecli",
       NINEBOT_TRAVEL_SOURCE: "ninecli",
+      NINEBOT_TELEMETRY_SOURCE: "unknown",
     };
-    expect(isCandidateSourceEnabled(environment, "vehicle")).toBe(true);
-    expect(isCandidateSourceEnabled(environment, "travel")).toBe(false);
-  });
-
-  it("fails closed when a domain-specific value is unknown", () => {
-    const environment = {
-      NINEBOT_SOURCE: "candidate",
-      NINEBOT_TRAVEL_SOURCE: "candidte",
-    };
-    expect(isCandidateSourceEnabled(environment, "travel")).toBe(false);
-  });
-
-  it("keeps unspecified domains on the SDK", () => {
-    const environment = { NINEBOT_TELEMETRY_SOURCE: "candidate" };
     expect(isCandidateSourceEnabled(environment, "vehicle")).toBe(true);
     expect(isCandidateSourceEnabled(environment, "telemetry")).toBe(true);
     expect(isCandidateSourceEnabled(environment, "travel")).toBe(true);
   });
 
   it("returns a stable renderer-safe source label", () => {
-    const environment = {
-      NINEBOT_SOURCE: "candidate",
-      NINEBOT_TRAVEL_SOURCE: "ninecli",
-    };
+    const environment = { NINEBOT_SOURCE: "ninecli" };
     expect(resolveCandidateSource(environment, "vehicle")).toBe("candidate");
-    expect(resolveCandidateSource(environment, "travel")).toBe("ninecli");
+    expect(resolveCandidateSource(environment, "travel")).toBe("candidate");
   });
 });
