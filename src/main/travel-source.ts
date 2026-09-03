@@ -120,12 +120,20 @@ export const createCandidateTravelReader = ({
   candidateClientFactory?: (session: NinebotCandidateSessionFields) => CandidateTravelClient;
 }): TravelReader => {
   const activeRequests = new Set<AbortController>();
+  let generation = 0;
   return {
-    clear: () => cancelCandidateRequests(activeRequests),
+    clear: () => {
+      generation += 1;
+      cancelCandidateRequests(activeRequests);
+    },
     async rides(serialNumber, month) {
+      const requestGeneration = generation;
       let requestController: AbortController | undefined;
       try {
         const context = await readContext(configDirectory, serialNumber, legacy.vehicles);
+        if (requestGeneration !== generation) {
+          throw new Error("Ninebot candidate request was cancelled");
+        }
         requestController = beginCandidateRequest(activeRequests);
         let candidateClient: CandidateTravelClient | undefined;
         try {
@@ -142,14 +150,18 @@ export const createCandidateTravelReader = ({
           candidateClient?.clear?.();
         }
       } catch (error) {
-        if (requestController?.signal.aborted) throw error;
+        if (requestGeneration !== generation || requestController?.signal.aborted) throw error;
         return legacy.rides(serialNumber, month);
       }
     },
     async rideDetail(serialNumber, travelId) {
+      const requestGeneration = generation;
       let requestController: AbortController | undefined;
       try {
         const context = await readContext(configDirectory, serialNumber, legacy.vehicles);
+        if (requestGeneration !== generation) {
+          throw new Error("Ninebot candidate request was cancelled");
+        }
         requestController = beginCandidateRequest(activeRequests);
         let candidateClient: CandidateTravelClient | undefined;
         try {
@@ -166,7 +178,7 @@ export const createCandidateTravelReader = ({
           candidateClient?.clear?.();
         }
       } catch (error) {
-        if (requestController?.signal.aborted) throw error;
+        if (requestGeneration !== generation || requestController?.signal.aborted) throw error;
         return legacy.rideDetail(serialNumber, travelId);
       }
     },

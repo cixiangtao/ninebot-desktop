@@ -58,9 +58,14 @@ export const createCandidateVehicleReader = ({
   candidateClientFactory?: (session: NinebotCandidateSessionFields) => CandidateVehicleClient;
 }): VehicleReader => {
   const activeRequests = new Set<AbortController>();
+  let generation = 0;
   return {
-    clear: () => cancelCandidateRequests(activeRequests),
+    clear: () => {
+      generation += 1;
+      cancelCandidateRequests(activeRequests);
+    },
     async vehicles() {
+      const requestGeneration = generation;
       let requestController: AbortController | undefined;
       try {
         const [session, cachedVehiclesValue] = await Promise.all([
@@ -69,6 +74,9 @@ export const createCandidateVehicleReader = ({
         ]);
         if (!isRecord(cachedVehiclesValue))
           throw new Error("Ninebot candidate vehicle cache is invalid");
+        if (requestGeneration !== generation) {
+          throw new Error("Ninebot candidate request was cancelled");
+        }
         let candidateClient: CandidateVehicleClient | undefined;
         try {
           candidateClient = candidateClientFactory(session);
@@ -112,6 +120,9 @@ export const createCandidateVehicleReader = ({
           const candidateRows: unknown[] = [];
           const seenVehicleKeys = new Set<string>();
           for (const { service, vehicleType } of grouped.values()) {
+            if (requestGeneration !== generation) {
+              throw new Error("Ninebot candidate request was cancelled");
+            }
             requestController = beginCandidateRequest(activeRequests);
             // Keep service-family requests sequential during migration to avoid bursting upstream.
             // eslint-disable-next-line no-await-in-loop
@@ -141,7 +152,7 @@ export const createCandidateVehicleReader = ({
           candidateClient?.clear?.();
         }
       } catch (error) {
-        if (requestController?.signal.aborted) throw error;
+        if (requestGeneration !== generation || requestController?.signal.aborted) throw error;
         return legacy.vehicles();
       }
     },

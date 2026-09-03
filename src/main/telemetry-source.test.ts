@@ -129,6 +129,36 @@ describe("candidate telemetry source", () => {
     await expect(pending).rejects.toThrow("candidate request was cancelled");
   });
 
+  it("does not start or fall back after clearing during session loading", async () => {
+    const configDirectory = await createSessionDirectory();
+    let candidateCalls = 0;
+    let legacyCalls = 0;
+    const reader = createCandidateTelemetryReader({
+      legacy: {
+        vehicleStatus: async () => {
+          legacyCalls += 1;
+          return { pwr: 1 };
+        },
+        battery: async () => ({ pwr: 1 }),
+      },
+      configDirectory,
+      candidateClientFactory: () => {
+        candidateCalls += 1;
+        return {
+          status: async () => ({ data: [{ pwr: 1 }] }),
+          battery: async () => ({ data: { electricity: 80 } }),
+        };
+      },
+    });
+
+    const pending = reader.vehicleStatus("SN1234567890");
+    reader.clear?.();
+
+    await expect(pending).rejects.toThrow("candidate request was cancelled");
+    expect(candidateCalls).toBe(0);
+    expect(legacyCalls).toBe(0);
+  });
+
   it("falls back independently when a candidate request fails", async () => {
     const configDirectory = await createSessionDirectory();
     const reader = createCandidateTelemetryReader({

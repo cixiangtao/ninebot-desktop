@@ -73,12 +73,20 @@ export const createCandidateTelemetryReader = ({
   candidateClientFactory?: (session: NinebotCandidateSessionFields) => CandidateTelemetryClient;
 }): VehicleTelemetryReader => {
   const activeRequests = new Set<AbortController>();
+  let generation = 0;
   return {
-    clear: () => cancelCandidateRequests(activeRequests),
+    clear: () => {
+      generation += 1;
+      cancelCandidateRequests(activeRequests);
+    },
     async vehicleStatus(serialNumber) {
+      const requestGeneration = generation;
       let requestController: AbortController | undefined;
       try {
         const context = await readContext(configDirectory, serialNumber);
+        if (requestGeneration !== generation) {
+          throw new Error("Ninebot candidate request was cancelled");
+        }
         requestController = beginCandidateRequest(activeRequests);
         let candidateClient: CandidateTelemetryClient | undefined;
         try {
@@ -93,14 +101,18 @@ export const createCandidateTelemetryReader = ({
           candidateClient?.clear?.();
         }
       } catch (error) {
-        if (requestController?.signal.aborted) throw error;
+        if (requestGeneration !== generation || requestController?.signal.aborted) throw error;
         return legacy.vehicleStatus(serialNumber);
       }
     },
     async battery(serialNumber) {
+      const requestGeneration = generation;
       let requestController: AbortController | undefined;
       try {
         const context = await readContext(configDirectory, serialNumber);
+        if (requestGeneration !== generation) {
+          throw new Error("Ninebot candidate request was cancelled");
+        }
         requestController = beginCandidateRequest(activeRequests);
         let candidateClient: CandidateTelemetryClient | undefined;
         try {
@@ -115,7 +127,7 @@ export const createCandidateTelemetryReader = ({
           candidateClient?.clear?.();
         }
       } catch (error) {
-        if (requestController?.signal.aborted) throw error;
+        if (requestGeneration !== generation || requestController?.signal.aborted) throw error;
         return legacy.battery(serialNumber);
       }
     },
