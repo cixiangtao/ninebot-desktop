@@ -142,6 +142,8 @@ Node 子路径另外提供 `decodeVehicleListResponseCandidateWithCodec`，将�
 
 `createNinebotVehicleCandidateCodec` 已实现带上下文的 `NinebotVehicleCodec` 合同：每次编码返回独立 keyData 上下文，响应解码只使用传回的对应上下文；它仍属于 Node 候选路径，尚未替换 Electron 默认 ninecli。
 
+`createNinebotVehicleCandidateClient` 在此合同之上补齐车辆列表的 Node 调用链：接收 `transport`、`VehicleListPlaintextFields` 和服务类型，内部完成明文校验、候选 envelope 构造、响应上下文传递及业务包装解析。它适合接入本地 recorder 或测试 transport，尚未绑定 Electron 默认数据源。
+
 从 ninecli 0.1.7 二进制静态数据中还识别出唯一一段 1024-bit RSA PKCS#1 公钥（指数 65537）。该公钥以 `@jiuhao/ninebot-client/rsa-node` 的 `ninebotCandidateRsaPublicKeyPem` 导出，供候选请求使用或显式覆盖；它不是私钥，也不代表请求已经完成服务端验证。公钥材料仍只服务于 Node 候选路径，默认 Electron 客户端继续使用内置 ninecli。
 
 车辆列表候选构造器和候选 codec 在未提供 `rsaPublicKey` 时会使用上述固定公钥；调用方仍可传入覆盖值做版本或环境差分。这个默认值只减少回放样板代码，不改变“候选、未服务端验证、不能替换默认 ninecli”的边界。

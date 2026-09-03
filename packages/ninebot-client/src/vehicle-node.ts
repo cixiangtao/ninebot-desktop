@@ -15,6 +15,8 @@ import {
   type DecodeVehicleListResponseWithCodecOptions,
   type NinebotVehicleCodec,
 } from "./vehicle-codec.ts";
+import { createNinebotVehicleClient } from "./vehicle-client.ts";
+import type { NinebotResponse, NinebotTransport } from "./transport.ts";
 
 /** Fields observed in the plaintext JSON sent before vehicle-list encryption. */
 export interface VehicleListPlaintextFields {
@@ -258,3 +260,41 @@ export const createNinebotVehicleCandidateCodec = ({
     });
   },
 });
+
+export interface CreateNinebotVehicleCandidateClientOptions extends CreateNinebotVehicleCandidateCodecOptions {
+  transport: NinebotTransport;
+  responseBodyDecoder?: (response: NinebotResponse) => Uint8Array | Promise<Uint8Array>;
+}
+
+export interface ListNinebotVehicleCandidateOptions {
+  service: "ebike" | "motor";
+  fields: VehicleListPlaintextFields;
+  headers?: Readonly<Record<string, string>>;
+}
+
+/**
+ * Creates a Node candidate client that builds and parses the complete vehicle-list flow.
+ *
+ * The transport remains injectable so a caller can use a local recorder or a real
+ * HTTP implementation. This helper is still a candidate boundary and does not
+ * change the Electron client's default ninecli implementation.
+ */
+export const createNinebotVehicleCandidateClient = ({
+  transport,
+  responseBodyDecoder,
+  ...codecOptions
+}: CreateNinebotVehicleCandidateClientOptions) => {
+  const codec = createNinebotVehicleCandidateCodec(codecOptions);
+  const client = createNinebotVehicleClient({
+    transport,
+    codec,
+    ...(responseBodyDecoder ? { responseBodyDecoder } : {}),
+  });
+  return {
+    async list<T = unknown>({ service, fields, headers = {} }: ListNinebotVehicleCandidateOptions) {
+      const plaintextBody = buildVehicleListPlaintextBody(fields);
+      const payload = await client.list({ service, plaintextBody, headers });
+      return parseVehicleListResponseCandidate<T>(payload);
+    },
+  };
+};

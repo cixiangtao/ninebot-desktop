@@ -1,8 +1,9 @@
-import { generateKeyPairSync } from "node:crypto";
+import { constants, generateKeyPairSync, privateDecrypt } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import {
   buildVehicleListEncryptedRequestCandidate,
   buildVehicleListPlaintextBody,
+  createNinebotVehicleCandidateClient,
   createNinebotVehicleCandidateCodec,
   decodeVehicleListResponseCandidate,
   decodeVehicleListResponseCandidateWithCodec,
@@ -11,10 +12,12 @@ import {
 import type { NinebotVehicleCodec } from "./vehicle-codec.ts";
 import {
   decodeNinebotBase64,
+  decryptAesCbcPkcs7,
   deriveNinebotKeyCandidate,
   encodeNinebotBase64,
   encryptAesCbcPkcs7,
 } from "./crypto-node.ts";
+import { parseNinebotEncryptedRequest } from "./crypto-envelope.ts";
 
 const fields = {
   sys_language: "zh_CN",
@@ -78,6 +81,75 @@ describe("Node vehicle request body candidate", () => {
     });
 
     expect(decodeNinebotBase64(result.envelope.k, "request k")).toHaveLength(128);
+  });
+
+  it("runs the candidate client through a complete local request/response loop", async () => {
+    const { publicKey, privateKey } = generateKeyPairSync("rsa", { modulusLength: 1024 });
+    const business = new TextEncoder().encode(
+      '{"code":0,"data":[{"wnumber":"demo"}],"desc":"ok","time_cost":4}',
+    );
+    const client = createNinebotVehicleCandidateClient({
+      platform: 2,
+      p: "100",
+      t: "1",
+      timeStamp: 1_725_000_000,
+      rsaPublicKey: publicKey.export({ type: "spki", format: "pem" }),
+      transport: {
+        async send(request) {
+          if (!request.body) throw new Error("missing request body");
+          const requestEnvelope = parseNinebotEncryptedRequest(request.body);
+          const kReq = new Uint8Array(
+            privateDecrypt(
+              { key: privateKey, padding: constants.RSA_PKCS1_PADDING },
+              decodeNinebotBase64(requestEnvelope.k, "request k"),
+            ),
+          );
+          const wrapper = JSON.parse(
+            new TextDecoder().decode(
+              decryptAesCbcPkcs7({
+                ciphertext: decodeNinebotBase64(requestEnvelope.d, "request d"),
+                key: kReq,
+              }),
+            ),
+          ) as {
+            keyDataOne: string;
+            keyDataTwo: string;
+            keyDataThree: string;
+            keyDataFour: string;
+          };
+          const responseKey = deriveNinebotKeyCandidate([
+            new TextEncoder().encode(wrapper.keyDataOne),
+            new TextEncoder().encode(wrapper.keyDataTwo),
+            new TextEncoder().encode(wrapper.keyDataThree),
+            new TextEncoder().encode(wrapper.keyDataFour),
+          ]);
+          const responsePlaintext = new TextEncoder().encode(
+            JSON.stringify({ data: encodeNinebotBase64(business), timeStamp: 1_725_000_000 }),
+          );
+          return {
+            status: 200,
+            headers: {},
+            body: new TextEncoder().encode(
+              JSON.stringify({
+                v: 1,
+                s: encodeNinebotBase64(new Uint8Array(128)),
+                r: encodeNinebotBase64(
+                  encryptAesCbcPkcs7({ plaintext: responsePlaintext, key: responseKey }),
+                ),
+              }),
+            ),
+          };
+        },
+      },
+    });
+
+    await expect(client.list({ service: "motor", fields })).resolves.toEqual({
+      code: 0,
+      data: [{ wnumber: "demo" }],
+      desc: "ok",
+      time_cost: 4,
+      extra: null,
+    });
   });
 
   it("parses the decrypted business response envelope", () => {
