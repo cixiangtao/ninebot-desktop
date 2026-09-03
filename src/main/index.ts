@@ -1,3 +1,4 @@
+import { access } from "node:fs/promises";
 import { join } from "node:path";
 import { app, BrowserWindow, dialog, Menu, protocol, session, shell } from "electron";
 import {
@@ -12,6 +13,7 @@ import { createCandidateTelemetryReader } from "./telemetry-source.js";
 import { createCandidateTravelReader } from "./travel-source.js";
 import { createCandidateVehicleReader } from "./vehicle-source.js";
 import { isCandidateSourceEnabled } from "./data-source.js";
+import { resolveNinebotConfigDirectory } from "./config-directory.js";
 
 protocol.registerSchemesAsPrivileged([
   {
@@ -109,8 +111,25 @@ app.whenReady().then(async () => {
     callback(false),
   );
   registerAppProtocol(join(import.meta.dirname, "../renderer"));
-  const configDirectory =
-    process.env.NINEBOT_CONFIG_DIR ?? join(app.getPath("userData"), "ninecli");
+  const userDataDirectory = app.getPath("userData");
+  const sdkDirectory = join(userDataDirectory, "ninebot");
+  const legacyDirectory = join(userDataDirectory, "ninecli");
+  const [sdkDirectoryExists, legacyDirectoryExists] = await Promise.all([
+    access(sdkDirectory).then(
+      () => true,
+      () => false,
+    ),
+    access(legacyDirectory).then(
+      () => true,
+      () => false,
+    ),
+  ]);
+  const configDirectory = resolveNinebotConfigDirectory({
+    explicitDirectory: process.env.NINEBOT_CONFIG_DIR,
+    userDataDirectory,
+    sdkDirectoryExists,
+    legacyDirectoryExists,
+  });
   const bundledBinaryPath = getBundledNineCliBinaryPath({
     appPath: app.getAppPath(),
     isPackaged: app.isPackaged,

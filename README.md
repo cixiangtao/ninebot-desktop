@@ -17,7 +17,7 @@ pnpm install
 pnpm dev
 ```
 
-默认登录信息保存在 Electron `userData/ninecli` 目录。开发时可以显式复用已有的 ninecli 配置目录：
+默认登录信息保存在 Electron `userData/ninebot` 目录。首次启动时如果检测到旧版 `userData/ninecli`，会继续使用该目录完成迁移；开发时也可以显式复用已有的 ninecli 配置目录：
 
 ```bash
 NINEBOT_CONFIG_DIR=/absolute/path/to/ninecli-config pnpm dev
