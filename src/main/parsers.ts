@@ -27,6 +27,13 @@ const asRecord = (value: unknown): JsonRecord | null => {
   return value as JsonRecord;
 };
 
+/** Unwraps the business envelope emitted by the travel candidate codec. */
+const unwrapTravelPayload = (value: unknown) => {
+  const record = asRecord(value);
+  const nested = asRecord(record?.data);
+  return nested && ("code" in (record ?? {}) || "desc" in (record ?? {})) ? nested : record;
+};
+
 const toNumber = (value: unknown, fallback = 0) => {
   const numeric = typeof value === "number" ? value : Number(value);
   return Number.isFinite(numeric) ? numeric : fallback;
@@ -352,8 +359,9 @@ export const parseRideMonth = (
   payload: unknown,
   requestedMonth: string,
 ): Omit<RideMonth, "rides"> & { rides: ParsedRide[] } => {
-  const record = asRecord(payload) ?? {};
-  const rides = parseRides(payload);
+  const normalizedPayload = unwrapTravelPayload(payload);
+  const record = normalizedPayload ?? {};
+  const rides = parseRides(normalizedPayload);
   const days = parseRideDays(record.detail, requestedMonth);
   const upstreamRideCount = toOptionalNonnegativeNumber(record.times);
   const upstreamMileageKm = toOptionalNonnegativeNumber(record.total_mileages);
@@ -405,7 +413,7 @@ export const parseRideDetail = (
   id: string,
   dayMileageKm: number | null = null,
 ): RideDetail => {
-  const record = asRecord(payload) ?? {};
+  const record = unwrapTravelPayload(payload) ?? {};
   const durationSeconds = toNumber(record.duration);
   const mileageKm = toNumber(record.mileages ?? record.mileage);
   const track = parseTrail(record.trail, durationSeconds);

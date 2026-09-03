@@ -156,6 +156,30 @@ describe("Ninebot response parsers", () => {
     expect(detail.batteryUsedPercent).toBe(6);
   });
 
+  it("accepts the travel candidate business wrapper for ride details", () => {
+    const detail = parseRideDetail(
+      {
+        code: 1,
+        desc: "ok",
+        data: {
+          speed: "71",
+          avg_speed: 0,
+          mileages: "12.6",
+          duration: 1529,
+          start_time: 100,
+          end_time: 1629,
+          trail: "116.1,39.1,0,1;116.2,39.2,70,1",
+        },
+      },
+      "ride-candidate",
+    );
+    expect(detail).toMatchObject({
+      id: "ride-candidate",
+      declaredMaxSpeed: 71,
+      sampledMaxSpeed: 70,
+    });
+  });
+
   it("parses monthly ride list rows", () => {
     expect(
       parseRides({
@@ -185,6 +209,37 @@ describe("Ninebot response parsers", () => {
         endTime: 1629,
       },
     ]);
+  });
+
+  it("accepts the travel candidate business wrapper for monthly rides", () => {
+    const parsed = parseRideMonth(
+      {
+        code: 1,
+        desc: "ok",
+        data: {
+          detail: [0, 4.2],
+          duration: 120,
+          ec: 8,
+          first_time: 1_735_689_600,
+          list: [
+            {
+              travel_id: "travel-candidate",
+              mileages: "4.2",
+              duration: 120,
+              speed: "53",
+              start_time: 1_735_689_600,
+              end_time: 1_735_689_720,
+            },
+          ],
+          month: "202608",
+          times: 1,
+          total_mileages: "4.2",
+        },
+      },
+      "202608",
+    );
+    expect(parsed.summary).toMatchObject({ month: "202608", rideCount: 1, mileageKm: 4.2 });
+    expect(parsed.rides[0]).toMatchObject({ travelId: "travel-candidate", declaredMaxSpeed: 53 });
   });
 
   it("preserves a consistent complete day mileage and rejects contradictory values", () => {
