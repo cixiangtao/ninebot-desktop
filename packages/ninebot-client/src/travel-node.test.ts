@@ -1,10 +1,14 @@
 import { generateKeyPairSync } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import {
+  buildTravelDetailEncryptedRequestCandidate,
+  buildTravelDetailPlaintextBody,
   buildTravelMonthEncryptedRequestCandidate,
   buildTravelMonthPlaintextBody,
   buildTravelCandidateHeaders,
+  decodeTravelDetailResponseCandidate,
   decodeTravelMonthResponseCandidate,
+  parseTravelDetailResponseCandidate,
   parseTravelMonthResponseCandidate,
 } from "./travel-node.ts";
 import {
@@ -35,6 +39,11 @@ const fields = {
   serviceTime: 1_725_000_000,
   nonce: "0123456789abcdef0123456789abcdef",
 } as const;
+
+const detailFields = {
+  ...fields,
+  travel_id: "travel-12345678901234567890",
+};
 
 describe("Node travel month candidate", () => {
   it("builds the observed ordered body with an uppercase MD5 checkcode", () => {
@@ -82,6 +91,19 @@ describe("Node travel month candidate", () => {
     expect(result.keyData.keyDataFour).toHaveLength(8);
   });
 
+  it("builds the observed detail body with travel_id instead of month pagination", () => {
+    const text = new TextDecoder().decode(buildTravelDetailPlaintextBody(detailFields));
+    expect(text).toContain('"vehicle_type":"14363","travel_id":"travel-12345678901234567890"');
+    expect(text).not.toContain('"month"');
+    expect(text).toMatch(/,"checkcode":"[0-9A-F]{32}"}$/);
+    expect(
+      buildTravelDetailEncryptedRequestCandidate({ fields: detailFields, platform: 2 }).envelope,
+    ).toMatchObject({
+      p: "101",
+      t: "0",
+    });
+  });
+
   it("parses the observed monthly aggregate and ride rows", () => {
     const parsed = parseTravelMonthResponseCandidate(
       new TextEncoder().encode(
@@ -124,6 +146,19 @@ describe("Node travel month candidate", () => {
       ),
     );
     expect(parsed).toMatchObject({ code: 1, desc: "ok", month: "202608", list: [] });
+  });
+
+  it("unwraps and preserves a single-ride detail payload", () => {
+    const parsed = parseTravelDetailResponseCandidate(
+      new TextEncoder().encode(
+        JSON.stringify({
+          code: 1,
+          desc: "ok",
+          data: { duration: 12, speed: "53", trail: "116.3,39.9,53" },
+        }),
+      ),
+    );
+    expect(parsed).toMatchObject({ code: 1, desc: "ok", duration: 12, speed: "53" });
   });
 
   it("decrypts and parses a candidate monthly response", () => {
@@ -169,5 +204,35 @@ describe("Node travel month candidate", () => {
       keyData: { ...request.keyData, ...keyData },
     });
     expect(result).toMatchObject({ month: "202608", times: 0, list: [] });
+  });
+
+  it("decrypts and parses a candidate detail response", () => {
+    const keyData = {
+      keyDataOne: "0123456789a",
+      keyDataTwo: "fedcba98765",
+      keyDataThree: "0011223344",
+      keyDataFour: "Ab3;_+x/",
+    };
+    const key = deriveNinebotKeyCandidate([
+      new TextEncoder().encode(keyData.keyDataOne),
+      new TextEncoder().encode(keyData.keyDataTwo),
+      new TextEncoder().encode(keyData.keyDataThree),
+      new TextEncoder().encode(keyData.keyDataFour),
+    ]);
+    const business = new TextEncoder().encode(
+      JSON.stringify({ code: 1, desc: "ok", data: { duration: 12, trail: "" } }),
+    );
+    const responseJson = new TextEncoder().encode(
+      JSON.stringify({ data: encodeNinebotBase64(business), timeStamp: 1_725_000_000 }),
+    );
+    const result = decodeTravelDetailResponseCandidate({
+      envelope: {
+        v: 101,
+        s: encodeNinebotBase64(new Uint8Array(128)),
+        r: encodeNinebotBase64(encryptAesCbcPkcs7({ plaintext: responseJson, key })),
+      },
+      keyData,
+    });
+    expect(result).toMatchObject({ code: 1, desc: "ok", duration: 12, trail: "" });
   });
 });

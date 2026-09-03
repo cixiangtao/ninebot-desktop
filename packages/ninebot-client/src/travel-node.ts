@@ -12,8 +12,11 @@ import type {
 import { ninebotCandidateRsaPublicKeyPem } from "./rsa-node.ts";
 import { ninebotVehicleCandidateProtocol } from "./vehicle-node.ts";
 
-/** Fields observed in the plaintext sent to the monthly travel endpoint. */
-export interface TravelMonthPlaintextFields {
+export const travelMonthPath = "/app-api/travel/v6/travel-list2" as const;
+export const travelDetailPath = "/app-api/travel/v6/travel-info" as const;
+
+/** Shared device/session fields sent to both travel endpoints. */
+export interface TravelCandidateHeaderFields {
   sys_language: string;
   client_ver: string;
   device_id: string;
@@ -26,14 +29,18 @@ export interface TravelMonthPlaintextFields {
   login_country: string;
   access_token: string;
   uid: string;
-  wnumber: string;
   rnVersion: string;
-  vehicle_type: string;
-  month: string;
-  page: string;
   current_version: string;
   serviceTime: number;
   nonce: string;
+}
+
+/** Fields observed in the plaintext sent to the monthly travel endpoint. */
+export interface TravelMonthPlaintextFields extends TravelCandidateHeaderFields {
+  wnumber: string;
+  vehicle_type: string;
+  month: string;
+  page: string;
 }
 
 const travelMonthPlaintextKeys = [
@@ -95,8 +102,103 @@ export const buildTravelMonthPlaintextBody = (fields: TravelMonthPlaintextFields
   return new TextEncoder().encode(JSON.stringify(body));
 };
 
+/** Fields observed in the plaintext sent to the single-ride travel endpoint. */
+export interface TravelDetailPlaintextFields extends TravelCandidateHeaderFields {
+  wnumber: string;
+  vehicle_type: string;
+  travel_id: string;
+}
+
+const travelDetailPlaintextKeys = [
+  "sys_language",
+  "client_ver",
+  "device_id",
+  "regionx",
+  "language",
+  "ostype",
+  "lang",
+  "platform_ver",
+  "platform",
+  "login_country",
+  "access_token",
+  "uid",
+  "wnumber",
+  "rnVersion",
+  "vehicle_type",
+  "travel_id",
+  "current_version",
+  "serviceTime",
+  "nonce",
+] as const satisfies readonly (keyof TravelDetailPlaintextFields)[];
+
+const assertTravelDetailPlaintextFields = (fields: TravelDetailPlaintextFields) => {
+  for (const key of travelDetailPlaintextKeys) {
+    const value = fields[key];
+    if (typeof value !== "string" && typeof value !== "number") {
+      throw new Error(`Ninebot travel detail request field ${key} is invalid`);
+    }
+    if (typeof value === "string" && value.length === 0) {
+      throw new Error(`Ninebot travel detail request field ${key} is empty`);
+    }
+  }
+  if (!Number.isSafeInteger(fields.serviceTime)) {
+    throw new Error("Ninebot travel detail request field serviceTime must be a safe integer");
+  }
+  if (!/^[0-9A-Fa-f]{32}$/.test(fields.nonce)) {
+    throw new Error("Ninebot travel detail request field nonce must be 32 hexadecimal characters");
+  }
+};
+
+/** Builds the observed ordered single-ride JSON and uppercase MD5 checkcode. */
+export const buildTravelDetailPlaintextBody = (fields: TravelDetailPlaintextFields) => {
+  assertTravelDetailPlaintextFields(fields);
+  const unsignedFields = Object.fromEntries(
+    travelDetailPlaintextKeys.map((key) => [key, fields[key]]),
+  ) as unknown as TravelDetailPlaintextFields;
+  const unsignedBody = JSON.stringify(unsignedFields);
+  const body = { ...unsignedFields, checkcode: computeNinebotBodyCheckcode(unsignedBody) };
+  return new TextEncoder().encode(JSON.stringify(body));
+};
+
+export interface BuildTravelDetailEncryptedRequestCandidateOptions {
+  fields: TravelDetailPlaintextFields;
+  platform: number;
+  p?: string;
+  t?: string;
+  timeStamp?: number;
+  /** Defaults to the public key embedded in ninecli 0.1.7. */
+  rsaPublicKey?: Uint8Array | string;
+}
+
+export interface TravelDetailEncryptedRequestCandidate {
+  envelope: NinebotEncryptedRequestEnvelope;
+  keyData: NinebotCandidateKeyData;
+}
+
+/** Builds a single-ride detail candidate and returns the response key context. */
+export const buildTravelDetailEncryptedRequestCandidate = ({
+  fields,
+  platform,
+  p = ninebotVehicleCandidateProtocol.p,
+  t = ninebotVehicleCandidateProtocol.t,
+  timeStamp,
+  rsaPublicKey,
+}: BuildTravelDetailEncryptedRequestCandidateOptions): TravelDetailEncryptedRequestCandidate => {
+  const material = generateNinebotCandidateRequestMaterial(
+    timeStamp === undefined ? { platform, p, t } : { platform, p, t, timeStamp },
+  );
+  return {
+    envelope: buildNinebotEncryptedRequestCandidate({
+      plaintextBody: buildTravelDetailPlaintextBody(fields),
+      material,
+      rsaPublicKey: rsaPublicKey ?? ninebotCandidateRsaPublicKeyPem,
+    }),
+    keyData: material.keyData,
+  };
+};
+
 export interface BuildTravelCandidateHeadersOptions {
-  fields: TravelMonthPlaintextFields;
+  fields: TravelCandidateHeaderFields;
   /** Ninebot business line: `1` for motor and `2` for ebike. */
   businessType: "1" | "2";
   requestId?: string;
@@ -266,3 +368,45 @@ export const decodeTravelMonthResponseCandidate = ({
   keyData: NinebotCandidateKeyData;
 }) =>
   parseTravelMonthResponseCandidate(decryptNinebotResponsePayloadCandidate({ envelope, keyData }));
+
+export interface TravelDetailResponseCandidate {
+  code: number | string | null;
+  desc: string | null;
+  [key: string]: unknown;
+}
+
+/** Parses the single-ride detail object, accepting travel-list2's business wrapper shape. */
+export const parseTravelDetailResponseCandidate = (
+  plaintext: Uint8Array,
+): TravelDetailResponseCandidate => {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(new TextDecoder().decode(plaintext));
+  } catch {
+    throw new Error("Ninebot travel detail response payload is not valid JSON");
+  }
+  const record = asRecord(parsed);
+  if (!record) throw new Error("Ninebot travel detail response payload is not a JSON object");
+  const nestedPayload = asRecord(record.data);
+  const isWrapped = nestedPayload !== null && ("code" in record || "desc" in record);
+  const payload = isWrapped ? nestedPayload : record;
+  const code = isWrapped ? readScalar(record, "code") : null;
+  const descValue = isWrapped ? record.desc : null;
+  if (descValue !== null && typeof descValue !== "string") {
+    throw new Error("Ninebot travel detail response field desc is invalid");
+  }
+  if ("trail" in payload && typeof payload.trail !== "string") {
+    throw new Error("Ninebot travel detail response field trail is invalid");
+  }
+  return { ...payload, code, desc: descValue };
+};
+
+/** Decrypts and parses one single-ride detail response with its request-specific key context. */
+export const decodeTravelDetailResponseCandidate = ({
+  envelope,
+  keyData,
+}: {
+  envelope: NinebotEncryptedResponseEnvelope;
+  keyData: NinebotCandidateKeyData;
+}) =>
+  parseTravelDetailResponseCandidate(decryptNinebotResponsePayloadCandidate({ envelope, keyData }));
