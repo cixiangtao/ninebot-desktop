@@ -248,6 +248,9 @@ export const parseTelemetryResponseCandidate = <TData = unknown, TExtra = unknow
   if (!record || !("data" in record)) {
     throw new Error("Ninebot telemetry response payload is not a business wrapper");
   }
+  if (record.desc !== undefined && record.desc !== null && typeof record.desc !== "string") {
+    throw new Error("Ninebot telemetry response field desc is invalid");
+  }
   return {
     code: readScalar(record, "code"),
     data: record.data as TData,

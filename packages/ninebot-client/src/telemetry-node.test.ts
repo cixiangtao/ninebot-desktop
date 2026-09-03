@@ -95,6 +95,14 @@ describe("Node telemetry candidate", () => {
     ).toMatchObject({ code: 1, data: { battery: 80 }, desc: "ok", extra: null });
   });
 
+  it("rejects a malformed business description instead of silently erasing it", () => {
+    expect(() =>
+      parseTelemetryResponseCandidate(
+        new TextEncoder().encode(JSON.stringify({ code: 1, data: [], desc: 200 })),
+      ),
+    ).toThrow("desc is invalid");
+  });
+
   it("provides typed status and battery response parsers without dropping unknown fields", () => {
     const status = parseVehicleStatusResponseCandidate(
       new TextEncoder().encode(
