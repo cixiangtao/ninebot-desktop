@@ -61,8 +61,9 @@ const parseSessionFile = (value: unknown): NinebotAuthSession => {
         })()
       : readExpiry(value.accessTokenValidity);
   if (expiresAtMs !== undefined) session.expiresAtMs = expiresAtMs;
-  if (value.refreshToken !== undefined) {
-    session.refreshToken = readText(value.refreshToken, "refreshToken");
+  const refreshToken = value.refreshToken ?? value.refresh_token;
+  if (refreshToken !== undefined) {
+    session.refreshToken = readText(refreshToken, "refreshToken");
   }
   return session;
 };

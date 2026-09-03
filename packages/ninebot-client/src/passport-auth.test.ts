@@ -63,6 +63,22 @@ describe("Passport password-login boundary", () => {
     ).toEqual({ accessToken: "access", refreshToken: "refresh", businessUid: "business" });
   });
 
+  it("preserves the optional uuid needed by business metadata bootstrap", () => {
+    expect(
+      parsePassportLoginSession({
+        access_token: "access",
+        refresh_token: "refresh",
+        business_uid: "business",
+        uuid: "0123456789abcdef0123456789abcdef",
+      }),
+    ).toMatchObject({
+      accessToken: "access",
+      refreshToken: "refresh",
+      businessUid: "business",
+      uuid: "0123456789abcdef0123456789abcdef",
+    });
+  });
+
   it("rejects a login response that cannot drive business requests", () => {
     expect(() => parsePassportLoginSession({ access_token: "access" })).toThrow(
       "refresh_token is invalid",

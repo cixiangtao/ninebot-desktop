@@ -70,6 +70,26 @@ describe("file-backed Ninebot auth session store", () => {
     });
   });
 
+  it("keeps legacy uuid and refresh metadata for business bootstrap", async () => {
+    const { directory, store } = await createStore();
+    await writeFile(
+      join(directory, "tokens.json"),
+      JSON.stringify({
+        access_token: "legacy-token",
+        business_uid: "legacy-uid",
+        uuid: "legacy-uuid",
+        refresh_token: "legacy-refresh",
+      }),
+    );
+
+    await expect(store.load()).resolves.toMatchObject({
+      accessToken: "legacy-token",
+      businessUid: "legacy-uid",
+      uuid: "legacy-uuid",
+      refreshToken: "legacy-refresh",
+    });
+  });
+
   it("clears only the new session file", async () => {
     const { directory, store } = await createStore();
     await store.save({ accessToken: "token", businessUid: "uid" });
