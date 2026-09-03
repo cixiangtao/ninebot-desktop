@@ -78,6 +78,8 @@ export interface CreateNinebotFetchCandidateSessionClientOptions extends Omit<
   origins?: FetchNinebotTransportOptions["origins"];
   /** Optional fetch implementation for tests, proxies, or alternate Node runtimes. */
   fetch?: typeof globalThis.fetch;
+  /** Optional upper bound for one fetch call, in milliseconds. */
+  timeoutMs?: FetchNinebotTransportOptions["timeoutMs"];
 }
 
 export interface CandidateServiceRequestOptions {
@@ -312,6 +314,7 @@ export const createNinebotCandidateSessionClient = ({
 export const createNinebotFetchCandidateSessionClient = ({
   origins = defaultNinebotCandidateOrigins,
   fetch: fetchImpl,
+  timeoutMs,
   ...options
 }: CreateNinebotFetchCandidateSessionClientOptions): NinebotCandidateSessionClient =>
   createNinebotCandidateSessionClient({
@@ -319,5 +322,6 @@ export const createNinebotFetchCandidateSessionClient = ({
     transport: createFetchNinebotTransport({
       origins: { ...defaultNinebotCandidateOrigins, ...origins },
       ...(fetchImpl === undefined ? {} : { fetch: fetchImpl }),
+      ...(timeoutMs === undefined ? {} : { timeoutMs }),
     }),
   });
