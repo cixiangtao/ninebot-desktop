@@ -141,7 +141,7 @@ export const createNinebotPassportLoginClient = ({
       if (!isSuccessCode(envelope.resultCode)) {
         throw new PassportLoginBusinessError(envelope.resultCode, envelope.resultDesc);
       }
-      return parsePassportRefreshSession(envelope.data, session.businessUid);
+      return parsePassportRefreshSession(envelope.data, session.businessUid, session.uuid);
     },
     async whoami<T = unknown>(session: NinebotAuthSession): Promise<T> {
       const request = await buildWhoamiPassportRequest({

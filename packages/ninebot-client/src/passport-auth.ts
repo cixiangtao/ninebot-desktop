@@ -361,6 +361,7 @@ export const parsePassportLoginSession = (data: unknown): NinebotAuthSession => 
 export const parsePassportRefreshSession = (
   data: unknown,
   previousBusinessUid: string,
+  previousUuid?: string,
 ): NinebotAuthSession => {
   if (!previousBusinessUid.trim()) throw new Error("Ninebot passport business uid is invalid");
   if (!data || typeof data !== "object" || Array.isArray(data)) {
@@ -372,7 +373,11 @@ export const parsePassportRefreshSession = (
     accessToken: requireText(record.access_token, "access_token"),
     refreshToken: requireText(record.refresh_token, "refresh_token"),
     businessUid: requireText(record.business_uid ?? previousBusinessUid, "business_uid"),
-    ...(record.uuid === undefined ? {} : { uuid: requireText(record.uuid, "uuid") }),
+    ...(record.uuid === undefined
+      ? previousUuid === undefined
+        ? {}
+        : { uuid: previousUuid }
+      : { uuid: requireText(record.uuid, "uuid") }),
     ...(expiresAtMs === undefined ? {} : { expiresAtMs }),
   };
 };

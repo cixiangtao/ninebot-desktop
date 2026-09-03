@@ -4,6 +4,7 @@ import {
   buildPassportCanonicalString,
   defaultPassportClientKey,
   parsePassportLoginSession,
+  parsePassportRefreshSession,
 } from "./passport-auth.ts";
 
 describe("Passport password-login boundary", () => {
@@ -74,6 +75,21 @@ describe("Passport password-login boundary", () => {
     ).toMatchObject({
       accessToken: "access",
       refreshToken: "refresh",
+      businessUid: "business",
+      uuid: "0123456789abcdef0123456789abcdef",
+    });
+  });
+
+  it("retains the previous uuid when refresh omits it", () => {
+    expect(
+      parsePassportRefreshSession(
+        { access_token: "next-access", refresh_token: "next-refresh" },
+        "business",
+        "0123456789abcdef0123456789abcdef",
+      ),
+    ).toMatchObject({
+      accessToken: "next-access",
+      refreshToken: "next-refresh",
       businessUid: "business",
       uuid: "0123456789abcdef0123456789abcdef",
     });
