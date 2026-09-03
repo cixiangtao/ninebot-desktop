@@ -28,11 +28,17 @@ From the repository root:
 
 ```sh
 pnpm --filter @jiuhao/ninebot-client build
+pnpm --filter @jiuhao/ninebot-client typecheck:browser
 ```
 
 The generated declaration and JavaScript files are written to this package's
 `dist/` directory. The package is not published by the current release
 workflow.
+
+`typecheck:browser` compiles only `candidate-contracts` and
+`candidate-session-core` against the DOM library with Node types excluded. It
+is a boundary check for the platform-neutral layer, not proof that a browser
+crypto provider has been implemented.
 
 ## Minimal usage
 

@@ -92,6 +92,11 @@ pnpm package:mac:local
 pnpm package:win:local
 ```
 
+`pnpm check` also runs the SDK's DOM-only `typecheck:browser` gate, ensuring
+the platform-neutral session core remains importable without Node crypto
+types. This does not imply that the browser or mobile encryption provider is
+already available.
+
 `package:mac:local` 会生成 DMG 和 ZIP，`package:win:local` 会生成 NSIS 安装程序和 ZIP；两者都会从成品启动自动化冒烟，但都不是正式签名包。Windows 打包与验收必须在 Windows x64 上运行。
 
 ## 源码许可
