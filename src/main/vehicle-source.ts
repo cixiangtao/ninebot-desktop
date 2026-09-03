@@ -5,6 +5,7 @@ import {
   readCandidateService,
   readCandidateVehicles,
   type CandidateService,
+  writeCandidateVehicles,
 } from "./candidate-context.js";
 import { createCandidateSessionClient } from "./candidate-client.js";
 import type { NineCliClient } from "./ninecli.js";
@@ -138,6 +139,8 @@ export const createCandidateVehicleReader = ({
               candidateRows.push(row);
             }
           }
+          const cachedValue = { vehicles: candidateRows };
+          await writeCandidateVehicles(configDirectory, cachedValue);
           return candidateRows;
         } finally {
           candidateClient?.clear?.();

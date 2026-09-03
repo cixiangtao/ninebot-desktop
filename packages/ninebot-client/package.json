@@ -89,6 +89,14 @@
       "types": "./dist/session-store-node.d.ts",
       "import": "./dist/session-store-node.js"
     },
+    "./device-store-node": {
+      "types": "./dist/device-store-node.d.ts",
+      "import": "./dist/device-store-node.js"
+    },
+    "./vehicle-cache-node": {
+      "types": "./dist/vehicle-cache-node.d.ts",
+      "import": "./dist/vehicle-cache-node.js"
+    },
     "./candidate-contracts": {
       "types": "./dist/candidate-contracts.d.ts",
       "import": "./dist/candidate-contracts.js"

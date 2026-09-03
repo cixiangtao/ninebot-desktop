@@ -145,6 +145,17 @@ export type {
 } from "./auth.ts";
 export { createFileNinebotAuthSessionStore } from "./session-store-node.ts";
 export type { FileNinebotAuthSessionStoreOptions } from "./session-store-node.ts";
+export { createFileNinebotDeviceContextStore } from "./device-store-node.ts";
+export type {
+  FileNinebotDeviceContextStoreOptions,
+  NinebotDeviceContext,
+  NinebotDeviceContextStore,
+} from "./device-store-node.ts";
+export { createFileNinebotVehicleCacheStore } from "./vehicle-cache-node.ts";
+export type {
+  FileNinebotVehicleCacheStoreOptions,
+  NinebotVehicleCacheStore,
+} from "./vehicle-cache-node.ts";
 export {
   buildPasswordLoginRequest,
   buildRefreshRequest,

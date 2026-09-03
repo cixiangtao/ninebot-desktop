@@ -1,6 +1,10 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { NinebotCandidateSessionFields } from "@jiuhao/ninebot-client/candidate-session";
+import {
+  createFileNinebotDeviceContextStore,
+  createFileNinebotVehicleCacheStore,
+} from "@jiuhao/ninebot-client";
 
 export type CandidateService = "ebike" | "motor";
 
@@ -37,9 +41,12 @@ export const createCandidateRequestTracker = (): CandidateRequestTracker => {
 
 interface CandidateConfig {
   device_id: string;
+  deviceId?: string;
   region: string;
   os_version: string;
+  osVersion?: string;
   os_model: string;
+  osModel?: string;
 }
 
 interface CandidateTokens {
@@ -91,14 +98,14 @@ export const readCandidateSession = async (
   configDirectory: string,
 ): Promise<NinebotCandidateSessionFields> => {
   const [configValue, authSessionValue] = await Promise.all([
-    readJson(join(configDirectory, "config.json")),
+    createFileNinebotDeviceContextStore({ directory: configDirectory }).load(),
     readJsonIfPresent(join(configDirectory, "auth-session.json")),
   ]);
   const tokensValue = authSessionValue ?? (await readJson(join(configDirectory, "tokens.json")));
   if (!isRecord(configValue) || !isRecord(tokensValue)) {
     throw new Error("Ninebot candidate session files are invalid");
   }
-  const config = configValue as Partial<CandidateConfig>;
+  const config = configValue as unknown as Partial<CandidateConfig>;
   const tokens = tokensValue as Partial<CandidateTokens> & {
     accessToken?: unknown;
     businessUid?: unknown;
@@ -106,12 +113,12 @@ export const readCandidateSession = async (
   return {
     sys_language: "zh-hans-cn",
     client_ver: "610063322",
-    device_id: requireText(config.device_id, "candidate device_id"),
+    device_id: requireText(config.deviceId ?? config.device_id, "candidate device_id"),
     regionx: requireText(config.region, "candidate region"),
     language: "zh",
     ostype: "and",
     lang: "zh",
-    platform_ver: `${requireText(config.os_version, "candidate os_version")} ${requireText(config.os_model, "candidate os_model")}`,
+    platform_ver: `${requireText(config.osVersion ?? config.os_version, "candidate os_version")} ${requireText(config.osModel ?? config.os_model, "candidate os_model")}`,
     platform: "android",
     login_country: "CN",
     access_token: requireText(tokens.accessToken ?? tokens.access_token, "candidate access_token"),
@@ -121,4 +128,12 @@ export const readCandidateSession = async (
 
 /** Reads the cached vehicle metadata needed to resolve a candidate service. */
 export const readCandidateVehicles = async (configDirectory: string): Promise<unknown> =>
-  readJson(join(configDirectory, "vehicles.json"));
+  (await createFileNinebotVehicleCacheStore({ directory: configDirectory }).load()) ??
+  (() => {
+    throw new Error("Ninebot candidate vehicle cache is unavailable");
+  })();
+
+/** Stores only the SDK vehicle metadata needed to resolve service families and model codes. */
+export const writeCandidateVehicles = async (configDirectory: string, value: unknown) => {
+  await createFileNinebotVehicleCacheStore({ directory: configDirectory }).save(value);
+};
