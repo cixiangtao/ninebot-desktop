@@ -170,6 +170,13 @@ export const SecuritySheet = ({
                 tone="good"
               />
               <SecurityRow
+                icon={<Database size={18} />}
+                label="候选数据源"
+                value={`${Object.values(status.candidate.domains).filter((source) => source === "candidate").length}/3 已启用`}
+                hint="只显示启用数量；未启用域继续使用默认读取路径"
+                tone="good"
+              />
+              <SecurityRow
                 icon={<Binary size={18} />}
                 label="本地数据运行环境"
                 value={binaryStatusLabels[status.binary.status]}

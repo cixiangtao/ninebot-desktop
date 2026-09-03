@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isCandidateSourceEnabled } from "./data-source.js";
+import { isCandidateSourceEnabled, resolveCandidateSource } from "./data-source.js";
 
 describe("candidate source selection", () => {
   it("keeps every domain on ninecli by default", () => {
@@ -37,5 +37,14 @@ describe("candidate source selection", () => {
     expect(isCandidateSourceEnabled(environment, "vehicle")).toBe(false);
     expect(isCandidateSourceEnabled(environment, "telemetry")).toBe(true);
     expect(isCandidateSourceEnabled(environment, "travel")).toBe(false);
+  });
+
+  it("returns a stable renderer-safe source label", () => {
+    const environment = {
+      NINEBOT_SOURCE: "candidate",
+      NINEBOT_TRAVEL_SOURCE: "ninecli",
+    };
+    expect(resolveCandidateSource(environment, "vehicle")).toBe("candidate");
+    expect(resolveCandidateSource(environment, "travel")).toBe("ninecli");
   });
 });

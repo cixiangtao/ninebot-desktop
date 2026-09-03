@@ -4,6 +4,7 @@ import { constants } from "node:fs";
 import { access, chmod, mkdir, readFile, rm, stat } from "node:fs/promises";
 import { basename, join } from "node:path";
 import { candidateRequestTimeoutMs } from "./candidate-client.js";
+import { resolveCandidateSource } from "./data-source.js";
 
 export const ninecliVersion = "0.1.7";
 const commandTimeoutMs = 45_000;
@@ -61,6 +62,11 @@ export interface RuntimeSecurityStatus {
   version: string;
   candidate: {
     requestTimeoutMs: number;
+    domains: {
+      vehicle: "candidate" | "ninecli";
+      telemetry: "candidate" | "ninecli";
+      travel: "candidate" | "ninecli";
+    };
   };
   binary: {
     status: "verified" | "mismatch" | "unsupported" | "unavailable";
@@ -341,6 +347,11 @@ export class NineCliClient {
       version: ninecliVersion,
       candidate: {
         requestTimeoutMs: candidateRequestTimeoutMs,
+        domains: {
+          vehicle: resolveCandidateSource(process.env, "vehicle"),
+          telemetry: resolveCandidateSource(process.env, "telemetry"),
+          travel: resolveCandidateSource(process.env, "travel"),
+        },
       },
       binary: {
         status: binaryStatus,

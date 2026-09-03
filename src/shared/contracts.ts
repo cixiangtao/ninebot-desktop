@@ -66,6 +66,11 @@ export interface RuntimeSecurityStatus {
   version: string;
   candidate: {
     requestTimeoutMs: number;
+    domains: {
+      vehicle: "candidate" | "ninecli";
+      telemetry: "candidate" | "ninecli";
+      travel: "candidate" | "ninecli";
+    };
   };
   binary: {
     status: "verified" | "mismatch" | "unsupported" | "unavailable";

@@ -7,6 +7,11 @@ const status: RuntimeSecurityStatus = {
   version: "0.1.7",
   candidate: {
     requestTimeoutMs: 15_000,
+    domains: {
+      vehicle: "ninecli",
+      telemetry: "candidate",
+      travel: "ninecli",
+    },
   },
   binary: {
     status: "verified",
@@ -55,6 +60,7 @@ describe("SecuritySheet", () => {
     expect(markup).toContain("本地数据运行环境");
     expect(markup).toContain("候选读取等待上限");
     expect(markup).toContain("15 秒");
+    expect(markup).toContain("1/3 已启用");
     expect(markup).toContain("只读白名单");
     expect(markup).not.toContain("ninecli");
     expect(markup).not.toContain(status.version);

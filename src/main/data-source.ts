@@ -1,4 +1,5 @@
 export type CandidateSourceDomain = "vehicle" | "telemetry" | "travel";
+export type CandidateSource = "candidate" | "ninecli";
 
 type SourceEnvironment = Readonly<Record<string, string | undefined>>;
 
@@ -14,3 +15,9 @@ export const isCandidateSourceEnabled = (
   if (domainValue !== undefined) return domainValue === "candidate";
   return environment.NINEBOT_SOURCE === "candidate";
 };
+
+/** Resolves the renderer-safe source label for one domain. */
+export const resolveCandidateSource = (
+  environment: SourceEnvironment,
+  domain: CandidateSourceDomain,
+): CandidateSource => (isCandidateSourceEnabled(environment, domain) ? "candidate" : "ninecli");
