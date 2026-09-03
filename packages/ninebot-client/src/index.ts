@@ -153,6 +153,17 @@ export type {
   PassportSigningInput,
 } from "./passport-auth.ts";
 export {
+  createNinebotPassportLoginClient,
+  PassportLoginBusinessError,
+  PassportLoginHttpError,
+} from "./passport-login-client.ts";
+export type {
+  NinebotPassportLoginClient,
+  PassportLoginClientOptions,
+  PassportResponse,
+  PassportTransport,
+} from "./passport-login-client.ts";
+export {
   createNinebotCandidateSessionClient,
   createNinebotFetchCandidateSessionClient,
   defaultNinebotCandidateOrigins,
