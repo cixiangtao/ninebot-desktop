@@ -58,8 +58,10 @@ export type {
 } from "./vehicle-client.ts";
 export {
   buildTelemetryCandidateHeaders,
+  buildVehicleBatteryFields,
   buildVehicleBatteryEncryptedRequestCandidate,
   buildVehicleBatteryPlaintextBody,
+  buildVehicleStatusFields,
   buildVehicleStatusEncryptedRequestCandidate,
   buildVehicleStatusPlaintextBody,
   createNinebotTelemetryCandidateClient,
@@ -75,8 +77,11 @@ export {
 export type {
   BuildTelemetryCandidateHeadersOptions,
   BuildTelemetryEncryptedRequestCandidateOptions,
+  BuildVehicleBatteryFieldsOptions,
+  BuildVehicleStatusFieldsOptions,
   CreateNinebotTelemetryCandidateClientOptions,
   TelemetryCandidateHeaderFields,
+  TelemetryCandidateSessionFields,
   TelemetryResponseCandidate,
   VehicleBatteryCandidateRecord,
   VehicleBatteryPackCandidate,

@@ -44,6 +44,26 @@ export interface VehicleBatteryPlaintextFields extends TelemetryCandidateHeaderF
   wnumber: string;
 }
 
+/** Session/device fields shared by both telemetry requests before per-request values are added. */
+export type TelemetryCandidateSessionFields = Omit<
+  TelemetryCandidateHeaderFields,
+  "serviceTime" | "nonce"
+>;
+
+export interface BuildVehicleStatusFieldsOptions {
+  session: TelemetryCandidateSessionFields;
+  sn_str: string;
+  serviceTime?: number;
+  nonce?: string;
+}
+
+export interface BuildVehicleBatteryFieldsOptions {
+  session: TelemetryCandidateSessionFields;
+  wnumber: string;
+  serviceTime?: number;
+  nonce?: string;
+}
+
 const telemetryBaseKeys = [
   "sys_language",
   "client_ver",
@@ -73,6 +93,16 @@ const assertTelemetryBaseFields = (fields: TelemetryCandidateHeaderFields) => {
     throw new Error("Ninebot telemetry request field nonce must be 32 hexadecimal characters");
   }
 };
+
+const buildTelemetryHeaderFields = ({
+  session,
+  serviceTime = Math.floor(Date.now() / 1000),
+  nonce = generateNinebotNonce(),
+}: {
+  session: TelemetryCandidateSessionFields;
+  serviceTime?: number;
+  nonce?: string;
+}): TelemetryCandidateHeaderFields => ({ ...session, serviceTime, nonce });
 
 const buildTelemetryBody = <T extends TelemetryCandidateHeaderFields>(
   fields: T,
@@ -106,6 +136,36 @@ export const buildVehicleStatusPlaintextBody = (fields: VehicleStatusPlaintextFi
 /** Builds the observed battery request body and uppercase MD5 checkcode. */
 export const buildVehicleBatteryPlaintextBody = (fields: VehicleBatteryPlaintextFields) =>
   buildTelemetryBody(fields, batteryKeys, "battery");
+
+/** Builds validated status fields from one session and a vehicle serial number. */
+export const buildVehicleStatusFields = ({
+  session,
+  sn_str,
+  serviceTime,
+  nonce,
+}: BuildVehicleStatusFieldsOptions): VehicleStatusPlaintextFields => ({
+  ...buildTelemetryHeaderFields({
+    session,
+    ...(serviceTime === undefined ? {} : { serviceTime }),
+    ...(nonce === undefined ? {} : { nonce }),
+  }),
+  sn_str,
+});
+
+/** Builds validated battery fields from one session and a vehicle serial number. */
+export const buildVehicleBatteryFields = ({
+  session,
+  wnumber,
+  serviceTime,
+  nonce,
+}: BuildVehicleBatteryFieldsOptions): VehicleBatteryPlaintextFields => ({
+  ...buildTelemetryHeaderFields({
+    session,
+    ...(serviceTime === undefined ? {} : { serviceTime }),
+    ...(nonce === undefined ? {} : { nonce }),
+  }),
+  wnumber,
+});
 
 export interface BuildTelemetryEncryptedRequestCandidateOptions {
   plaintextBody: Uint8Array;

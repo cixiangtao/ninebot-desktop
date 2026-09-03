@@ -2,7 +2,9 @@ import { constants, generateKeyPairSync, privateDecrypt } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import {
   buildTelemetryCandidateHeaders,
+  buildVehicleBatteryFields,
   buildVehicleBatteryPlaintextBody,
+  buildVehicleStatusFields,
   buildVehicleStatusPlaintextBody,
   createNinebotTelemetryCandidateClient,
   decodeVehicleBatteryResponseCandidate,
@@ -41,6 +43,7 @@ const common = {
 
 const statusFields = { ...common, sn_str: "SN1234567890" } as const;
 const batteryFields = { ...common, wnumber: "SN1234567890" } as const;
+const sessionFields = { ...common } as Omit<typeof common, "serviceTime" | "nonce">;
 
 describe("Node telemetry candidate", () => {
   it("builds ordered status and battery bodies with uppercase checkcodes", () => {
@@ -50,6 +53,25 @@ describe("Node telemetry candidate", () => {
     expect(battery).toContain('"uid":"12345678","wnumber":"SN1234567890","serviceTime":1725000000');
     expect(status).toMatch(/,"checkcode":"[0-9A-F]{32}"}$/);
     expect(battery).toMatch(/,"checkcode":"[0-9A-F]{32}"}$/);
+  });
+
+  it("builds both request field shapes from shared session metadata", () => {
+    expect(
+      buildVehicleStatusFields({
+        session: sessionFields,
+        sn_str: "SN1234567890",
+        serviceTime: 1_725_000_000,
+        nonce: common.nonce,
+      }),
+    ).toEqual(statusFields);
+    expect(
+      buildVehicleBatteryFields({
+        session: sessionFields,
+        wnumber: "SN1234567890",
+        serviceTime: 1_725_000_000,
+        nonce: common.nonce,
+      }),
+    ).toEqual(batteryFields);
   });
 
   it("maps observed telemetry headers and service business type", () => {
