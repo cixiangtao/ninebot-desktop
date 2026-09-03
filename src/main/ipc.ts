@@ -295,6 +295,13 @@ export const registerIpcHandlers = (
     rideMonthCache.clear();
     rideDetailCache.clear();
   };
+  const clearSessionState = (resetRideSequence = false) => {
+    serialNumbers.clear();
+    travelIds.clear();
+    rideIdsByUpstream.clear();
+    clearReadCaches();
+    if (resetRideSequence) rideSequence = 0;
+  };
 
   ipcMain.handle(ipcChannels.authStatus, async (): Promise<BridgeResult<AuthStatus>> => {
     try {
@@ -320,6 +327,7 @@ export const registerIpcHandlers = (
       try {
         const { areaCode, user, password } = passwordLoginSchema.parse(input);
         await client.login(user, areaCode, password);
+        clearSessionState(true);
         return ok({ connected: true });
       } catch (error) {
         return handleError(error);
@@ -346,6 +354,7 @@ export const registerIpcHandlers = (
       try {
         const { areaCode, phone, code } = smsCodeLoginSchema.parse(input);
         await client.loginWithSmsCode(phone, areaCode, code);
+        clearSessionState(true);
         return ok({ connected: true });
       } catch (error) {
         return handleError(error);
@@ -356,10 +365,7 @@ export const registerIpcHandlers = (
   ipcMain.handle(ipcChannels.authLogout, async (): Promise<BridgeResult<AuthStatus>> => {
     try {
       await client.logout();
-      serialNumbers.clear();
-      travelIds.clear();
-      rideIdsByUpstream.clear();
-      clearReadCaches();
+      clearSessionState(true);
       return ok({ connected: false });
     } catch (error) {
       return handleError(error);
@@ -380,10 +386,7 @@ export const registerIpcHandlers = (
   ipcMain.handle(ipcChannels.listVehicles, async (): Promise<BridgeResult<VehicleSummary[]>> => {
     try {
       const vehicles = parseVehicles(await vehicleReader.vehicles());
-      serialNumbers.clear();
-      travelIds.clear();
-      rideIdsByUpstream.clear();
-      clearReadCaches();
+      clearSessionState();
       const summaries = vehicles.map(({ serialNumber, ...vehicle }, index) => {
         const id = `vehicle-${index + 1}`;
         serialNumbers.set(id, serialNumber);
