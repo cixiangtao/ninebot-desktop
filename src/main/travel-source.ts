@@ -8,7 +8,6 @@ import {
   type CandidateService,
 } from "./candidate-context.js";
 import { createCandidateSessionClient } from "./candidate-client.js";
-import type { NineCliClient } from "./ninecli.js";
 
 export type CandidateTravelService = CandidateService;
 
@@ -54,9 +53,11 @@ interface CandidateTravelContext {
   session: NinebotCandidateSessionFields;
 }
 
-type LegacyTravelClient = Pick<NineCliClient, "rides" | "rideDetail"> & {
+interface LegacyTravelClient {
+  rides(serialNumber: string, month: string): Promise<unknown>;
+  rideDetail(serialNumber: string, travelId: string): Promise<unknown>;
   vehicles?: () => Promise<unknown>;
-};
+}
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === "object" && !Array.isArray(value);

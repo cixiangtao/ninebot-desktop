@@ -9,7 +9,6 @@ import {
   writeCandidateVehicles,
 } from "./candidate-context.js";
 import { createCandidateSessionClient } from "./candidate-client.js";
-import type { NineCliClient } from "./ninecli.js";
 
 export type CandidateVehicleService = CandidateService;
 
@@ -38,6 +37,11 @@ interface CachedVehicles {
   vehicles?: VehicleRow[];
 }
 
+/** Minimal oracle shape kept only for migration parity tests. */
+interface LegacyVehicleClient {
+  vehicles(): Promise<unknown>;
+}
+
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === "object" && !Array.isArray(value);
 
@@ -56,7 +60,7 @@ export const createCandidateVehicleReader = ({
   candidateClientFactory = createCandidateSessionClient,
   fallbackToLegacy = false,
 }: {
-  legacy?: Pick<NineCliClient, "vehicles">;
+  legacy?: LegacyVehicleClient;
   configDirectory: string;
   /** Supplies a fresh authenticated session before each candidate request. */
   sessionProvider?: () => Promise<NinebotAuthSession>;
