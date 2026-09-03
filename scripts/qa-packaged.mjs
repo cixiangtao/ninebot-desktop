@@ -103,15 +103,17 @@ try {
   await page.waitForURL("ninebot-desktop://app/**");
   await page.locator(".playback-panel").waitFor();
   const runtimeStatus = await page.evaluate(() => window.ninebot.runtime.security());
+  const sdkRuntime = runtimeStatus.ok && runtimeStatus.data.version === "typescript-sdk";
+  const legacyRuntime = runtimeStatus.ok && runtimeStatus.data.binary.status === "verified";
   if (
     !runtimeStatus.ok ||
-    runtimeStatus.data.binary.status !== "verified" ||
+    (!sdkRuntime && !legacyRuntime) ||
     runtimeStatus.data.policy.sessionCache.storage !== "memory-only" ||
     runtimeStatus.data.policy.sessionCache.rawResponsesStored !== false ||
     runtimeStatus.data.policy.sessionCache.persistsAcrossRestarts !== false ||
     runtimeStatus.data.policy.sessionCache.manualRefreshBypasses !== true
   ) {
-    throw new Error(`Packaged ninecli runtime check failed: ${JSON.stringify(runtimeStatus)}`);
+    throw new Error(`Packaged runtime check failed: ${JSON.stringify(runtimeStatus)}`);
   }
   await page.getByRole("button", { name: "导出本月清单" }).click();
   const monthExportDialog = page.getByRole("dialog", { name: "选择月度导出格式" });
@@ -127,8 +129,9 @@ try {
       platform: process.platform,
       demoReady: true,
       bridgeReady: true,
-      bundledRuntime: true,
-      binaryVerified: true,
+      runtimeMode: sdkRuntime ? "typescript-sdk" : "ninecli-legacy",
+      bundledRuntime: legacyRuntime,
+      binaryVerified: legacyRuntime,
       sessionCacheMemoryOnly: true,
       monthSummaryExportReady,
     }),
