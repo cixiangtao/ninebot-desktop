@@ -9,6 +9,7 @@ import {
   RefreshCw,
   ShieldCheck,
   TerminalSquare,
+  Timer,
   X,
 } from "lucide-react";
 import { useState, type ReactNode } from "react";
@@ -161,6 +162,13 @@ export const SecuritySheet = ({
 
           {status ? (
             <div className="security-group">
+              <SecurityRow
+                icon={<Timer size={18} />}
+                label="候选读取等待上限"
+                value={`${Math.round(status.candidate.requestTimeoutMs / 1000)} 秒`}
+                hint="候选数据源超时后自动回退到默认读取路径"
+                tone="good"
+              />
               <SecurityRow
                 icon={<Binary size={18} />}
                 label="本地数据运行环境"

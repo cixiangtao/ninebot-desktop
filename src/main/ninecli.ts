@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { constants } from "node:fs";
 import { access, chmod, mkdir, readFile, rm, stat } from "node:fs/promises";
 import { basename, join } from "node:path";
+import { candidateRequestTimeoutMs } from "./candidate-client.js";
 
 export const ninecliVersion = "0.1.7";
 const commandTimeoutMs = 45_000;
@@ -58,6 +59,9 @@ const restrictedFiles = ["config.json", ...tokenFiles] as const;
 
 export interface RuntimeSecurityStatus {
   version: string;
+  candidate: {
+    requestTimeoutMs: number;
+  };
   binary: {
     status: "verified" | "mismatch" | "unsupported" | "unavailable";
     sha256: string | null;
@@ -335,6 +339,9 @@ export class NineCliClient {
 
     return {
       version: ninecliVersion,
+      candidate: {
+        requestTimeoutMs: candidateRequestTimeoutMs,
+      },
       binary: {
         status: binaryStatus,
         sha256,

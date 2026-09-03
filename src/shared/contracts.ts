@@ -64,6 +64,9 @@ export interface SmsCodeRequestStatus {
 
 export interface RuntimeSecurityStatus {
   version: string;
+  candidate: {
+    requestTimeoutMs: number;
+  };
   binary: {
     status: "verified" | "mismatch" | "unsupported" | "unavailable";
     sha256: string | null;
