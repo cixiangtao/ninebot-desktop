@@ -256,3 +256,11 @@ SDK 另提供 `createNinebotCandidateSessionClient` 和 `createNinebotFetchCandi
 随后运行 `pnpm protocol:parity -- --rounds=3 --month=202608`，三轮车辆列表、status、battery、travel 月度和 travel 详情均 `equal=true` 且未截断；每轮分别比较 41、25、19、300 和 26 个节点，进程退出码为 0。该门禁只输出结构元数据，不保存或展示响应值；目前证据覆盖本机一台电自和一个月份，仍需其他车辆服务族与月份的连续样本。
 
 为扩大月份覆盖，又在同一会话对 `202607` 运行两轮、对 `202606` 运行一轮；两个月份的五类对照均 `equal=true` 且未截断，车辆列表节点数为 41，月度节点数分别为 300/299，详情均为 26。当前账号仍只有一台电自，motor 服务族尚无可用车辆，不能用电自序列号代替 motor 做 parity。
+
+### 2026-09-03 SDK 默认入口与 Passport 真实会话验证
+
+默认认证入口现已切换为 TypeScript SDK；只有显式设置 `NINEBOT_AUTH_SOURCE=legacy` 才会创建 ninecli 兼容客户端。SDK 认证错误会映射到 Electron 的统一 `NinebotClientError`，不会把 Passport 原始响应正文传入 renderer。短信登录继续在 `NinebotHumanVerificationRequiredError` 边界上失败关闭，不绕过九号的人机校验。
+
+对本机隔离副本中的现有会话做了真实 Passport `POST /v5/user` 验证：SDK 使用与 ninecli 相同的原始 JWT Authorization 值（不添加 `Bearer`），并接受 Passport 的成功码 `90000`。服务端返回用户资料对象，SDK 仅记录字段名用于验证；会话解析同时把 `accessTokenValidity` 的秒/毫秒格式归一化为 `expiresAtMs`，供自动刷新判断。
+
+同一隔离会话运行 `pnpm protocol:parity -- --rounds=1 --month=202609`，车辆列表、status、battery、travel 月度和详情五类请求均 `equal=true`、未截断并以退出码 0 完成。Node 直连还得到 12 条当月行程和一条详情的 `trail` 字符串；本次只保留计数、字段名和差异元数据，未将令牌、序列号、坐标、密文或原始响应写入仓库。证据目前覆盖一台电自和一个账号；多账号及 motor 服务族仍需真实会话样本后才能宣称 parity 完成。
