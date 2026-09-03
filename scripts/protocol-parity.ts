@@ -3,12 +3,18 @@ import { readFile } from "node:fs/promises";
 import { basename, join, resolve } from "node:path";
 import { promisify } from "node:util";
 import { compareNinebotPayloads } from "../packages/ninebot-client/src/parity-node.ts";
+import { generateNinebotNonce } from "../packages/ninebot-client/src/crypto-node.ts";
 import {
   buildVehicleBatteryFields,
   buildVehicleStatusFields,
   createNinebotTelemetryCandidateClient,
   NinebotTelemetryBusinessError,
 } from "../packages/ninebot-client/src/telemetry-node.ts";
+import {
+  createNinebotTravelCandidateClient,
+  type TravelDetailPlaintextFields,
+  type TravelMonthPlaintextFields,
+} from "../packages/ninebot-client/src/travel-node.ts";
 import { createFetchNinebotTransport } from "../packages/ninebot-client/src/transport.ts";
 
 const execFileAsync = promisify(execFile);
@@ -21,6 +27,7 @@ Options:
   --vehicle-index=<number>  Zero-based cached vehicle index (default: 0).
   --rounds=<number>         Number of sequential samples, from 1 to 20 (default: 3).
   --service=<ebike|motor>   Override the cached vehicle business line.
+  --month=<YYYYMM>          Travel month to compare (default: previous calendar month).
   --help                    Show this help.
 
 The report contains only parity metadata, paths, kinds, and lengths. Credentials,
@@ -42,7 +49,8 @@ const unknownArguments = argumentsList.filter(
   (argument) =>
     !argument.startsWith("--vehicle-index=") &&
     !argument.startsWith("--rounds=") &&
-    !argument.startsWith("--service="),
+    !argument.startsWith("--service=") &&
+    !argument.startsWith("--month="),
 );
 if (unknownArguments.length > 0) {
   throw new Error(`Unknown protocol parity argument: ${unknownArguments[0]}`);
@@ -71,6 +79,20 @@ if (
   requestedService !== "motor"
 ) {
   throw new Error("service must be ebike or motor");
+}
+
+const requestedMonth = readNamedArgument("month");
+const previousMonth = new Date();
+previousMonth.setMonth(previousMonth.getMonth() - 1);
+const parityMonth =
+  requestedMonth ??
+  `${previousMonth.getFullYear()}${String(previousMonth.getMonth() + 1).padStart(2, "0")}`;
+if (
+  !/^\d{6}$/.test(parityMonth) ||
+  Number(parityMonth.slice(4)) < 1 ||
+  Number(parityMonth.slice(4)) > 12
+) {
+  throw new Error("month must be a valid YYYYMM value");
 }
 
 const [config, tokens, vehicleCache] = await Promise.all([
@@ -114,19 +136,80 @@ const candidate = createNinebotTelemetryCandidateClient({
   transport: createFetchNinebotTransport({ origins }),
   platform: 2,
 });
+const travelCandidate = createNinebotTravelCandidateClient({
+  transport: createFetchNinebotTransport({
+    origins: { travel: "https://cn-cbu-gateway.ninebot.com" },
+  }),
+  platform: 2,
+});
 const ninecliBinary = join(
   projectRoot,
   "build/generated/runtime/ninecli",
   process.platform === "win32" ? "ninecli.exe" : "ninecli",
 );
 
-const runOracle = async (command: "status" | "battery") => {
+const runOracle = async (
+  command: "status" | "battery" | "travel" | "vehicles",
+  args: string[] = [],
+) => {
+  const commandArgs = command === "vehicles" ? args : [vehicle.wnumber, ...args];
   const result = await execFileAsync(
     ninecliBinary,
-    ["--config", configDirectory, "--json", command, vehicle.wnumber],
+    ["--config", configDirectory, "--json", command, ...commandArgs],
     { env: { ...process.env, NINEBOT_CONFIG_DIR: configDirectory }, maxBuffer: 16 * 1024 * 1024 },
   );
   return JSON.parse(result.stdout) as unknown;
+};
+
+const vehicleType = async () => {
+  const payload = await runOracle("vehicles");
+  const rows = Array.isArray(payload) ? payload : [];
+  const row = rows.find(
+    (item): item is Record<string, unknown> =>
+      item !== null &&
+      typeof item === "object" &&
+      !Array.isArray(item) &&
+      ((item as Record<string, unknown>).wnumber === vehicle.wnumber ||
+        (item as Record<string, unknown>).sn === vehicle.wnumber),
+  );
+  const value = row?.vehicle_type;
+  if ((typeof value !== "string" && typeof value !== "number") || String(value).length === 0) {
+    throw new Error("ninecli vehicles output has no vehicle_type for the selected vehicle");
+  }
+  return String(value);
+};
+
+const unwrapTravelPayload = (value: unknown): Record<string, unknown> => {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return {};
+  const record = value as Record<string, unknown>;
+  if (
+    record.data !== null &&
+    typeof record.data === "object" &&
+    !Array.isArray(record.data) &&
+    ("code" in record || "desc" in record)
+  ) {
+    return record.data as Record<string, unknown>;
+  }
+  return record;
+};
+
+const normalizeTravelMonth = (value: unknown) => {
+  const record = unwrapTravelPayload(value);
+  return {
+    detail: record.detail,
+    duration: record.duration,
+    ec: record.ec,
+    first_time: record.first_time,
+    list: record.list,
+    month: record.month,
+    times: record.times,
+    total_mileages: record.total_mileages,
+  };
+};
+
+const normalizeTravelDetail = (value: unknown) => {
+  const { code: _code, desc: _desc, ...payload } = unwrapTravelPayload(value);
+  return payload;
 };
 
 const summarizeError = (error: unknown) => {
@@ -144,6 +227,7 @@ const summarizeReport = (report: ReturnType<typeof compareNinebotPayloads>) => (
   differences: report.differences,
 });
 
+const selectedVehicleType = await vehicleType();
 const samples = [];
 for (let index = 0; index < rounds; index += 1) {
   const sample: Record<string, unknown> = { index: index + 1 };
@@ -167,6 +251,65 @@ for (let index = 0; index < rounds; index += 1) {
     ]);
     sample.status = summarizeReport(compareNinebotPayloads(oracleStatus, candidateStatus.data[0]));
     sample.battery = summarizeReport(compareNinebotPayloads(oracleBattery, candidateBattery.data));
+    const travelBase = {
+      ...session,
+      wnumber: vehicle.wnumber,
+      rnVersion: "743",
+      vehicle_type: selectedVehicleType,
+      current_version: "610063322",
+      serviceTime: Date.now(),
+      nonce: generateNinebotNonce(),
+    };
+    // eslint-disable-next-line no-await-in-loop
+    const oracleMonth = await runOracle("travel", ["--month", parityMonth]);
+    // eslint-disable-next-line no-await-in-loop
+    const candidateMonth = await travelCandidate.month({
+      fields: { ...travelBase, month: parityMonth, page: "1" } as TravelMonthPlaintextFields,
+      businessType: service === "motor" ? "1" : "2",
+    });
+    const travelReport: Record<string, unknown> = {
+      month: summarizeReport(
+        compareNinebotPayloads(
+          normalizeTravelMonth(oracleMonth),
+          normalizeTravelMonth(candidateMonth),
+        ),
+      ),
+    };
+    const monthPayload = unwrapTravelPayload(oracleMonth);
+    const firstRide = Array.isArray(monthPayload.list)
+      ? monthPayload.list.find(
+          (item) => item !== null && typeof item === "object" && !Array.isArray(item),
+        )
+      : null;
+    const travelId =
+      firstRide && typeof firstRide === "object"
+        ? ((firstRide as Record<string, unknown>).travel_id ??
+          (firstRide as Record<string, unknown>).travelId ??
+          (firstRide as Record<string, unknown>).id)
+        : null;
+    if (typeof travelId === "string" && travelId.length > 0) {
+      // eslint-disable-next-line no-await-in-loop
+      const oracleDetail = await runOracle("travel", ["--detail", travelId]);
+      // eslint-disable-next-line no-await-in-loop
+      const candidateDetail = await travelCandidate.detail({
+        fields: {
+          ...travelBase,
+          nonce: generateNinebotNonce(),
+          serviceTime: Date.now(),
+          travel_id: travelId,
+        } as TravelDetailPlaintextFields,
+        businessType: service === "motor" ? "1" : "2",
+      });
+      travelReport.detail = summarizeReport(
+        compareNinebotPayloads(
+          normalizeTravelDetail(oracleDetail),
+          normalizeTravelDetail(candidateDetail),
+        ),
+      );
+    } else {
+      travelReport.detail = { skipped: true, reason: "month-empty" };
+    }
+    sample.travel = travelReport;
   } catch (error) {
     sample.error = summarizeError(error);
   }
@@ -179,11 +322,21 @@ const successfulSamples = samples.filter(
   ): sample is {
     status: ReturnType<typeof summarizeReport>;
     battery: ReturnType<typeof summarizeReport>;
-  } => "status" in sample && "battery" in sample,
+    travel: {
+      month: ReturnType<typeof summarizeReport>;
+      detail: ReturnType<typeof summarizeReport> | { skipped: true; reason: string };
+    };
+  } => "status" in sample && "battery" in sample && "travel" in sample,
 );
 const allEqual =
   successfulSamples.length === rounds &&
-  successfulSamples.every((sample) => sample.status.equal && sample.battery.equal);
+  successfulSamples.every(
+    (sample) =>
+      sample.status.equal &&
+      sample.battery.equal &&
+      sample.travel.month.equal &&
+      ("skipped" in sample.travel.detail || sample.travel.detail.equal),
+  );
 console.log(
   JSON.stringify(
     {
@@ -191,6 +344,7 @@ console.log(
       vehicleIndex,
       service,
       requestedRounds: rounds,
+      month: parityMonth,
       samples,
       allEqual,
     },
