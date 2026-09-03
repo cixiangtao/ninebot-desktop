@@ -4,7 +4,10 @@ import {
   buildVehicleStatusFields,
   createNinebotTelemetryCandidateClient,
   type CreateNinebotTelemetryCandidateClientOptions,
+  type TelemetryResponseCandidate,
+  type VehicleBatteryCandidateRecord,
   type VehicleBatteryCandidateOptions,
+  type VehicleStatusCandidateRecord,
   type VehicleStatusCandidateOptions,
   type TelemetryCandidateSessionFields,
 } from "./telemetry-node.ts";
@@ -12,11 +15,14 @@ import {
   createNinebotTravelCandidateClient,
   type CreateNinebotTravelCandidateClientOptions,
   type TravelDetailPlaintextFields,
+  type TravelDetailResponseCandidate,
   type TravelMonthPlaintextFields,
+  type TravelMonthResponseCandidate,
 } from "./travel-node.ts";
 import {
   createNinebotVehicleCandidateClient,
   type CreateNinebotVehicleCandidateClientOptions,
+  type NinebotVehicleResponseCandidate,
   type VehicleListPlaintextFields,
 } from "./vehicle-node.ts";
 import type { NinebotResponse, NinebotTransport } from "./transport.ts";
@@ -75,6 +81,21 @@ export interface CandidateTravelDetailRequestOptions extends CandidateVehicleReq
   travelId: string;
 }
 
+export interface NinebotCandidateSessionClient {
+  listVehicles(
+    options: CandidateVehicleRequestOptions,
+  ): Promise<NinebotVehicleResponseCandidate<unknown>>;
+  status(
+    options: CandidateTelemetryRequestOptions,
+  ): Promise<TelemetryResponseCandidate<VehicleStatusCandidateRecord[]>>;
+  battery(
+    options: CandidateTelemetryRequestOptions,
+  ): Promise<TelemetryResponseCandidate<VehicleBatteryCandidateRecord>>;
+  month(options: CandidateTravelMonthRequestOptions): Promise<TravelMonthResponseCandidate>;
+  detail(options: CandidateTravelDetailRequestOptions): Promise<TravelDetailResponseCandidate>;
+  clear(): void;
+}
+
 const businessTypeFor = (service: NinebotCandidateService): "1" | "2" =>
   service === "motor" ? "1" : "2";
 
@@ -118,7 +139,7 @@ export const createNinebotCandidateSessionClient = ({
   nonceFactory = generateNinebotNonce,
   requestIdFactory = generateNinebotNonce,
   ...options
-}: CreateNinebotCandidateSessionClientOptions) => {
+}: CreateNinebotCandidateSessionClientOptions): NinebotCandidateSessionClient => {
   let activeSession: NinebotCandidateSessionFields | null = session;
   const sharedOptions = protocolOptions(options);
   const telemetry = createNinebotTelemetryCandidateClient(
@@ -143,7 +164,7 @@ export const createNinebotCandidateSessionClient = ({
     service,
     vehicleType,
     headers,
-  }: CandidateVehicleRequestOptions) => {
+  }: CandidateVehicleRequestOptions): Promise<NinebotVehicleResponseCandidate<unknown>> => {
     const fields: VehicleListPlaintextFields = {
       ...getSession(),
       vehicle_type: asVehicleType(vehicleType),

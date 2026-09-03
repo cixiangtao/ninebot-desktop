@@ -142,5 +142,6 @@ export type {
   CandidateVehicleRequestOptions,
   CreateNinebotCandidateSessionClientOptions,
   NinebotCandidateService,
+  NinebotCandidateSessionClient,
   NinebotCandidateSessionFields,
 } from "./candidate-session.ts";
