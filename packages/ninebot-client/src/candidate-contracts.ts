@@ -15,6 +15,10 @@ export interface NinebotCandidateSessionFields {
   login_country: string;
   access_token: string;
   uid: string;
+  /** Optional Passport UUID used by the business metadata bootstrap. */
+  uuid?: string;
+  /** Optional Passport refresh token used by the business metadata bootstrap. */
+  refresh_token?: string;
   /** Observed React-Native track module version used by travel requests. */
   rnVersion?: string;
   /** Observed app version used by travel requests. */

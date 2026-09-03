@@ -314,6 +314,7 @@ interface PassportLoginData {
   refresh_token?: unknown;
   business_uid?: unknown;
   uid?: unknown;
+  uuid?: unknown;
   accessTokenValidity?: unknown;
 }
 
@@ -351,6 +352,7 @@ export const parsePassportLoginSession = (data: unknown): NinebotAuthSession => 
     accessToken: requireText(record.access_token, "access_token"),
     refreshToken: requireText(record.refresh_token, "refresh_token"),
     businessUid: requireText(businessUid, "business_uid"),
+    ...(record.uuid === undefined ? {} : { uuid: requireText(record.uuid, "uuid") }),
     ...(expiresAtMs === undefined ? {} : { expiresAtMs }),
   };
 };
@@ -370,6 +372,7 @@ export const parsePassportRefreshSession = (
     accessToken: requireText(record.access_token, "access_token"),
     refreshToken: requireText(record.refresh_token, "refresh_token"),
     businessUid: requireText(record.business_uid ?? previousBusinessUid, "business_uid"),
+    ...(record.uuid === undefined ? {} : { uuid: requireText(record.uuid, "uuid") }),
     ...(expiresAtMs === undefined ? {} : { expiresAtMs }),
   };
 };

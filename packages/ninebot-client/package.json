@@ -104,6 +104,10 @@
     "./candidate-contracts": {
       "types": "./dist/candidate-contracts.d.ts",
       "import": "./dist/candidate-contracts.js"
+    },
+    "./business-login-node": {
+      "types": "./dist/business-login-node.d.ts",
+      "import": "./dist/business-login-node.js"
     }
   },
   "scripts": {

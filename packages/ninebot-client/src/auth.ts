@@ -21,6 +21,8 @@ export interface NinebotSmsLoginInput extends NinebotSmsCodeRequest {
 export interface NinebotAuthSession {
   accessToken: string;
   businessUid: string;
+  /** Passport UUID required by the business metadata bootstrap request. */
+  uuid?: string;
   /** Optional absolute expiry supplied by the verified auth response. */
   expiresAtMs?: number;
   /** Optional refresh token supplied by the verified auth response. */
@@ -60,6 +62,7 @@ const cloneSession = (session: NinebotAuthSession): NinebotAuthSession => {
     accessToken: session.accessToken,
     businessUid: session.businessUid,
   };
+  if (session.uuid !== undefined) copy.uuid = session.uuid;
   if (session.expiresAtMs !== undefined) copy.expiresAtMs = session.expiresAtMs;
   if (session.refreshToken !== undefined) copy.refreshToken = session.refreshToken;
   return copy;
@@ -80,6 +83,9 @@ const validateSession = (session: NinebotAuthSession): NinebotAuthSession => {
   }
   if (session.refreshToken !== undefined && !session.refreshToken.trim()) {
     throw new Error("Ninebot auth session refresh token is invalid");
+  }
+  if (session.uuid !== undefined && !session.uuid.trim()) {
+    throw new Error("Ninebot auth session uuid is invalid");
   }
   return cloneSession(session);
 };

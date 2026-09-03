@@ -52,6 +52,8 @@ interface CandidateConfig {
 interface CandidateTokens {
   access_token: string;
   business_uid: string;
+  uuid?: string;
+  refresh_token?: string;
 }
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -109,8 +111,9 @@ export const readCandidateSession = async (
   const tokens = tokensValue as Partial<CandidateTokens> & {
     accessToken?: unknown;
     businessUid?: unknown;
+    refreshToken?: unknown;
   };
-  return {
+  const session: NinebotCandidateSessionFields = {
     sys_language: "zh-hans-cn",
     client_ver: "610063322",
     device_id: requireText(config.deviceId ?? config.device_id, "candidate device_id"),
@@ -124,6 +127,13 @@ export const readCandidateSession = async (
     access_token: requireText(tokens.accessToken ?? tokens.access_token, "candidate access_token"),
     uid: requireText(tokens.businessUid ?? tokens.business_uid, "candidate business_uid"),
   };
+  const uuid = tokens.uuid;
+  const refreshToken = tokens.refreshToken ?? tokens.refresh_token;
+  if (typeof uuid === "string" && uuid.length > 0) session.uuid = uuid;
+  if (typeof refreshToken === "string" && refreshToken.length > 0) {
+    session.refresh_token = refreshToken;
+  }
+  return session;
 };
 
 /** Reads the cached vehicle metadata needed to resolve a candidate service. */

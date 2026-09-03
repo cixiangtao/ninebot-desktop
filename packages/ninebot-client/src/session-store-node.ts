@@ -45,6 +45,8 @@ const parseSessionFile = (value: unknown): NinebotAuthSession => {
     accessToken: readText(accessToken, "accessToken"),
     businessUid: readText(businessUid, "businessUid"),
   };
+  const uuid = value.uuid;
+  if (uuid !== undefined) session.uuid = readText(uuid, "uuid");
   const expiresAtMs =
     value.expiresAtMs !== undefined
       ? (() => {

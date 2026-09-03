@@ -201,6 +201,24 @@ export {
   defaultNinebotCandidateOrigins,
 } from "./candidate-session.ts";
 export { createNinebotCandidateSessionClientFromClients } from "./candidate-session-core.ts";
+export {
+  businessLoginPath,
+  businessLoginProtocol,
+  buildBusinessLoginHeaders,
+  buildBusinessLoginPlaintextBody,
+  buildBusinessLoginEncryptedRequest,
+  buildBusinessLoginRequest,
+  decodeBusinessLoginResponse,
+  createBusinessLoginClient,
+} from "./business-login-node.ts";
+export type {
+  BusinessLoginEncryptedRequest,
+  BusinessLoginKeyData,
+  BusinessLoginPlaintextFields,
+  BuildBusinessLoginEncryptedRequestOptions,
+  BuildBusinessLoginHeadersOptions,
+  CreateBusinessLoginClientOptions,
+} from "./business-login-node.ts";
 export type {
   CandidateServiceRequestOptions,
   CandidateTelemetryRequestOptions,
