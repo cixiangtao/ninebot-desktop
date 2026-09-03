@@ -196,7 +196,7 @@ Node 子路径另外提供 `decodeVehicleListResponseCandidateWithCodec`，将�
 
 为支持迁移期的字段级对照，`@jiuhao/ninebot-client` 新增 `compareNinebotPayloads`。它只在内存比较 ninecli 与 Node 结果，报告路径、类型、长度和差异原因，不返回任何字段值；数组和嵌套对象达到比较上限时会标记 `truncated`，不会把不完整比较误报为一致。
 
-仓库同时提供 `pnpm protocol:parity -- --rounds=3`，从 `NINEBOT_CONFIG_DIR` 读取本机已有 ninecli 会话，连续运行 oracle 与 Node telemetry 候选，并只输出 parity 元数据。脚本支持 `--vehicle-index` 和 `--service`，不会打印车辆序列号、令牌、坐标、Header 值或响应正文，适合在迁移前重复执行多车辆、多车型校验。
+仓库同时提供 `pnpm protocol:parity -- --rounds=3`，从 `NINEBOT_CONFIG_DIR` 读取本机已有 ninecli 会话，连续运行 oracle 与 Node telemetry 候选，并只输出 parity 元数据。脚本支持 `--vehicle-index` 和 `--service`，不会打印车辆序列号、令牌、坐标、Header 值或响应正文；只要任一轮请求失败或出现差异，进程就以退出码 1 结束，适合在迁移前重复执行多车辆、多车型校验和自动化门禁。
 
 首次使用本机配置自动拼装 status/battery 候选请求的回放显示：真实服务端返回 HTTP 200，但业务 wrapper 为 `code=190003`、`data=null`、通讯异常描述。由此确认 HTTP 层成功不等于业务协议已验证；类型化解析器会拒绝这类空数据，Electron 继续保留 ninecli 默认路径，后续需要用 oracle 明文/Header 做字段级修正。
 

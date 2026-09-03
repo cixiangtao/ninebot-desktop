@@ -181,6 +181,9 @@ const successfulSamples = samples.filter(
     battery: ReturnType<typeof summarizeReport>;
   } => "status" in sample && "battery" in sample,
 );
+const allEqual =
+  successfulSamples.length === rounds &&
+  successfulSamples.every((sample) => sample.status.equal && sample.battery.equal);
 console.log(
   JSON.stringify(
     {
@@ -189,11 +192,10 @@ console.log(
       service,
       requestedRounds: rounds,
       samples,
-      allEqual:
-        successfulSamples.length === rounds &&
-        successfulSamples.every((sample) => sample.status.equal && sample.battery.equal),
+      allEqual,
     },
     null,
     2,
   ),
 );
+if (!allEqual) process.exitCode = 1;
