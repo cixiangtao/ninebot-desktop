@@ -1,5 +1,5 @@
 import type { VehicleSnapshot } from "../shared/contracts.js";
-import { NineCliError } from "./ninecli.js";
+import { NinebotClientError } from "./app-client.js";
 import { parseVehicleSnapshot } from "./parsers.js";
 
 export interface VehicleTelemetryReader {
@@ -9,7 +9,7 @@ export interface VehicleTelemetryReader {
 }
 
 const isDegradableFailure = (reason: unknown) =>
-  reason instanceof NineCliError && reason.kind === "upstream";
+  reason instanceof NinebotClientError && reason.kind === "upstream";
 
 /** Reads independent vehicle domains and preserves whichever upstream service succeeds. */
 export const loadVehicleSnapshot = async (

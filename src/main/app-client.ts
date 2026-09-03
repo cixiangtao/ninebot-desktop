@@ -12,7 +12,7 @@ export type NinebotClientErrorKind =
   | "unsupported"
   | "upstream";
 
-/** Error contract shared by the legacy oracle and the SDK-backed client. */
+/** Stable error contract shared by every app data client implementation. */
 export class NinebotClientError extends Error {
   constructor(
     message: string,

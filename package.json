@@ -23,7 +23,6 @@
     "build:sdk": "pnpm --filter @jiuhao/ninebot-client build",
     "typecheck:sdk:browser": "pnpm --filter @jiuhao/ninebot-client typecheck:browser",
     "preview": "pnpm run build:sdk && electron-vite preview",
-    "prepare:ninecli-runtime": "node scripts/prepare-ninecli-runtime.mjs",
     "preprotocol:record": "pnpm run build:sdk",
     "protocol:record": "node scripts/protocol-recorder.ts",
     "preprotocol:report": "pnpm run build:sdk",
