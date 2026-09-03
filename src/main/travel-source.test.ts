@@ -149,4 +149,36 @@ describe("candidate travel source", () => {
     });
     expect(observedVehicleType).toBe("14363");
   });
+
+  it("cancels an in-flight month request without falling back", async () => {
+    const configDirectory = await createSessionDirectory("14363");
+    let signalReceived: (() => void) | undefined;
+    const started = new Promise<void>((resolve) => {
+      signalReceived = resolve;
+    });
+    const reader = createCandidateTravelReader({
+      legacy: {
+        rides: async () => {
+          throw new Error("legacy rides should not be called after cancellation");
+        },
+        rideDetail: async () => ({ source: "legacy" }),
+      },
+      configDirectory,
+      candidateClientFactory: () => ({
+        month: ({ signal }) => {
+          signalReceived?.();
+          return new Promise((_resolve, reject) => {
+            signal?.addEventListener("abort", () => reject(signal.reason), { once: true });
+          });
+        },
+        detail: async () => ({ data: { trail: "" } }),
+      }),
+    });
+
+    const pending = reader.rides("SN1234567890", "202608");
+    await started;
+    reader.clear?.();
+
+    await expect(pending).rejects.toThrow("candidate request was cancelled");
+  });
 });

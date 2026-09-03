@@ -159,4 +159,35 @@ describe("candidate vehicle source", () => {
     ]);
     expect(requestedTypes).toEqual(["14363", "14364"]);
   });
+
+  it("cancels an in-flight vehicle request without falling back", async () => {
+    const configDirectory = await createSessionDirectory();
+    await addCachedVehicleType(configDirectory);
+    let signalReceived: (() => void) | undefined;
+    const started = new Promise<void>((resolve) => {
+      signalReceived = resolve;
+    });
+    const reader = createCandidateVehicleReader({
+      configDirectory,
+      legacy: {
+        vehicles: async () => {
+          throw new Error("legacy vehicles should not be called after cancellation");
+        },
+      },
+      candidateClientFactory: () => ({
+        listVehicles: ({ signal }) => {
+          signalReceived?.();
+          return new Promise((_resolve, reject) => {
+            signal?.addEventListener("abort", () => reject(signal.reason), { once: true });
+          });
+        },
+      }),
+    });
+
+    const pending = reader.vehicles();
+    await started;
+    reader.clear?.();
+
+    await expect(pending).rejects.toThrow("candidate request was cancelled");
+  });
 });
