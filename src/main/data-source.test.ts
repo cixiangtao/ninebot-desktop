@@ -24,6 +24,14 @@ describe("candidate source selection", () => {
     expect(isCandidateSourceEnabled(environment, "travel")).toBe(false);
   });
 
+  it("fails closed when a domain-specific value is unknown", () => {
+    const environment = {
+      NINEBOT_SOURCE: "candidate",
+      NINEBOT_TRAVEL_SOURCE: "candidte",
+    };
+    expect(isCandidateSourceEnabled(environment, "travel")).toBe(false);
+  });
+
   it("enables one domain without enabling the others", () => {
     const environment = { NINEBOT_TELEMETRY_SOURCE: "candidate" };
     expect(isCandidateSourceEnabled(environment, "vehicle")).toBe(false);

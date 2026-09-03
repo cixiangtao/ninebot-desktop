@@ -11,7 +11,6 @@ export const isCandidateSourceEnabled = (
   domain: CandidateSourceDomain,
 ): boolean => {
   const domainValue = environment[`NINEBOT_${domain.toUpperCase()}_SOURCE`];
-  if (domainValue === "candidate") return true;
-  if (domainValue === "ninecli") return false;
+  if (domainValue !== undefined) return domainValue === "candidate";
   return environment.NINEBOT_SOURCE === "candidate";
 };
