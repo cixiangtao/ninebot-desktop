@@ -25,7 +25,13 @@ import {
   type NinebotVehicleResponseCandidate,
   type VehicleListPlaintextFields,
 } from "./vehicle-node.ts";
-import type { NinebotResponse, NinebotTransport } from "./transport.ts";
+import {
+  createFetchNinebotTransport,
+  type FetchNinebotTransportOptions,
+  type NinebotResponse,
+  type NinebotTransport,
+} from "./transport.ts";
+import type { NinebotServiceName } from "./protocol-lab.ts";
 import type { VehicleServiceName } from "./vehicle.ts";
 
 export type NinebotCandidateService = VehicleServiceName;
@@ -56,6 +62,22 @@ export interface CreateNinebotCandidateSessionClientOptions extends CandidatePro
   nonceFactory?: () => string;
   /** Request-id source used for transport headers; defaults to the secure generator. */
   requestIdFactory?: () => string;
+}
+
+export const defaultNinebotCandidateOrigins = {
+  ebike: "https://ebike.ninebot.com",
+  motor: "https://steeldust.ninebot.com",
+  travel: "https://cn-cbu-gateway.ninebot.com",
+} as const satisfies Readonly<Partial<Record<NinebotServiceName, string>>>;
+
+export interface CreateNinebotFetchCandidateSessionClientOptions extends Omit<
+  CreateNinebotCandidateSessionClientOptions,
+  "transport"
+> {
+  /** Optional origin overrides for self-hosted gateways or protocol test environments. */
+  origins?: FetchNinebotTransportOptions["origins"];
+  /** Optional fetch implementation for tests, proxies, or alternate Node runtimes. */
+  fetch?: typeof globalThis.fetch;
 }
 
 export interface CandidateServiceRequestOptions {
@@ -253,3 +275,17 @@ export const createNinebotCandidateSessionClient = ({
 
   return { listVehicles, status, battery, month, detail, clear };
 };
+
+/** Creates the read-only candidate client with the validated Ninebot service origins. */
+export const createNinebotFetchCandidateSessionClient = ({
+  origins = defaultNinebotCandidateOrigins,
+  fetch: fetchImpl,
+  ...options
+}: CreateNinebotFetchCandidateSessionClientOptions): NinebotCandidateSessionClient =>
+  createNinebotCandidateSessionClient({
+    ...options,
+    transport: createFetchNinebotTransport({
+      origins,
+      ...(fetchImpl === undefined ? {} : { fetch: fetchImpl }),
+    }),
+  });

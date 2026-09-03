@@ -133,7 +133,11 @@ export type {
 } from "./travel-node.ts";
 export { createNinebotClient, NinebotHttpError } from "./client.ts";
 export type { NinebotClient, NinebotClientOptions } from "./client.ts";
-export { createNinebotCandidateSessionClient } from "./candidate-session.ts";
+export {
+  createNinebotCandidateSessionClient,
+  createNinebotFetchCandidateSessionClient,
+  defaultNinebotCandidateOrigins,
+} from "./candidate-session.ts";
 export type {
   CandidateServiceRequestOptions,
   CandidateTelemetryRequestOptions,
@@ -141,6 +145,7 @@ export type {
   CandidateTravelMonthRequestOptions,
   CandidateVehicleRequestOptions,
   CreateNinebotCandidateSessionClientOptions,
+  CreateNinebotFetchCandidateSessionClientOptions,
   NinebotCandidateService,
   NinebotCandidateSessionClient,
   NinebotCandidateSessionFields,

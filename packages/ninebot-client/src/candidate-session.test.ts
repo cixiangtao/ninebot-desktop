@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { createNinebotCandidateSessionClient } from "./candidate-session.ts";
+import {
+  createNinebotCandidateSessionClient,
+  createNinebotFetchCandidateSessionClient,
+} from "./candidate-session.ts";
 import type { NinebotRequest, NinebotTransport } from "./transport.ts";
 
 const session = {
@@ -100,5 +103,22 @@ describe("candidate session client", () => {
       "session client is closed",
     );
     expect(sendCount).toBe(0);
+  });
+
+  it("uses validated default origins through the fetch convenience factory", async () => {
+    let observedUrl = "";
+    const client = createNinebotFetchCandidateSessionClient({
+      platform: 2,
+      session,
+      fetch: async (input) => {
+        observedUrl = String(input);
+        return new Response("", { status: 500 });
+      },
+    });
+
+    await expect(client.status({ service: "ebike", serialNumber: "SN1234567890" })).rejects.toThrow(
+      "Ninebot request failed with HTTP 500",
+    );
+    expect(observedUrl).toBe("https://ebike.ninebot.com/vehicle/vehicle/desktop-component");
   });
 });
