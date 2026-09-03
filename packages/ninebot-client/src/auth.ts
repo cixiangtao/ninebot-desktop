@@ -117,6 +117,7 @@ export const createMemoryNinebotAuthSessionStore = (
  */
 export class NinebotAuthSessionManager {
   private session: NinebotAuthSession | null = null;
+  private refreshPromise: Promise<NinebotAuthSession> | null = null;
   private readonly now: () => number;
   private readonly refreshSkewMs: number;
 
@@ -176,13 +177,14 @@ export class NinebotAuthSessionManager {
 
   /** Refreshes explicitly and persists the replacement session. */
   async refresh(): Promise<NinebotAuthSession> {
-    const current = this.requireSession();
-    if (!this.options.provider.refresh) {
-      throw new Error("Ninebot auth provider does not support token refresh");
+    if (this.refreshPromise !== null) return cloneSession(await this.refreshPromise);
+    const operation = this.performRefresh();
+    this.refreshPromise = operation;
+    try {
+      return cloneSession(await operation);
+    } finally {
+      if (this.refreshPromise === operation) this.refreshPromise = null;
     }
-    const nextSession = validateSession(await this.options.provider.refresh(current));
-    await this.replaceSession(nextSession);
-    return this.getSession() as NinebotAuthSession;
   }
 
   /** Clears local credentials even when an optional upstream revoke call fails. */
@@ -208,6 +210,16 @@ export class NinebotAuthSessionManager {
   private async replaceSession(nextSession: NinebotAuthSession) {
     await this.options.store.save(nextSession);
     this.session = cloneSession(nextSession);
+  }
+
+  private async performRefresh(): Promise<NinebotAuthSession> {
+    const current = this.requireSession();
+    if (!this.options.provider.refresh) {
+      throw new Error("Ninebot auth provider does not support token refresh");
+    }
+    const nextSession = validateSession(await this.options.provider.refresh(current));
+    await this.replaceSession(nextSession);
+    return nextSession;
   }
 
   private async ensureFreshSession() {

@@ -3,6 +3,7 @@ import {
   createMemoryNinebotAuthSessionStore,
   NinebotAuthSessionManager,
   type NinebotAuthProvider,
+  type NinebotAuthSession,
 } from "./auth.ts";
 
 const session = { accessToken: "token", businessUid: "uid", expiresAtMs: 2_000 } as const;
@@ -65,6 +66,35 @@ describe("Ninebot auth session manager", () => {
       accessToken: "refreshed",
     });
     expect(provider.refresh).toHaveBeenCalledWith(session);
+  });
+
+  it("shares one refresh operation across concurrent domain requests", async () => {
+    let resolveRefresh: ((value: NinebotAuthSession) => void) | undefined;
+    const provider = createProvider({
+      refresh: vi.fn(
+        () =>
+          new Promise<NinebotAuthSession>((resolve) => {
+            resolveRefresh = resolve;
+          }),
+      ),
+    });
+    const manager = new NinebotAuthSessionManager({
+      provider,
+      store: createMemoryNinebotAuthSessionStore(session),
+      now: () => 1_500,
+      refreshSkewMs: 600,
+    });
+    await manager.restore();
+
+    const first = manager.ensureSession();
+    const second = manager.ensureSession();
+    expect(provider.refresh).toHaveBeenCalledTimes(1);
+    resolveRefresh?.({ ...session, accessToken: "refreshed" });
+
+    await expect(Promise.all([first, second])).resolves.toEqual([
+      { ...session, accessToken: "refreshed" },
+      { ...session, accessToken: "refreshed" },
+    ]);
   });
 
   it("fails closed when an expired session cannot refresh", async () => {
