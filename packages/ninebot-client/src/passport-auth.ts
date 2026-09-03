@@ -326,11 +326,17 @@ const requireText = (value: unknown, field: string) => {
 
 const readExpiry = (value: unknown) => {
   if (value === undefined || value === null) return undefined;
-  if (typeof value !== "number" || !Number.isFinite(value) || value <= 0) {
+  const parsed =
+    typeof value === "number"
+      ? value
+      : typeof value === "string" && /^\d+(?:\.\d+)?$/.test(value.trim())
+        ? Number(value)
+        : Number.NaN;
+  if (!Number.isFinite(parsed) || parsed <= 0) {
     throw new Error("Ninebot passport response field accessTokenValidity is invalid");
   }
   // The Passport response has appeared in both Unix seconds and milliseconds.
-  return value < 1_000_000_000_000 ? value * 1_000 : value;
+  return parsed < 1_000_000_000_000 ? parsed * 1_000 : parsed;
 };
 
 /** Converts a verified Passport login data object into the shared session contract. */

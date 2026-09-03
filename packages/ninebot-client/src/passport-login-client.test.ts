@@ -155,6 +155,31 @@ describe("Passport login client", () => {
     ).resolves.toMatchObject({ accessToken: "a", businessUid: "u" });
   });
 
+  it("normalizes a string access-token validity returned by Passport", async () => {
+    const client = createNinebotPassportLoginClient({
+      transport: {
+        send: vi.fn().mockResolvedValue({
+          status: 200,
+          headers: {},
+          body: json({
+            resultCode: "90000",
+            data: {
+              access_token: "a",
+              refresh_token: "r",
+              business_uid: "u",
+              accessTokenValidity: "1790735062000",
+            },
+          }),
+        }),
+      },
+      signer: () => "signature",
+    });
+
+    await expect(
+      client.loginWithPassword({ areaCode: "+86", username: "user", password: "password" }),
+    ).resolves.toMatchObject({ expiresAtMs: 1_790_735_062_000 });
+  });
+
   it("surfaces non-success business codes without exposing response data", async () => {
     const client = createNinebotPassportLoginClient({
       transport: {
