@@ -208,6 +208,8 @@ Electron 现支持显式设置 `NINEBOT_TELEMETRY_SOURCE=candidate` 来试用 No
 
 继续回到 `EncryptRequest` 入口对照后发现，telemetry 明文的 `serviceTime` 使用 13 位 Unix 毫秒，而车辆列表和加密外壳的 `timeStamp` 仍使用已验证的 Unix 秒。Node 默认值已按能力拆开修正为毫秒；使用同一账号连续运行 3 轮 status/battery，并将 Node 数据与 ninecli 明文结果在内存中 parity，3 轮均为 `statusEqual=true`、`batteryEqual=true`，分别比较 25 和 19 个节点且未截断。该结果只证明当前账号、车辆和运行时版本下的只读 telemetry 候选链，Electron 默认仍保留 ninecli，待多车辆、多车型样本后再评估切换。
 
-为继续推进 travel 迁移，主进程新增了独立的 `TravelReader` 边界和 `NINEBOT_TRAVEL_SOURCE=candidate` 试用开关。候选源按请求重新读取本地会话，调用 `travel-node` 的月度/详情客户端；月度读取或详情读取失败时分别回退到 ninecli，不影响另一个域。travel 的 `serviceTime` 与请求 Header 的 `service-time` 均使用 Unix 毫秒，当前 ninecli 0.1.7 的 `rn-ver` 为 `743`。由于 travel 明文需要 `vehicle_type`，只有在本机 `vehicles.json` 已包含该私有模型码时才发送候选请求；缺少模型码会安全回退，不会猜测或写入该值。默认行为仍是 ninecli。
+为继续推进 travel 迁移，主进程新增了独立的 `TravelReader` 边界和 `NINEBOT_TRAVEL_SOURCE=candidate` 试用开关。候选源按请求重新读取本地会话，调用 `travel-node` 的月度/详情客户端；月度读取或详情读取失败时分别回退到 ninecli，不影响另一个域。travel 的 `serviceTime` 与请求 Header 的 `service-time` 均使用 Unix 毫秒，当前 ninecli 0.1.7 的 `rn-ver` 为 `743`。由于 travel 明文需要 `vehicle_type`，候选源会优先读本地 `vehicles.json`，缺失时仅在内存中调用 ninecli 的 `vehicles` 输出补齐，不写回缓存；若仍无法取得模型码则安全回退，不会猜测该值。默认行为仍是 ninecli。
 
 `@jiuhao/ninebot-client` 根入口现导出 `travel-node` 的构造器、解析器、transport client 和类型，调用方可以在 Node、Electron 主进程或测试 transport 中复用同一套候选合同。该导出不代表登录、令牌刷新或移动端能力已迁移，也不改变候选请求必须经过多车型 parity 的门槛。
+
+修正模型码来源和毫秒级 `serviceTime` 后，使用本机现有会话做了独立 Node 直连验证：`travel-list2` 返回 `code=1`、请求月份、31 项日明细和 20 条行程；选取其中一条行程调用 `travel-info` 返回 `code=1`，`trail` 为字符串且包含速度字段。该验证没有经过 Electron 的 ninecli 回退路径，也没有保存响应正文，说明当前账号、车辆和 ninecli 0.1.7 下的 travel 月度/详情候选链已经完成单车型真实服务端校验；多车型和多版本 parity 仍是切换默认源前的门槛。

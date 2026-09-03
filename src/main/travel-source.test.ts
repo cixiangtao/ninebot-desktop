@@ -119,4 +119,33 @@ describe("candidate travel source", () => {
       travelId: "travel-1",
     });
   });
+
+  it("enriches the private cache from ninecli vehicle output without persisting it", async () => {
+    const configDirectory = await createSessionDirectory();
+    let observedVehicleType: string | undefined;
+    const reader = createCandidateTravelReader({
+      legacy: {
+        rides: async () => {
+          throw new Error("legacy rides should not be called");
+        },
+        rideDetail: async () => {
+          throw new Error("legacy detail should not be called");
+        },
+        vehicles: async () => [{ wnumber: "SN1234567890", businessType: 2, vehicle_type: 14363 }],
+      },
+      configDirectory,
+      candidateClientFactory: () => ({
+        month: async ({ fields }) => {
+          observedVehicleType = fields.vehicle_type;
+          return { data: { month: fields.month, list: [] } };
+        },
+        detail: async () => ({ data: { trail: "" } }),
+      }),
+    });
+
+    await expect(reader.rides("SN1234567890", "202608")).resolves.toMatchObject({
+      data: { month: "202608" },
+    });
+    expect(observedVehicleType).toBe("14363");
+  });
 });

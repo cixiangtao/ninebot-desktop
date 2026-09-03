@@ -40,6 +40,7 @@ interface CandidateTokens {
 interface CachedVehicle {
   wnumber: string;
   business_line?: string;
+  businessType?: string | number;
   /** Optional model code captured from a private ninecli vehicle cache. */
   vehicle_type?: string;
 }
@@ -54,19 +55,44 @@ interface CandidateTravelContext {
   fields: Omit<TravelMonthPlaintextFields, "month" | "page" | "travel_id">;
 }
 
+type LegacyTravelClient = Pick<NineCliClient, "rides" | "rideDetail"> & {
+  vehicles?: () => Promise<unknown>;
+};
+
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === "object" && !Array.isArray(value);
 
 const readJson = async (path: string): Promise<unknown> => JSON.parse(await readFile(path, "utf8"));
 
-const requireString = (value: unknown, label: string) => {
-  if (typeof value !== "string" || value.length === 0) {
+const requireText = (value: unknown, label: string) => {
+  if ((typeof value !== "string" && typeof value !== "number") || String(value).length === 0) {
     throw new Error(`Ninebot ${label} is incomplete`);
   }
-  return value;
+  return String(value);
 };
 
-const readContext = async (configDirectory: string, serialNumber: string) => {
+const readService = (
+  value:
+    | {
+        business_line?: unknown;
+        businessType?: unknown;
+      }
+    | null
+    | undefined,
+): CandidateTravelService | null => {
+  if (value?.business_line === "ebike" || value?.business_line === "motor") {
+    return value.business_line;
+  }
+  if (value?.businessType === 1 || value?.businessType === "1") return "motor";
+  if (value?.businessType === 2 || value?.businessType === "2") return "ebike";
+  return null;
+};
+
+const readContext = async (
+  configDirectory: string,
+  serialNumber: string,
+  loadLegacyVehicles?: () => Promise<unknown>,
+) => {
   const [configValue, tokensValue, vehiclesValue] = await Promise.all([
     readJson(join(configDirectory, "config.json")),
     readJson(join(configDirectory, "tokens.json")),
@@ -78,19 +104,33 @@ const readContext = async (configDirectory: string, serialNumber: string) => {
   const config = configValue as Partial<CandidateConfig>;
   const tokens = tokensValue as Partial<CandidateTokens>;
   const vehicles = vehiclesValue as CachedVehicles;
-  const vehicle = vehicles.vehicles?.find((item) => item.wnumber === serialNumber);
-  const service = vehicle?.business_line;
-  if (service !== "ebike" && service !== "motor") {
+  const cachedVehicle = vehicles.vehicles?.find((item) => item.wnumber === serialNumber);
+  let legacyVehicle: Record<string, unknown> | null = null;
+  if (!cachedVehicle?.vehicle_type && loadLegacyVehicles) {
+    const legacyValue = await loadLegacyVehicles();
+    const legacyRows = Array.isArray(legacyValue) ? legacyValue : [];
+    legacyVehicle =
+      legacyRows.find((item) => {
+        if (!isRecord(item)) return false;
+        return item.wnumber === serialNumber || item.sn === serialNumber;
+      }) ?? null;
+  }
+  const vehicle = cachedVehicle ?? (legacyVehicle as CachedVehicle | null);
+  const service = readService(cachedVehicle) ?? readService(legacyVehicle);
+  if (!service) {
     throw new Error("Ninebot candidate travel vehicle service is unavailable");
   }
   if (!vehicle) throw new Error("Ninebot candidate travel vehicle is unavailable");
-  const vehicleType = requireString(vehicle.vehicle_type, "candidate travel vehicle_type");
-  const deviceId = requireString(config.device_id, "candidate device_id");
-  const region = requireString(config.region, "candidate region");
-  const osVersion = requireString(config.os_version, "candidate os_version");
-  const osModel = requireString(config.os_model, "candidate os_model");
-  const accessToken = requireString(tokens.access_token, "candidate access_token");
-  const businessUid = requireString(tokens.business_uid, "candidate business_uid");
+  const vehicleType = requireText(
+    vehicle?.vehicle_type ?? legacyVehicle?.vehicle_type,
+    "candidate travel vehicle_type",
+  );
+  const deviceId = requireText(config.device_id, "candidate device_id");
+  const region = requireText(config.region, "candidate region");
+  const osVersion = requireText(config.os_version, "candidate os_version");
+  const osModel = requireText(config.os_model, "candidate os_model");
+  const accessToken = requireText(tokens.access_token, "candidate access_token");
+  const businessUid = requireText(tokens.business_uid, "candidate business_uid");
   return {
     service,
     vehicleType,
@@ -141,13 +181,13 @@ export const createCandidateTravelReader = ({
   configDirectory,
   candidateClientFactory = createCandidateClient,
 }: {
-  legacy: Pick<NineCliClient, "rides" | "rideDetail">;
+  legacy: LegacyTravelClient;
   configDirectory: string;
   candidateClientFactory?: (service: CandidateTravelService) => CandidateTravelClient;
 }): TravelReader => ({
   async rides(serialNumber, month) {
     try {
-      const context = await readContext(configDirectory, serialNumber);
+      const context = await readContext(configDirectory, serialNumber, legacy.vehicles);
       const fields = {
         ...requestBaseFields(context),
         month,
@@ -164,7 +204,7 @@ export const createCandidateTravelReader = ({
   },
   async rideDetail(serialNumber, travelId) {
     try {
-      const context = await readContext(configDirectory, serialNumber);
+      const context = await readContext(configDirectory, serialNumber, legacy.vehicles);
       const fields = {
         ...requestBaseFields(context),
         travel_id: travelId,
