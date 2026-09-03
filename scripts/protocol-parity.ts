@@ -29,6 +29,7 @@ const printUsage = () => {
 
 Options:
   --vehicle-index=<number>  Zero-based cached vehicle index (default: 0).
+  --all-vehicles            Run the parity suite for every cached vehicle.
   --rounds=<number>         Number of sequential samples, from 1 to 20 (default: 3).
   --service=<ebike|motor>   Override the cached vehicle business line.
   --month=<YYYYMM>          Travel month to compare (default: previous calendar month).
@@ -52,6 +53,7 @@ const readNamedArgument = (name: string) => {
 const unknownArguments = argumentsList.filter(
   (argument) =>
     !argument.startsWith("--vehicle-index=") &&
+    argument !== "--all-vehicles" &&
     !argument.startsWith("--rounds=") &&
     !argument.startsWith("--service=") &&
     !argument.startsWith("--month="),
@@ -97,6 +99,76 @@ if (
   Number(parityMonth.slice(4)) > 12
 ) {
   throw new Error("month must be a valid YYYYMM value");
+}
+
+const allVehicles = argumentsList.includes("--all-vehicles");
+if (allVehicles && argumentsList.some((argument) => argument.startsWith("--vehicle-index="))) {
+  throw new Error("--all-vehicles cannot be combined with --vehicle-index");
+}
+
+if (allVehicles) {
+  const cachedVehicles = await readFile(join(configDirectory, "vehicles.json"), "utf8").then(
+    JSON.parse,
+  );
+  const vehicleCount =
+    cachedVehicles !== null &&
+    typeof cachedVehicles === "object" &&
+    !Array.isArray(cachedVehicles) &&
+    Array.isArray((cachedVehicles as { vehicles?: unknown }).vehicles)
+      ? (cachedVehicles as { vehicles: unknown[] }).vehicles.length
+      : 0;
+  if (vehicleCount === 0) throw new Error("No cached vehicles available for parity");
+  const scriptPath = process.argv[1];
+  if (!scriptPath) throw new Error("Unable to resolve protocol parity script path");
+  const reports: unknown[] = [];
+  for (let index = 0; index < vehicleCount; index += 1) {
+    const childArguments = [
+      scriptPath,
+      `--vehicle-index=${index}`,
+      `--rounds=${rounds}`,
+      `--month=${parityMonth}`,
+    ];
+    if (requestedService) childArguments.push(`--service=${requestedService}`);
+    try {
+      // Keep multi-vehicle runs sequential to avoid bursting the upstream with duplicate reads.
+      // eslint-disable-next-line no-await-in-loop
+      const result = await execFileAsync(process.execPath, childArguments, {
+        env: process.env,
+        maxBuffer: 16 * 1024 * 1024,
+      });
+      reports.push(JSON.parse(result.stdout));
+    } catch (error) {
+      reports.push({
+        vehicleIndex: index,
+        error: { type: error instanceof Error ? error.name : "UnknownError" },
+      });
+    }
+  }
+  const allEqual =
+    reports.length === vehicleCount &&
+    reports.every(
+      (report) =>
+        report !== null &&
+        typeof report === "object" &&
+        (report as { allEqual?: unknown }).allEqual === true,
+    );
+  console.log(
+    JSON.stringify(
+      {
+        configDirectoryName: basename(configDirectory),
+        vehicleCount,
+        requestedRounds: rounds,
+        month: parityMonth,
+        ...(requestedService ? { service: requestedService } : {}),
+        reports,
+        allEqual,
+      },
+      null,
+      2,
+    ),
+  );
+  process.exitCode = allEqual ? 0 : 1;
+  process.exit();
 }
 
 const [config, tokens, vehicleCache] = await Promise.all([

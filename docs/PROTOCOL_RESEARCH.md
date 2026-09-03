@@ -196,7 +196,7 @@ Node 子路径另外提供 `decodeVehicleListResponseCandidateWithCodec`，将�
 
 为支持迁移期的字段级对照，`@jiuhao/ninebot-client` 新增 `compareNinebotPayloads`。它只在内存比较 ninecli 与 Node 结果，报告路径、类型、长度和差异原因，不返回任何字段值；数组和嵌套对象达到比较上限时会标记 `truncated`，不会把不完整比较误报为一致。
 
-仓库同时提供 `pnpm protocol:parity -- --rounds=3`，从 `NINEBOT_CONFIG_DIR` 读取本机已有 ninecli 会话，连续运行 oracle 与 Node telemetry/travel 候选，并只输出 parity 元数据。脚本支持 `--vehicle-index`、`--service` 和 `--month`，不会打印车辆序列号、令牌、坐标、Header 值或响应正文；只要任一轮请求失败或出现差异，进程就以退出码 1 结束，适合在迁移前重复执行多车辆、多车型校验和自动化门禁。
+仓库同时提供 `pnpm protocol:parity -- --rounds=3`，从 `NINEBOT_CONFIG_DIR` 读取本机已有 ninecli 会话，连续运行 oracle 与 Node telemetry/travel 候选，并只输出 parity 元数据。脚本支持 `--vehicle-index`、`--all-vehicles`、`--service` 和 `--month`；其中 `--all-vehicles` 会按缓存顺序逐车执行完整套件，适合新账号或多车型会话。脚本不会打印车辆序列号、令牌、坐标、Header 值或响应正文；只要任一轮请求失败或出现差异，进程就以退出码 1 结束。
 
 Electron 现支持显式设置 `NINEBOT_TELEMETRY_SOURCE=candidate` 来试用 Node telemetry 候选；候选读取本地 ninecli 会话并在 status/battery 任一失败时自动回退内置 ninecli。未设置该变量时行为完全不变，仍由 ninecli 提供实时状态和电池数据。该开关用于迁移期验证，不代表已经切换默认数据源。
 
