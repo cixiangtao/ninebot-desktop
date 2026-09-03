@@ -198,6 +198,12 @@ const mergeAbortSignals = (signals: readonly AbortSignal[]): RequestSignal => {
   return { signal: controller.signal, cleanup };
 };
 
+const assertRequestActive = (signal: AbortSignal) => {
+  if (signal.aborted) {
+    throw signal.reason ?? new Error("Ninebot candidate request was cancelled");
+  }
+};
+
 /**
  * Composes runtime-specific candidate clients behind one platform-neutral session API.
  *
@@ -212,15 +218,15 @@ export const createNinebotCandidateSessionClientFromClients = ({
   nonceFactory = generateWebNonce,
   requestIdFactory = nonceFactory,
 }: CreateNinebotCandidateSessionClientFromClientsOptions): NinebotCandidateSessionClient => {
-  let activeSession: NinebotCandidateSessionFields | null = session;
+  let sessionRef: NinebotCandidateSessionFields | null = session;
   const sessionAbortController = new AbortController();
   const withRequestId = (headers: Readonly<Record<string, string>> | undefined) => ({
     "request-id": requestIdFactory(),
     ...headers,
   });
   const getSession = () => {
-    if (activeSession === null) throw new Error("Ninebot candidate session client is closed");
-    return activeSession;
+    if (sessionRef === null) throw new Error("Ninebot candidate session client is closed");
+    return sessionRef;
   };
   const requestSignal = (callerSignal: AbortSignal | undefined) =>
     callerSignal === undefined
@@ -233,14 +239,16 @@ export const createNinebotCandidateSessionClientFromClients = ({
     headers,
     signal,
   }: CandidateVehicleRequestOptions) => {
-    const fields: VehicleListPlaintextFields = {
-      ...getSession(),
-      vehicle_type: asVehicleType(vehicleType),
-      serviceTime: clock(),
-      nonce: nonceFactory(),
-    };
+    const currentSession = getSession();
     const request = requestSignal(signal);
     try {
+      assertRequestActive(request.signal);
+      const fields: VehicleListPlaintextFields = {
+        ...currentSession,
+        vehicle_type: asVehicleType(vehicleType),
+        serviceTime: clock(),
+        nonce: nonceFactory(),
+      };
       return await clients.vehicles.list({
         service,
         fields,
@@ -258,14 +266,16 @@ export const createNinebotCandidateSessionClientFromClients = ({
     headers,
     signal,
   }: CandidateTelemetryRequestOptions) => {
-    const fields = {
-      ...getSession(),
-      sn_str: serialNumber,
-      serviceTime: clock(),
-      nonce: nonceFactory(),
-    };
+    const currentSession = getSession();
     const request = requestSignal(signal);
     try {
+      assertRequestActive(request.signal);
+      const fields = {
+        ...currentSession,
+        sn_str: serialNumber,
+        serviceTime: clock(),
+        nonce: nonceFactory(),
+      };
       return await clients.telemetry.status({
         service,
         fields,
@@ -283,14 +293,16 @@ export const createNinebotCandidateSessionClientFromClients = ({
     headers,
     signal,
   }: CandidateTelemetryRequestOptions) => {
-    const fields = {
-      ...getSession(),
-      wnumber: serialNumber,
-      serviceTime: clock(),
-      nonce: nonceFactory(),
-    };
+    const currentSession = getSession();
     const request = requestSignal(signal);
     try {
+      assertRequestActive(request.signal);
+      const fields = {
+        ...currentSession,
+        wnumber: serialNumber,
+        serviceTime: clock(),
+        nonce: nonceFactory(),
+      };
       return await clients.telemetry.battery({
         service,
         fields,
@@ -303,17 +315,19 @@ export const createNinebotCandidateSessionClientFromClients = ({
   };
 
   const travelFields = ({
+    session: currentSession,
     serialNumber,
     vehicleType,
   }: {
+    session: NinebotCandidateSessionFields;
     serialNumber: string;
     vehicleType: string | number;
   }) => ({
-    ...getSession(),
+    ...currentSession,
     wnumber: serialNumber,
-    rnVersion: getSession().rnVersion ?? "743",
+    rnVersion: currentSession.rnVersion ?? "743",
     vehicle_type: asVehicleType(vehicleType),
-    current_version: getSession().current_version ?? "610063322",
+    current_version: currentSession.current_version ?? "610063322",
     serviceTime: clock(),
     nonce: nonceFactory(),
   });
@@ -326,13 +340,15 @@ export const createNinebotCandidateSessionClientFromClients = ({
     headers,
     signal,
   }: CandidateTravelMonthRequestOptions) => {
-    const fields = {
-      ...travelFields({ serialNumber, vehicleType }),
-      month: monthKey,
-      page: "1",
-    } as TravelMonthPlaintextFields;
+    const currentSession = getSession();
     const request = requestSignal(signal);
     try {
+      assertRequestActive(request.signal);
+      const fields = {
+        ...travelFields({ session: currentSession, serialNumber, vehicleType }),
+        month: monthKey,
+        page: "1",
+      } as TravelMonthPlaintextFields;
       return await clients.travel.month({
         fields,
         businessType: businessTypeFor(service),
@@ -352,12 +368,14 @@ export const createNinebotCandidateSessionClientFromClients = ({
     headers,
     signal,
   }: CandidateTravelDetailRequestOptions) => {
-    const fields = {
-      ...travelFields({ serialNumber, vehicleType }),
-      travel_id: travelId,
-    } as TravelDetailPlaintextFields;
+    const currentSession = getSession();
     const request = requestSignal(signal);
     try {
+      assertRequestActive(request.signal);
+      const fields = {
+        ...travelFields({ session: currentSession, serialNumber, vehicleType }),
+        travel_id: travelId,
+      } as TravelDetailPlaintextFields;
       return await clients.travel.detail({
         fields,
         businessType: businessTypeFor(service),
@@ -371,7 +389,7 @@ export const createNinebotCandidateSessionClientFromClients = ({
 
   const clear = () => {
     sessionAbortController.abort(new Error("Ninebot candidate session client was cleared"));
-    activeSession = null;
+    sessionRef = null;
   };
 
   return { listVehicles, status, battery, month, detail, clear };

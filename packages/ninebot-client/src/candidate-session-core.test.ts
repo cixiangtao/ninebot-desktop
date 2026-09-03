@@ -193,4 +193,51 @@ describe("platform-neutral candidate session core", () => {
     expect(signal).toBeDefined();
     expect(signal?.aborted).toBe(false);
   });
+
+  it("fails before generating request material when the caller signal is already aborted", async () => {
+    let nonceCalls = 0;
+    let clientCalls = 0;
+    const client = createNinebotCandidateSessionClientFromClients({
+      session,
+      clients: {
+        vehicles: {
+          list: async () => {
+            clientCalls += 1;
+            return { code: 1, data: [], desc: null, time_cost: 0, extra: null };
+          },
+        },
+        telemetry: {
+          status: async () => ({ code: 1, data: [], desc: null, time_cost: 0, extra: null }),
+          battery: async () => ({ code: 1, data: {}, desc: null, time_cost: 0, extra: null }),
+        },
+        travel: {
+          month: async () => ({
+            code: 1,
+            detail: [],
+            desc: null,
+            duration: 0,
+            ec: 0,
+            first_time: null,
+            list: [],
+            month: "202608",
+            times: 0,
+            total_mileages: 0,
+          }),
+          detail: async () => ({ code: 1, desc: null, trail: "" }),
+        },
+      } satisfies NinebotCandidateSessionClients,
+      nonceFactory: () => {
+        nonceCalls += 1;
+        return "0123456789abcdef0123456789abcdef";
+      },
+    });
+    const controller = new AbortController();
+    controller.abort(new Error("already cancelled"));
+
+    await expect(
+      client.listVehicles({ service: "ebike", vehicleType: 14363, signal: controller.signal }),
+    ).rejects.toThrow("already cancelled");
+    expect(nonceCalls).toBe(0);
+    expect(clientCalls).toBe(0);
+  });
 });
