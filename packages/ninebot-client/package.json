@@ -33,6 +33,10 @@
       "types": "./dist/vehicle-node.d.ts",
       "import": "./dist/vehicle-node.js"
     },
+    "./travel-node": {
+      "types": "./dist/travel-node.d.ts",
+      "import": "./dist/travel-node.js"
+    },
     "./rsa-node": {
       "types": "./dist/rsa-node.d.ts",
       "import": "./dist/rsa-node.js"

@@ -132,7 +132,7 @@ export interface BuildVehicleListCandidateHeadersOptions {
   serviceTime?: number;
 }
 
-/** Builds the observed non-secret headers for a vehicle-list request. */
+/** Builds the observed request headers for a vehicle-list request. */
 export const buildVehicleListCandidateHeaders = ({
   service,
   fields,
@@ -154,6 +154,7 @@ export const buildVehicleListCandidateHeaders = ({
     "client-ver": fields.client_ver,
     "device-id": fields.device_id,
     debug: "0",
+    access_token: fields.access_token,
     language: fields.language,
     "login-country": fields.login_country,
     platform: platformHeader,

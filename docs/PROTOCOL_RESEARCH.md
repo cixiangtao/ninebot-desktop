@@ -161,3 +161,11 @@ Node 子路径另外提供 `decodeVehicleListResponseCandidateWithCodec`，将�
 同批 oracle 样本确认两种车辆服务都使用 `p="101"`、`t="0"`。Node 候选现在将这两个值设为默认值，并提供 `buildVehicleListCandidateHeaders`：根据 `motor`/`ebike` 映射 `business-type`，从请求明文映射 `client-ver`、`device-id`、平台版本、地区、语言、用户标识和服务时间，同时补齐 `cache-control`、`debug`、`request-id` 与 `user-agent` 等已观察 Header。调用方仍可显式覆盖 Header 或 RSA 公钥，以便后续版本差分。
 
 这次验证只提升 Node 候选路径的可信度；Electron 默认数据源仍是内置 ninecli，未被自动切换。登录、令牌刷新和短信人机验证仍不在本迁移范围内。
+
+### 2026-09-03 travel 月度请求形状
+
+通过同一记录器对 `travel --month 202608` 取得一组私有样本，确认请求进入 `travel` 服务的 `POST /app-api/travel/v6/travel-list2`。请求和响应仍使用与车辆列表相同的 `d/h/k/p/t`、`v/s/r` 加密外壳，样本中 `p="101"`、`t="0"`，请求 `d` 解码后为 AES 块对齐数据，响应 `r` 解码后为 gzip 包装的外层响应。
+
+在 `EncryptRequest` 入口捕获到的月度明文固定字段顺序为：通用设备/会话字段，随后是 `wnumber`、`rnVersion`、`vehicle_type`、`month`、`page`、`current_version`、`serviceTime`、`nonce` 和 `checkcode`。去掉 `checkcode` 后按该顺序重建 JSON，并计算大写 MD5，可与 oracle 明文中的 `checkcode` 一致。Node 子路径新增 `travel-node`，提供月度明文校验、候选加密 envelope、请求上下文和月度响应对象解析；原始 Body 未写入仓库。
+
+随后使用新 nonce/服务时间、完整 Header 映射和 `travel-node` 候选实现回放 `travel-list2`，真实服务端返回 HTTP 200；Node 成功解密并解析出业务 `code=1`、`month="202608"`、31 项日明细和 20 条行程记录。该验证提升了月度 travel 候选链的可信度，但尚未完成多月份、多车型和 `travel --detail` 的连续对照，因此 Electron 仍继续使用 ninecli。下一步是将月度候选结果接入现有 `parseRideMonth`，再研究详情请求。

@@ -116,8 +116,8 @@ const deriveCandidateKey = (keyData: NinebotCandidateKeyData) => {
  * Builds the encrypted request shape reconstructed from ninecli's crypto package.
  *
  * The wrapper ordering and primitive operations are binary-backed candidates. The
- * endpoint-specific `p`/`t` values and key-data ordering still require oracle
- * validation before this helper is used as a default transport codec.
+ * currently observed vehicle and travel endpoints use `p="101"`/`t="0"`; other
+ * endpoint families must still be validated independently before reuse.
  */
 export const buildNinebotEncryptedRequestCandidate = ({
   plaintextBody,

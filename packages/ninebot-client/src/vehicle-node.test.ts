@@ -110,6 +110,7 @@ describe("Node vehicle request body candidate", () => {
       "client-ver": "5.5.5.5",
       "device-id": "device-id",
       debug: "0",
+      access_token: "token",
       language: "zh",
       "login-country": "CN",
       platform: "Android",
