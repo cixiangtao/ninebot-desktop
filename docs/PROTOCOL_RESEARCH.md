@@ -284,3 +284,7 @@ Node SDK 新增独立的 `business-login-node` 边界：固定重建九号观察
 ### 2026-09-03 Passport refresh 响应兼容性
 
 Node fetch 可能已经自动解压 gzip 响应，但仍保留 `content-encoding: gzip` 头。SDK 的 Passport 响应解码器现先检查 gzip 魔数，避免对已解压的 refresh/whoami 响应二次解压。使用当前本机会话验证后，SDK 能稳定解析服务端 `90002 args missing` 业务错误；同一会话经 ninecli 的 refresh 代理也返回 HTTP 502，说明该旧会话的 refresh 失败属于服务端/会话状态，不能当作 SDK 请求解析失败。
+
+### 2026-09-03 领域请求会话 freshness 接线
+
+Electron 的三个 SDK reader 现在通过 `NinebotAuthSessionManager.ensureSession()` 获取会话，而不是仅从磁盘读取旧令牌。该入口在会话接近过期时执行 provider refresh、持久化替换后的 access token/uuid/refresh token，再把同一份内存会话字段交给车辆列表、telemetry 和 travel 请求；并发请求与协议工具仍可使用各自注入的文件读取边界。这样登录、刷新、退出和领域请求共享同一生命周期合同，生产主进程不需要创建 ninecli 客户端。

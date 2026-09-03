@@ -27,7 +27,7 @@ NINEBOT_CONFIG_DIR=/absolute/path/to/ninecli-config pnpm dev
 
 正式应用始终使用 TypeScript SDK 数据源；ninecli 仅保留在仓库内作为协议 parity 与迁移排查 oracle，不会被 Electron 运行时或安装包加载。SDK 读取异常默认直接报告，不会悄悄回退 ninecli；候选构造器仍保留显式 `fallbackToLegacy` 选项供 parity 工具使用。首次运行或 `vehicle-cache.json` 缺少车型元数据时，车辆候选会使用已验证的电自 `65` / 电摩 `64` 服务族发现码并缓存响应中的真实 `vehicle_type`；travel 候选随后只读取 SDK 自己的缓存，不猜测模型值。
 
-认证使用纯 SDK Passport 会话客户端（密码登录、whoami、令牌保存/刷新和退出登录）。SDK 要求车辆缓存中已有服务族和车型元数据，首次账号接入的车辆元数据引导仍在迁移中。短信请求遵循九号服务端人机校验边界，不绕过或模拟验证。
+认证使用纯 SDK Passport 会话客户端（密码登录、whoami、令牌保存/刷新和退出登录）。首次账号接入时，车辆 reader 会按已验证的电自 `65` / 电摩 `64` 服务族发现码获取并缓存真实车型元数据；后续车辆、状态、电池和骑行请求都会先向会话管理器取得新鲜令牌，临近过期时自动刷新。短信请求遵循九号服务端人机校验边界，不绕过或模拟验证。
 
 候选请求默认最多等待 15 秒；VPN 或上游较慢时可通过 `NINEBOT_CANDIDATE_TIMEOUT_MS` 调整为正整数毫秒，超过 120 秒会按 120 秒执行，空值或非法值回到 15 秒。超时后该次读取按 SDK 错误边界结束，不会偷偷切换到 ninecli，也不会改变数据源开关或会话凭据。
 
