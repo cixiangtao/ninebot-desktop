@@ -115,6 +115,36 @@ select:focus-visible {
   font-weight: 620;
 }
 
+.account-connect-card {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  gap: 10px;
+  margin-top: 9px;
+  padding: 13px 12px;
+  border: 1px solid #d9eeeb;
+  border-radius: 15px;
+  color: #087f76;
+  background: #f2fbfa;
+  text-align: left;
+}
+
+.account-connect-card > span {
+  display: grid;
+  gap: 3px;
+}
+
+.account-connect-card strong {
+  color: #24404a;
+  font-size: 13px;
+  font-weight: 680;
+}
+
+.account-connect-card small {
+  color: #71828a;
+  font-size: 11px;
+}
+
 .vehicle-card {
   display: flex;
   width: 100%;
@@ -1228,6 +1258,76 @@ select:focus-visible {
   color: #087f76;
   background: #e9f7f5;
   font-size: 11px;
+  font-weight: 680;
+}
+
+.unauthenticated-page {
+  display: grid;
+  height: 100%;
+  place-items: center;
+  padding: 32px;
+  background: radial-gradient(circle at 50% 28%, rgb(218 247 243 / 74%), transparent 36%), #f7fafb;
+}
+
+.unauthenticated-card {
+  display: grid;
+  width: min(440px, 100%);
+  justify-items: center;
+  gap: 10px;
+  padding: 42px 36px 38px;
+  border: 1px solid rgb(211 229 229 / 86%);
+  border-radius: 24px;
+  background: rgb(255 255 255 / 88%);
+  box-shadow: 0 24px 64px rgb(45 81 88 / 12%);
+  text-align: center;
+  backdrop-filter: blur(24px);
+}
+
+.unauthenticated-icon {
+  display: grid;
+  width: 58px;
+  height: 58px;
+  place-items: center;
+  margin-bottom: 8px;
+  border-radius: 18px;
+  color: #087f76;
+  background: #e5f8f5;
+}
+
+.unauthenticated-card > p {
+  margin: 0;
+  color: #7b8994;
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.unauthenticated-card h1 {
+  margin: 0;
+  color: #20333d;
+  font-size: 22px;
+  font-weight: 720;
+  letter-spacing: -0.025em;
+}
+
+.unauthenticated-card > span:not(.unauthenticated-icon) {
+  max-width: 320px;
+  color: #70818a;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.unauthenticated-card button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 12px;
+  padding: 11px 17px;
+  border: 0;
+  border-radius: 12px;
+  color: #ffffff;
+  background: #0a9f92;
+  box-shadow: 0 8px 18px rgb(10 159 146 / 20%);
+  font-size: 13px;
   font-weight: 680;
 }
 

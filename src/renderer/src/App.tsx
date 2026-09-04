@@ -66,11 +66,9 @@ import {
   createDemoDetail,
   demoDetail,
   demoRides,
-  demoVehicle,
   demoVehicleLocations,
   demoVehicleLocationPermissions,
   demoVehicleSnapshot,
-  demoVehicles,
   demoVehicleSnapshots,
 } from "./data/demo";
 import {
@@ -110,7 +108,7 @@ import {
   type YearRideStatistics,
 } from "./lib/statistics";
 
-type DataMode = "demo" | "live";
+type DataMode = "unauthenticated" | "demo" | "live";
 type AppView = "device" | "map" | "rides" | "statistics" | "comparison";
 
 interface LiveDataOptions {
@@ -142,6 +140,17 @@ const STATISTICS_BATCH_SIZE = 3;
 const demoHistoryStartTime = Math.floor(
   new Date(new Date().getFullYear() - 1, 0, 1).getTime() / 1000,
 );
+
+const unconnectedVehicle: VehicleSummary = {
+  id: "vehicle-empty",
+  name: "未连接九号账号",
+  model: "连接账号后加载车辆",
+  access: "owner",
+  activated: null,
+  activationTime: null,
+  authorizationTime: null,
+  smartServiceRemainingDays: null,
+};
 
 const unwrap = <T,>(result: BridgeResult<T>) => {
   if (!result.ok) throw new Error(result.error.message);
@@ -188,6 +197,37 @@ const createDemoMonthSummary = (month: string, rides: RideSummary[]): RideMonthS
     longestDayMileageKm: Math.max(0, ...days.map(({ mileageKm }) => mileageKm ?? 0)),
   };
 };
+
+const createEmptyMonthSummary = (month: string): RideMonthSummary => ({
+  month,
+  historyStartTime: null,
+  rideCount: 0,
+  mileageKm: 0,
+  durationSeconds: 0,
+  energyWh: null,
+  visibleRideCount: 0,
+  aggregateAvailable: false,
+  ridesTruncated: false,
+  activeDayCount: null,
+  longestDayMileageKm: null,
+});
+
+const UnauthenticatedPanel = ({ onConnect }: { onConnect: () => void }) => (
+  <div className="unauthenticated-page">
+    <section className="unauthenticated-card">
+      <span className="unauthenticated-icon">
+        <CircleUserRound size={28} />
+      </span>
+      <p>九号账号</p>
+      <h1>连接账号后查看真实数据</h1>
+      <span>当前未连接九号账号。为了避免混淆，这里不会展示演示行程、车辆状态或虚构统计。</span>
+      <button type="button" onClick={onConnect}>
+        <CircleUserRound size={17} />
+        连接九号账号
+      </button>
+    </section>
+  </div>
+);
 
 const createDemoStatisticsSourceMonth = (month: string): YearSummaryExportMonth => {
   const monthNumber = Number(month.slice(4));
@@ -241,14 +281,12 @@ const createDemoRollingStatistics = (referenceMonth: string): MonthRideStatistic
 };
 
 export default function App() {
-  const [mode, setMode] = useState<DataMode>("demo");
+  const [mode, setMode] = useState<DataMode>("unauthenticated");
   const [view, setView] = useState<AppView>("rides");
-  const [vehicles, setVehicles] = useState<VehicleSummary[]>(demoVehicles);
-  const [vehicle, setVehicle] = useState<VehicleSummary>(demoVehicle);
+  const [vehicles, setVehicles] = useState<VehicleSummary[]>([]);
+  const [vehicle, setVehicle] = useState<VehicleSummary>(unconnectedVehicle);
   const [vehiclePickerOpen, setVehiclePickerOpen] = useState(false);
-  const [vehicleSnapshot, setVehicleSnapshot] = useState<VehicleSnapshot | null>(
-    demoVehicleSnapshot,
-  );
+  const [vehicleSnapshot, setVehicleSnapshot] = useState<VehicleSnapshot | null>(null);
   const [snapshotLoading, setSnapshotLoading] = useState(false);
   const [snapshotError, setSnapshotError] = useState<string | null>(null);
   const [snapshotUpdatedAt, setSnapshotUpdatedAt] = useState<number | null>(null);
@@ -267,30 +305,28 @@ export default function App() {
   const [locationUpdatedAt, setLocationUpdatedAt] = useState<number | null>(null);
   const [coordinateDisplayMode, setCoordinateDisplayMode] =
     useState<CoordinateDisplayMode>("source");
-  const [rides, setRides] = useState<RideSummary[]>(demoRides);
-  const [rideDays, setRideDays] = useState<RideDaySummary[]>(() =>
-    createDemoRideDays(currentMonth(), demoRides),
-  );
+  const [rides, setRides] = useState<RideSummary[]>([]);
+  const [rideDays, setRideDays] = useState<RideDaySummary[]>([]);
   const [selectedRideDay, setSelectedRideDay] = useState<number | null>(null);
   const [rideMonthSummary, setRideMonthSummary] = useState<RideMonthSummary>(() =>
-    createDemoMonthSummary(currentMonth(), demoRides),
+    createEmptyMonthSummary(currentMonth()),
   );
-  const [historyStartTime, setHistoryStartTime] = useState<number | null>(demoHistoryStartTime);
-  const [detail, setDetail] = useState<RideDetail | null>(demoDetail);
-  const [selectedRideId, setSelectedRideId] = useState<string | null>(demoDetail.id);
+  const [historyStartTime, setHistoryStartTime] = useState<number | null>(null);
+  const [detail, setDetail] = useState<RideDetail | null>(null);
+  const [selectedRideId, setSelectedRideId] = useState<string | null>(null);
   const [detailRefreshState, setDetailRefreshState] = useState<DetailRefreshState>({
     status: "idle",
   });
   const [rideSpeedVerifications, setRideSpeedVerifications] = useState<
     Record<string, RideSpeedVerification>
-  >(() => ({ [demoDetail.id]: createRideSpeedVerification(demoDetail) }));
+  >({});
   const [rideSpeedVerificationState, setRideSpeedVerificationState] =
     useState<RideSpeedVerificationState>({ status: "idle" });
   const [comparisonDetail, setComparisonDetail] = useState<RideDetail | null>(null);
   const [comparisonRideId, setComparisonRideId] = useState<string | null>(null);
   const [comparisonLoading, setComparisonLoading] = useState(false);
   const [comparisonError, setComparisonError] = useState<string | null>(null);
-  const [playbackPosition, setPlaybackPosition] = useState(38);
+  const [playbackPosition, setPlaybackPosition] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [playbackRate, setPlaybackRate] = useState<PlaybackRate>(1);
   const [loading, setLoading] = useState(false);
@@ -316,17 +352,13 @@ export default function App() {
   const thisMonth = useMemo(() => currentMonth(), []);
   const currentYear = useMemo(() => Number(thisMonth.slice(0, 4)), [thisMonth]);
   const [statisticsYear, setStatisticsYear] = useState(currentYear);
-  const [statistics, setStatistics] = useState<YearRideStatistics | null>(() =>
-    createDemoYearStatistics(currentYear, thisMonth),
-  );
-  const [rollingStatisticsMonths, setRollingStatisticsMonths] = useState<MonthRideStatistics[]>(
-    () => createDemoRollingStatistics(thisMonth),
-  );
+  const [statistics, setStatistics] = useState<YearRideStatistics | null>(null);
+  const [rollingStatisticsMonths, setRollingStatisticsMonths] = useState<MonthRideStatistics[]>([]);
   const [statisticsLoading, setStatisticsLoading] = useState(false);
   const [statisticsProgress, setStatisticsProgress] = useState({ loaded: 0, total: 0 });
   const [statisticsError, setStatisticsError] = useState<string | null>(null);
   const [statisticsSourceMonths, setStatisticsSourceMonths] = useState<YearSummaryExportMonth[]>(
-    () => createDemoYearMonths(currentYear, thisMonth),
+    [],
   );
   const [yearExportOpen, setYearExportOpen] = useState(false);
   const [yearExportBusy, setYearExportBusy] = useState(false);
@@ -341,7 +373,7 @@ export default function App() {
   const liveRequestRef = useRef(0);
   const snapshotRequestRef = useRef(0);
   const snapshotLoadingRef = useRef(false);
-  const vehicleSnapshotRef = useRef<VehicleSnapshot | null>(demoVehicleSnapshot);
+  const vehicleSnapshotRef = useRef<VehicleSnapshot | null>(null);
   const locationRequestRef = useRef(0);
   const statisticsRequestRef = useRef(0);
   const comparisonRequestRef = useRef(0);
@@ -349,7 +381,7 @@ export default function App() {
   const viewRef = useRef<AppView>(view);
   const vehicleRef = useRef(vehicle);
   const statisticsYearRef = useRef(statisticsYear);
-  const historyStartTimeRef = useRef<number | null>(demoHistoryStartTime);
+  const historyStartTimeRef = useRef<number | null>(null);
   const rideDetailDeferredRef = useRef(false);
   const historyStartMonth = useMemo(
     () => (historyStartTime === null ? null : getMonthFromUnixSeconds(historyStartTime)),
@@ -595,7 +627,7 @@ export default function App() {
         setRides([]);
         setRideDays([]);
         setSelectedRideDay(null);
-        setRideMonthSummary(createDemoMonthSummary(targetMonth, []));
+        setRideMonthSummary(createEmptyMonthSummary(targetMonth));
         setDetail(null);
         setSelectedRideId(null);
         seekPlayback(0);
@@ -1025,25 +1057,25 @@ export default function App() {
     ++locationRequestRef.current;
     ++statisticsRequestRef.current;
     resetComparison();
-    resetRideSpeedVerification(demoDetail);
+    resetRideSpeedVerification();
     setSecurityBusy(true);
     setSecurityError(null);
     try {
       unwrap(await window.ninebot.auth.logout());
       setAccountProfile(null);
       setAccountProfileError(null);
-      setMode("demo");
-      historyStartTimeRef.current = demoHistoryStartTime;
-      setHistoryStartTime(demoHistoryStartTime);
-      setVehicles(demoVehicles);
+      setMode("unauthenticated");
+      historyStartTimeRef.current = null;
+      setHistoryStartTime(null);
+      setVehicles([]);
       setMonth(thisMonth);
       setMonthPickerYear(getMonthYear(thisMonth));
       setMonthPickerOpen(false);
-      setVehicle(demoVehicle);
-      vehicleRef.current = demoVehicle;
+      setVehicle(unconnectedVehicle);
+      vehicleRef.current = unconnectedVehicle;
       setVehiclePickerOpen(false);
-      vehicleSnapshotRef.current = demoVehicleSnapshot;
-      setVehicleSnapshot(demoVehicleSnapshot);
+      vehicleSnapshotRef.current = null;
+      setVehicleSnapshot(null);
       setSnapshotUpdatedAt(null);
       setSnapshotError(null);
       snapshotLoadingRef.current = false;
@@ -1056,9 +1088,9 @@ export default function App() {
       setLocationUpdatedAt(null);
       setStatisticsYear(currentYear);
       statisticsYearRef.current = currentYear;
-      setStatistics(createDemoYearStatistics(currentYear, thisMonth));
-      setRollingStatisticsMonths(createDemoRollingStatistics(thisMonth));
-      setStatisticsSourceMonths(createDemoYearMonths(currentYear, thisMonth));
+      setStatistics(null);
+      setRollingStatisticsMonths([]);
+      setStatisticsSourceMonths([]);
       setStatisticsLoading(false);
       setStatisticsProgress({ loaded: 0, total: 0 });
       setStatisticsError(null);
@@ -1071,19 +1103,19 @@ export default function App() {
       setMonthExportOpen(false);
       setMonthExportError(null);
       setMonthExportNotice(null);
-      setRides(demoRides);
-      setRideDays(createDemoRideDays(thisMonth, demoRides));
+      setRides([]);
+      setRideDays([]);
       setSelectedRideDay(null);
-      setRideMonthSummary(createDemoMonthSummary(thisMonth, demoRides));
-      setDetail(demoDetail);
-      setSelectedRideId(demoDetail.id);
+      setRideMonthSummary(createEmptyMonthSummary(thisMonth));
+      setDetail(null);
+      setSelectedRideId(null);
       setDetailRefreshState({ status: "idle" });
       if (viewRef.current === "comparison") {
         viewRef.current = "rides";
         setView("rides");
       }
       setIsPlaying(false);
-      seekPlayback(38);
+      seekPlayback(0);
       setSecurityStatus(unwrap(await window.ninebot.runtime.security()));
     } catch (cause) {
       setSecurityError(cause instanceof Error ? cause.message : "无法清除本地登录令牌。");
@@ -1393,15 +1425,29 @@ export default function App() {
 
           <section className="mt-8">
             <p className="sidebar-label">我的车辆</p>
-            <VehicleSwitcher
-              vehicles={vehicles}
-              selectedVehicle={vehicle}
-              live={mode === "live"}
-              open={vehiclePickerOpen}
-              disabled={loading || snapshotLoading || vehicles.length === 0}
-              onToggle={() => setVehiclePickerOpen((open) => !open)}
-              onSelect={selectVehicle}
-            />
+            {mode === "live" ? (
+              <VehicleSwitcher
+                vehicles={vehicles}
+                selectedVehicle={vehicle}
+                live
+                open={vehiclePickerOpen}
+                disabled={loading || snapshotLoading || vehicles.length === 0}
+                onToggle={() => setVehiclePickerOpen((open) => !open)}
+                onSelect={selectVehicle}
+              />
+            ) : (
+              <button
+                className="account-connect-card"
+                type="button"
+                onClick={() => setLoginOpen(true)}
+              >
+                <CircleUserRound size={21} />
+                <span>
+                  <strong>尚未连接账号</strong>
+                  <small>连接后加载你的车辆</small>
+                </span>
+              </button>
+            )}
           </section>
 
           <nav className="mt-5 space-y-1" aria-label="主导航">
@@ -1432,7 +1478,7 @@ export default function App() {
             <NavItem icon={<Settings size={18} />} label="设置" onClick={openSecurity} />
           </nav>
 
-          {view === "rides" ? (
+          {mode === "live" && view === "rides" ? (
             <div className="mt-7 flex items-start justify-between gap-2 px-2">
               <MonthNavigator
                 month={month}
@@ -1469,7 +1515,7 @@ export default function App() {
                       : Promise.resolve())
                   }
                   aria-label="刷新行程"
-                  disabled={loading || mode === "demo"}
+                  disabled={loading}
                 >
                   <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
                 </button>
@@ -1657,7 +1703,9 @@ export default function App() {
         </header>
 
         <div className="relative min-h-0 flex-1 overflow-hidden">
-          {view === "device" ? (
+          {mode === "unauthenticated" ? (
+            <UnauthenticatedPanel onConnect={() => setLoginOpen(true)} />
+          ) : view === "device" ? (
             <VehicleDashboard
               vehicle={vehicle}
               snapshot={vehicleSnapshot}
