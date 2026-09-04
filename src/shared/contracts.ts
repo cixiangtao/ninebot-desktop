@@ -195,7 +195,7 @@ export interface RideSummary {
   dayMileageKm: number | null;
 }
 
-/** Complete month totals plus the ride rows currently exposed by ninecli. */
+/** Complete month totals plus the ride rows currently available to the client. */
 export interface RideMonthSummary {
   /** Requested month in YYYYMM form. */
   month: string;
@@ -206,11 +206,11 @@ export interface RideMonthSummary {
   durationSeconds: number;
   /** Complete month energy from ninecli's top-level `ec` field, in watt-hours. */
   energyWh: number | null;
-  /** Number of ride rows available for selection, which can be lower than `rideCount`. */
+  /** Number of ride rows available for selection, which can be lower than `rideCount` if incomplete. */
   visibleRideCount: number;
-  /** Whether count, mileage, and duration came from ninecli's complete month aggregate. */
+  /** Whether count, mileage, and duration came from the upstream month aggregate. */
   aggregateAvailable: boolean;
-  /** Whether ninecli returned fewer selectable rows than the month contains. */
+  /** Whether the client received fewer selectable rows than the month contains. */
   ridesTruncated: boolean;
   /** Active calendar days derived from ninecli's complete monthly `detail` mileage array. */
   activeDayCount: number | null;
@@ -227,7 +227,7 @@ export interface RideDaySummary {
 
 export interface RideMonth {
   summary: RideMonthSummary;
-  /** Complete per-day mileage when ninecli exposes its monthly `detail` array. */
+  /** Complete per-day mileage when the upstream exposes its monthly `detail` array. */
   days: RideDaySummary[];
   rides: RideSummary[];
 }
@@ -272,7 +272,7 @@ export interface RideDetailInput {
 
 export interface RideSpeedVerificationInput {
   vehicleId: string;
-  /** Opaque ids from the currently visible month, limited by ninecli to at most 20 rows. */
+  /** Opaque ids from the currently visible month; the client may include multiple upstream pages. */
   rideIds: string[];
 }
 

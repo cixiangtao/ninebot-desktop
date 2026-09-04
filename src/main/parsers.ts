@@ -369,7 +369,7 @@ export const parseRides = (payload: unknown): ParsedRide[] => {
   });
 };
 
-/** Preserves complete month totals even when ninecli caps the selectable ride rows. */
+/** Preserves complete month totals even when the available ride rows are incomplete. */
 export const parseRideMonth = (
   payload: unknown,
   requestedMonth: string,
