@@ -67,6 +67,10 @@ export const createHybridTravelReader = ({
         assertActive(requestGeneration);
         const envelope = complete as { code?: unknown };
         if (typeof envelope.code === "number" && envelope.code !== 0) {
+          console.warn("ninebot travel pagination business rejection", {
+            month,
+            code: envelope.code,
+          });
           throw new NinebotClientError("月度轨迹分页鉴权失败，请重新连接账号。", "auth");
         }
         const result = parseRideMonth(complete, month);
@@ -90,6 +94,10 @@ export const createHybridTravelReader = ({
         if (error instanceof NinebotClientError && error.kind === "auth") throw error;
         if (error instanceof NinebotClientError) throw error;
         if (error instanceof NinebotHttpError && (error.status === 401 || error.status === 403)) {
+          console.warn("ninebot travel pagination HTTP auth rejection", {
+            month,
+            status: error.status,
+          });
           throw new NinebotClientError("月度轨迹分页鉴权失败，请重新连接账号。", "auth");
         }
         // Do not leak protocol responses or silently return a truncated export.

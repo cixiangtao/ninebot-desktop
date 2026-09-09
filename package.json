@@ -20,6 +20,7 @@
   "scripts": {
     "dev": "pnpm run prepare:ninecli-runtime && electron-vite dev",
     "build": "pnpm run typecheck && electron-vite build",
+    "prebuild": "pnpm run build:sdk",
     "prepare:ninecli-runtime": "node scripts/prepare-ninecli-runtime.mjs",
     "build:sdk": "pnpm --filter @jiuhao/ninebot-client build",
     "preview": "pnpm run prepare:ninecli-runtime && electron-vite preview",
