@@ -8,6 +8,8 @@ import {
 } from "./app-protocol.js";
 import { registerIpcHandlers } from "./ipc.js";
 import { getBundledNineCliBinaryPath, NineCliClient } from "./ninecli.js";
+import { createCandidateTravelReader } from "./travel-source.js";
+import { createHybridTravelReader } from "./hybrid-travel-source.js";
 
 protocol.registerSchemesAsPrivileged([
   {
@@ -114,8 +116,10 @@ app.whenReady().then(async () => {
   });
   const ninecli = new NineCliClient(configDirectory, binaryPath);
   await ninecli.start();
-  registerIpcHandlers(ninecli);
-  app.on("before-quit", () => ninecli.stop());
+  const paginatedTravel = createCandidateTravelReader({ configDirectory });
+  const travelReader = createHybridTravelReader({ ninecli, paginated: paginatedTravel });
+  registerIpcHandlers(ninecli, ninecli, travelReader, ninecli);
+  app.on("before-quit", () => travelReader.clear?.());
   await createWindow();
 
   app.on("activate", () => {
