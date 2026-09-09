@@ -17,6 +17,8 @@ const appDirectory = resolve(projectRoot, "release/win-unpacked");
 const executablePath = resolve(appDirectory, "韭号出行.exe");
 const resourcesPath = resolve(appDirectory, "resources");
 const asarPath = resolve(resourcesPath, "app.asar");
+const ninecliPath = resolve(resourcesPath, "runtime/ninecli/ninecli.exe");
+const expectedNinecliSha256 = "94338e423b1d5219a2f6bfeda9af34271b83814ef725220c2598676ac18d650e";
 const verifyArtifacts = process.argv.includes("--artifacts");
 
 const require = createRequire(import.meta.url);
@@ -55,7 +57,7 @@ const readPeMachine = async (path) => {
   }
 };
 
-await Promise.all([access(executablePath), access(asarPath)]);
+await Promise.all([access(executablePath), access(asarPath), access(ninecliPath)]);
 assert((await readPeMachine(executablePath)) === 0x8664, "Windows executable is not x64");
 
 const versionResult = await run(
@@ -98,12 +100,12 @@ for (const requiredFile of [
 ]) {
   assert(asarFiles.includes(requiredFile), `Packaged ASAR is missing ${requiredFile}`);
 }
-const forbiddenPattern =
-  /(^|\/)(\.env(?:\.|$)|tokens\.json$|vehicles\.json$|config\.json$|ninecli(?:\.exe)?$)/i;
+const forbiddenPattern = /(^|\/)(\.env(?:\.|$)|tokens\.json$|vehicles\.json$|config\.json$)/i;
 assert(
   !asarFiles.some((path) => forbiddenPattern.test(path)),
-  "Packaged ASAR contains credentials, local config, or a ninecli binary",
+  "Packaged ASAR contains credentials or local config",
 );
+assert((await sha256(ninecliPath)) === expectedNinecliSha256, "Bundled ninecli hash mismatch");
 
 const expectedFuseStates = [48, 49, 48, 48, 49, 49, 48, 48];
 const fuseWire = await getCurrentFuseWire(executablePath);
@@ -119,7 +121,8 @@ const summary = {
   signature: "unsigned",
   asarFiles: asarFiles.length,
   fuses: "hardened",
-  runtime: "typescript-sdk",
+  runtime: "ninecli",
+  bundledNinecli: true,
   thirdPartyNotices: true,
 };
 

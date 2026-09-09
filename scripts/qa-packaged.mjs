@@ -101,12 +101,13 @@ try {
   if (!context) throw new Error("Packaged renderer context was not found");
   const page = context.pages()[0] ?? (await context.waitForEvent("page"));
   await page.waitForURL("ninebot-desktop://app/**");
-  await page.locator(".playback-panel").waitFor();
+  await page.locator(".unauthenticated-page, .app-shell").first().waitFor();
   const runtimeStatus = await page.evaluate(() => window.ninebot.runtime.security());
-  const sdkRuntime = runtimeStatus.ok && runtimeStatus.data.version === "typescript-sdk";
+  const ninecliRuntime = runtimeStatus.ok && runtimeStatus.data.version === "0.1.7";
   if (
     !runtimeStatus.ok ||
-    !sdkRuntime ||
+    !ninecliRuntime ||
+    runtimeStatus.data.binary.status !== "verified" ||
     runtimeStatus.data.policy.sessionCache.storage !== "memory-only" ||
     runtimeStatus.data.policy.sessionCache.rawResponsesStored !== false ||
     runtimeStatus.data.policy.sessionCache.persistsAcrossRestarts !== false ||
@@ -114,23 +115,27 @@ try {
   ) {
     throw new Error(`Packaged runtime check failed: ${JSON.stringify(runtimeStatus)}`);
   }
-  await page.getByRole("button", { name: "导出本月清单" }).click();
-  const monthExportDialog = page.getByRole("dialog", { name: "选择月度导出格式" });
-  await monthExportDialog.waitFor();
-  const monthSummaryExportReady =
-    (await monthExportDialog.getByRole("button", { name: /CSV 表格/ }).isVisible()) &&
-    (await monthExportDialog.getByRole("button", { name: /JSON 数据/ }).isVisible()) &&
-    (await monthExportDialog.getByText(/不包含 GPS、轨迹点、车辆 SN/).isVisible());
-  if (!monthSummaryExportReady) throw new Error("Packaged month summary export is incomplete");
+  const monthExportButton = page.getByRole("button", { name: "导出本月清单" });
+  const monthSummaryExportReady = await monthExportButton.isVisible().catch(() => false);
+  if (monthSummaryExportReady) {
+    await monthExportButton.click();
+    const monthExportDialog = page.getByRole("dialog", { name: "选择月度导出格式" });
+    await monthExportDialog.waitFor();
+    const exportDialogReady =
+      (await monthExportDialog.getByRole("button", { name: /CSV 表格/ }).isVisible()) &&
+      (await monthExportDialog.getByRole("button", { name: /JSON 数据/ }).isVisible()) &&
+      (await monthExportDialog.getByText(/不包含 GPS、轨迹点、车辆 SN/).isVisible());
+    if (!exportDialogReady) throw new Error("Packaged month summary export is incomplete");
+  }
   console.log(
     JSON.stringify({
       title: await page.title(),
       platform: process.platform,
       demoReady: true,
       bridgeReady: true,
-      runtimeMode: "typescript-sdk",
-      bundledRuntime: false,
-      binaryVerified: false,
+      runtimeMode: "ninecli",
+      bundledRuntime: true,
+      binaryVerified: runtimeStatus.data.binary.status === "verified",
       sessionCacheMemoryOnly: true,
       monthSummaryExportReady,
     }),

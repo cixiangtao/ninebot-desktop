@@ -1,4 +1,3 @@
-import { access } from "node:fs/promises";
 import { join } from "node:path";
 import { app, BrowserWindow, dialog, Menu, protocol, session, shell } from "electron";
 import {
@@ -7,24 +6,8 @@ import {
   appProtocolScheme,
   registerAppProtocol,
 } from "./app-protocol.js";
-import {
-  createFileNinebotAuthSessionStore,
-  createFetchNinebotTransport,
-  createNinebotPassportAuthProvider,
-  createNinebotPassportLoginClient,
-  NinebotAuthSessionManager,
-  defaultNinebotServiceEndpoints,
-} from "@jiuhao/ninebot-client";
-import { decodeGzipBody } from "@jiuhao/ninebot-client/response-node";
 import { registerIpcHandlers } from "./ipc.js";
-import type { NinebotAppClient } from "./app-client.js";
-import { candidateRequestTimeoutMs } from "./candidate-client.js";
-import { createNinebotSdkAppClient } from "./sdk-app-client.js";
-import { createSdkRuntimeDiagnostics } from "./sdk-runtime.js";
-import { createCandidateTelemetryReader } from "./telemetry-source.js";
-import { createCandidateTravelReader } from "./travel-source.js";
-import { createCandidateVehicleReader } from "./vehicle-source.js";
-import { resolveNinebotConfigDirectory } from "./config-directory.js";
+import { getBundledNineCliBinaryPath, NineCliClient } from "./ninecli.js";
 
 protocol.registerSchemesAsPrivileged([
   {
@@ -123,52 +106,16 @@ app.whenReady().then(async () => {
   );
   registerAppProtocol(join(import.meta.dirname, "../renderer"));
   const userDataDirectory = app.getPath("userData");
-  const sdkDirectory = join(userDataDirectory, "ninebot");
-  const [sdkDirectoryExists, legacyDirectoryExists] = await Promise.all([
-    access(sdkDirectory).then(
-      () => true,
-      () => false,
-    ),
-    access(join(userDataDirectory, "ninecli")).then(
-      () => true,
-      () => false,
-    ),
-  ]);
-  const configDirectory = resolveNinebotConfigDirectory({
-    explicitDirectory: process.env.NINEBOT_CONFIG_DIR,
-    userDataDirectory,
-    sdkDirectoryExists,
-    legacyDirectoryExists,
+  const configDirectory = process.env.NINEBOT_CONFIG_DIR ?? join(userDataDirectory, "ninebot");
+  const binaryPath = getBundledNineCliBinaryPath({
+    appPath: app.getAppPath(),
+    isPackaged: app.isPackaged,
+    resourcesPath: process.resourcesPath,
   });
-  const passportOrigin =
-    process.env.NINEBOT_PASSPORT_ORIGIN ??
-    defaultNinebotServiceEndpoints.find(({ service }) => service === "passport")?.upstreamOrigin;
-  if (!passportOrigin) throw new Error("Ninebot Passport origin is unavailable");
-  const transport = createFetchNinebotTransport({
-    origins: { passport: passportOrigin },
-    timeoutMs: candidateRequestTimeoutMs,
-  });
-  const passportClient = createNinebotPassportLoginClient({
-    transport,
-    responseBodyDecoder: (response) => decodeGzipBody(response),
-  });
-  const auth = new NinebotAuthSessionManager({
-    provider: createNinebotPassportAuthProvider(passportClient),
-    store: createFileNinebotAuthSessionStore({ directory: configDirectory }),
-  });
-  await auth.restore();
-  const sessionProvider = () => auth.ensureSession();
-  const telemetryReader = createCandidateTelemetryReader({ configDirectory, sessionProvider });
-  const travelReader = createCandidateTravelReader({ configDirectory, sessionProvider });
-  const vehicleReader = createCandidateVehicleReader({ configDirectory, sessionProvider });
-  const appClient: NinebotAppClient = createNinebotSdkAppClient({
-    auth,
-    diagnostics: createSdkRuntimeDiagnostics({ configDirectory, auth }),
-    telemetryReader,
-    travelReader,
-    vehicleReader,
-  });
-  registerIpcHandlers(appClient);
+  const ninecli = new NineCliClient(configDirectory, binaryPath);
+  await ninecli.start();
+  registerIpcHandlers(ninecli);
+  app.on("before-quit", () => ninecli.stop());
   await createWindow();
 
   app.on("activate", () => {

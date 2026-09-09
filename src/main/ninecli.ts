@@ -1,11 +1,11 @@
-import { spawn } from "node:child_process";
+import { spawn, type ChildProcess } from "node:child_process";
 import { createHash } from "node:crypto";
 import { constants } from "node:fs";
 import { access, chmod, mkdir, readFile, rm, stat } from "node:fs/promises";
 import { basename, join } from "node:path";
-import { candidateRequestTimeoutMs } from "./candidate-client.js";
-import { resolveCandidateSource } from "./data-source.js";
 import { NinebotClientError } from "./app-client.js";
+
+const candidateRequestTimeoutMs = 45_000;
 
 export const ninecliVersion = "0.1.7";
 const commandTimeoutMs = 45_000;
@@ -236,6 +236,7 @@ const collectProcess = (
   args: string[],
   environment: NodeJS.ProcessEnv,
   missingMessage: string,
+  registerChild?: (child: ChildProcess) => () => void,
 ) =>
   new Promise<{ stdout: string; stderr: string; code: number | null }>((resolve, reject) => {
     const child = spawn(executable, args, {
@@ -243,6 +244,7 @@ const collectProcess = (
       shell: false,
       stdio: ["ignore", "pipe", "pipe"],
     });
+    const unregisterChild = registerChild?.(child);
     let stdout = "";
     let stderr = "";
     let settled = false;
@@ -250,6 +252,7 @@ const collectProcess = (
       if (settled) return;
       settled = true;
       clearTimeout(timer);
+      unregisterChild?.();
       callback();
     };
     const timer = setTimeout(() => {
@@ -282,11 +285,29 @@ const collectProcess = (
 /** Narrow adapter around a fixed, integrity-checked subset of ninecli. */
 export class NineCliClient {
   private binaryPathPromise: Promise<string> | null = null;
+  private readonly activeChildren = new Set<ChildProcess>();
 
   constructor(
     private readonly configDirectory: string,
     private readonly bundledBinaryPath: string,
   ) {}
+
+  /** Verifies that the bundled executable is available before the first request. */
+  async start() {
+    await this.prepareConfigDirectory();
+    await this.resolveVerifiedBinaryPath();
+  }
+
+  /** Terminates in-flight commands and forgets runtime discovery state. */
+  stop() {
+    for (const child of this.activeChildren) child.kill("SIGTERM");
+    this.activeChildren.clear();
+    this.binaryPathPromise = null;
+  }
+
+  clear() {
+    this.stop();
+  }
 
   async login(user: string, areaCode: string, password: string) {
     await this.run("login", ["--area", areaCode, "--user", user, "--password", password], false);
@@ -354,9 +375,9 @@ export class NineCliClient {
       candidate: {
         requestTimeoutMs: candidateRequestTimeoutMs,
         domains: {
-          vehicle: resolveCandidateSource(process.env, "vehicle"),
-          telemetry: resolveCandidateSource(process.env, "telemetry"),
-          travel: resolveCandidateSource(process.env, "travel"),
+          vehicle: "ninecli",
+          telemetry: "ninecli",
+          travel: "ninecli",
         },
       },
       binary: {
@@ -496,6 +517,10 @@ export class NineCliClient {
         commandArgs,
         createNineCliEnvironment(),
         "内置数据组件不可用，请重新安装韭号出行。",
+        (child) => {
+          this.activeChildren.add(child);
+          return () => this.activeChildren.delete(child);
+        },
       );
     } finally {
       // Login may create token files, so close their permissions before returning control.
