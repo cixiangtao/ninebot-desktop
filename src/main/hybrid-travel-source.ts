@@ -1,5 +1,6 @@
 import { parseRideMonth } from "./parsers.js";
 import { NinebotClientError } from "./app-client.js";
+import { NinebotHttpError } from "@jiuhao/ninebot-client";
 import type { TravelReader } from "./travel-source.js";
 
 /**
@@ -47,7 +48,10 @@ export const createHybridTravelReader = ({
         )
           throw new Error("Incomplete month");
         return complete;
-      } catch {
+      } catch (error) {
+        if (error instanceof NinebotHttpError && (error.status === 401 || error.status === 403)) {
+          throw new NinebotClientError("月度轨迹分页鉴权失败，请重新连接账号。", "auth");
+        }
         // Do not leak protocol responses or silently return a truncated export.
         throw new NinebotClientError("完整月份读取失败，请刷新重试；若持续失败，请重新连接账号。");
       }
