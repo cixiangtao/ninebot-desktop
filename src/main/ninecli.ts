@@ -528,6 +528,14 @@ export class NineCliClient {
     }
     if (result.code === 0) return result.stdout;
 
+    console.warn("ninecli command failed", {
+      command,
+      exitCode: result.code,
+      stdoutLength: result.stdout.length,
+      stderrLength: result.stderr.length,
+      configDirectory: basename(this.configDirectory),
+    });
+
     throw classifyNineCliFailure(result.stdout, result.stderr);
   }
 }
