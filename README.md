@@ -1,16 +1,16 @@
 # 韭号出行
 
-一个本地只读的九号车辆与骑行数据客户端。当前由 Node.js/TypeScript SDK 查询车辆状态、电池信息、骑行记录并负责 Passport 会话；ninecli 只在仓库工具中作为协议对照 oracle 保留；支持自有/共享车辆与多车辆切换，并按账号关系展示车辆激活日期或获得共享权限的日期；区分主电源与 ACC，逐组查看单/双电池的类型、电量、评分、温度、电压、循环次数和 BMS 说明，对比智能/精细/基础三种续航估算并展示充电剩余时间与预计完成时间，还可按需监看只读状态变化；按年份和月份浏览历史，导出年度统计或带极速依据的月度逐次清单，通过全年每日里程热力图查看连续骑行和活跃规律，把官方电自详情页没有展示的极速、单次能耗、电量消耗、平均能耗和骑行日背景直接可视化，并支持同月行程对比以及 GPX、CSV、JSON 三种格式导出。
+一个本地只读的九号车辆与骑行数据客户端。桌面端随包提供经过固定哈希校验的 ninecli 0.1.7，Electron 主进程负责运行时生命周期、领域解析、缓存与导出；支持自有/共享车辆与多车辆切换，并按账号关系展示车辆激活日期或获得共享权限的日期；区分主电源与 ACC，逐组查看单/双电池的类型、电量、评分、温度、电压、循环次数和 BMS 说明，对比智能/精细/基础三种续航估算并展示充电剩余时间与预计完成时间，还可按需监看只读状态变化；按年份和月份浏览历史，导出年度统计或带极速依据的月度逐次清单，通过全年每日里程热力图查看连续骑行和活跃规律，把官方电自详情页没有展示的极速、单次能耗、电量消耗、平均能耗和骑行日背景直接可视化，并支持同月行程对比以及 GPX、CSV、JSON 三种格式导出。
 
 ## 下载
 
-[GitHub Releases](https://github.com/cixiangtao/ninebot-desktop/releases) 提供 macOS Apple Silicon 的 DMG/ZIP、Windows x64 的 NSIS 安装程序/ZIP，以及统一的 SHA-256 校验清单。安装包已经内置 TypeScript SDK，普通使用者无需另装 Python、uv 或 ninecli。当前 macOS 包采用 ad-hoc 签名且尚未经过 Apple 公证，Windows 包尚未进行 Authenticode 签名，因此 Release 会标记为 prerelease；Gatekeeper 或 Microsoft Defender SmartScreen 可能阻止直接打开，请只在理解并接受风险时安装。
+[GitHub Releases](https://github.com/cixiangtao/ninebot-desktop/releases) 提供 macOS Apple Silicon 的 DMG/ZIP、Windows x64 的 NSIS 安装程序/ZIP，以及统一的 SHA-256 校验清单。安装包已经内置 ninecli 运行时，普通使用者无需另装 Python、uv 或 ninecli。当前 macOS 包采用 ad-hoc 签名且尚未经过 Apple 公证，Windows 包尚未进行 Authenticode 签名，因此 Release 会标记为 prerelease；Gatekeeper 或 Microsoft Defender SmartScreen 可能阻止直接打开，请只在理解并接受风险时安装。
 
 本项目不是九号官方产品，也未获得九号品牌或商业背书。
 
 ## 开发
 
-源码开发只需要 Node.js 24 和 pnpm 10。`pnpm dev` 直接启动 Electron 与 TypeScript SDK；只有运行协议 parity 工具时才需要另外准备 ninecli oracle，生成目录不会进入 Git。
+源码开发只需要 Node.js 24 和 pnpm 10。`pnpm dev` 会准备并校验本机平台的 ninecli 运行时后启动 Electron；生成目录不会进入 Git。
 
 ```bash
 pnpm install
@@ -23,9 +23,9 @@ pnpm dev
 NINEBOT_CONFIG_DIR=/absolute/path/to/ninecli-config pnpm dev
 ```
 
-仓库正在把现有只读能力逐步迁移为 Node.js/TypeScript SDK。当前已经加入仅监听本机、默认不保存 Body 原文的协议记录器，以 ninecli 作为迁移期行为对照；使用方式、私有样本边界和实现顺序见[九号协议研究计划](docs/PROTOCOL_RESEARCH.md)。
+仓库保留 Node.js/TypeScript 协议研究工具用于离线 parity 和响应解析测试；生产桌面端固定通过随包 ninecli 访问九号服务。协议记录器仅监听本机且默认不保存 Body 原文，使用方式和私有样本边界见[九号协议研究计划](docs/PROTOCOL_RESEARCH.md)。
 
-正式应用始终使用 TypeScript SDK 数据源；ninecli 仅保留在仓库内作为协议 parity 与迁移排查 oracle，不会被 Electron 运行时或安装包加载。SDK 读取异常默认直接报告，不会悄悄回退 ninecli；候选构造器仍保留显式 `fallbackToLegacy` 选项供 parity 工具使用。首次运行或 `vehicle-cache.json` 缺少车型元数据时，车辆候选会使用已验证的电自 `65` / 电摩 `64` 服务族发现码并缓存响应中的真实 `vehicle_type`；travel 候选随后只读取 SDK 自己的缓存，不猜测模型值。
+正式应用固定使用 ninecli 数据源。Electron 只允许 `whoami`、`login`、`login-code`、`vehicles`、`status`、`battery` 和 `travel` 这一组只读或认证命令，并在执行前验证随包二进制；运行时输出先在主进程解析为脱敏领域对象，再进入 IPC。ninecli 的 `travel --month` 只提供首屏逐次明细，同时返回完整月度汇总，页面会明确标注明细截断状态，不把首屏伪装成分页全量。
 
 认证使用纯 SDK Passport 会话客户端（密码登录、whoami、令牌保存/刷新和退出登录）。首次账号接入时，车辆 reader 会按已验证的电自 `65` / 电摩 `64` 服务族发现码获取并缓存真实车型元数据；后续车辆、状态、电池和骑行请求都会先向会话管理器取得新鲜令牌，临近过期时自动刷新。短信请求遵循九号服务端人机校验边界，不绕过或模拟验证。
 
@@ -41,7 +41,7 @@ SDK 还提供 `@jiuhao/ninebot-client/crypto-web`，以 Web Crypto 和纯 TypeSc
 
 在线地图默认使用 SDK telemetry 返回的坐标原值。中国大陆范围内可显式切换本地 `GCJ-02 → WGS84` 校准预览并查看大约位移，用道路贴合情况判断坐标基准。预览只改变地图覆盖物副本，不修改原始轨迹、速度、里程、统计或导出，也不调用外部坐标转换服务。
 
-## 只读能力覆盖（TypeScript SDK）
+## 只读能力覆盖（ninecli）
 
 | 九号只读能力                                  | 客户端状态   | 说明                                                            |
 | --------------------------------------------- | ------------ | --------------------------------------------------------------- |
@@ -54,7 +54,7 @@ SDK 还提供 `@jiuhao/ninebot-client/crypto-web`，以 Web Crypto 和纯 TypeSc
 | `mcp`、`serve`                                | 不嵌入客户端 | 桌面端直接使用受控领域桥接，避免开放明文 REST 或任意工具调用面  |
 | `bell`、`buck`、`engine-start`、`engine-stop` | 明确排除     | 会改变车辆状态，不进入只读客户端白名单                          |
 
-年度统计按 3 个并发批次读取月度摘要，不加载 GPS 轨迹。查看当前年份时，请求范围会与“截至本月的近 12 个月”去重合并，因此跨年趋势不需要再次读取；历史起点之前的月份直接跳过。九号接口按每页 20 条返回行程，TypeScript SDK 会自动继续请求后续页面，直到拿齐服务端声明的总次数或最后一页不足 20 条；`travel --month` 顶层同时返回完整的月度次数、里程、时长、能耗，以及按自然日排列的完整每日里程数组。韭号出行用顶层汇总计算全年总量、平均能耗和活跃天数，并把每日里程做成可筛选的月度骑行日历；“完整汇总”和“逐次明细”分开表达，不会再用单页结果低估全年数据。
+年度统计按 3 个并发批次读取月度摘要，不加载 GPS 轨迹。查看当前年份时，请求范围会与“截至本月的近 12 个月”去重合并，因此跨年趋势不需要再次读取；历史起点之前的月份直接跳过。ninecli `travel --month` 顶层返回完整的月度次数、里程、时长、能耗和按自然日排列的每日里程数组，同时提供首屏逐次记录；页面会用 `ridesTruncated` 明确首屏与汇总的覆盖差异。韭号出行用顶层汇总计算全年总量、平均能耗和活跃天数，并把每日里程做成可筛选的月度骑行日历；“完整汇总”和“逐次明细”分开表达。
 
 统计页还会把已加载的每日里程排列成年度活动热力图，并在本地计算最高里程日、最长连续骑行和最常骑行的星期。历史起点之前、今天之后以及上游缺失的日期都不会被伪造为零里程；点击有里程的日期只加载并返回对应月份的列表，继续选择某条具体行程后才读取 GPS 详情。
 
@@ -66,7 +66,7 @@ SDK 还提供 `@jiuhao/ninebot-client/crypto-web`，以 Web Crypto 和纯 TypeSc
 
 年度统计加载完成后可导出 CSV 或 JSON 摘要。schema v2 包含车辆显示名称、年份、数据起点、年度总量与平均值、完整月度总量与平均值、每日里程，以及汇总是否完整、可选明细是否被截断等覆盖标记；CSV 首条数据是可直接用于 Excel 的年度汇总行，JSON 保留年/月/日层级供编程、备份和 AI 分析。导出不会额外请求行程详情，也不包含 GPS、车辆 SN 或九号内部行程 ID；任一活跃月份缺失能耗或活跃天数时，相应年度值保持为空。
 
-轨迹侧栏可以把当前月份导出为 CSV 或 JSON 月度清单。文件同时保留 `travel --month` 的完整月总次数、里程、时长、能耗、每日里程和 SDK 自动分页得到的全部逐次行程。逐次记录包含时间、里程、时长、能耗、电量消耗、骑行日累计和平均速度，但不包含 GPS、车辆 SN 或九号内部行程 ID。极速同时保存接口声明值、轨迹采样值、最终显示值和依据类型：未经轨迹校验的旧 `25 km/h` 摘要使用 `unverified-capped` 并把最终显示值留空，校验后才使用 `track` 结果。
+轨迹侧栏可以把当前月份导出为 CSV 或 JSON 月度清单。文件同时保留 `travel --month` 的完整月总次数、里程、时长、能耗、每日里程和 ninecli 返回的逐次行程，并明确是否只有首屏明细。逐次记录包含时间、里程、时长、能耗、电量消耗、骑行日累计和平均速度，但不包含 GPS、车辆 SN 或九号内部行程 ID。极速同时保存接口声明值、轨迹采样值、最终显示值和依据类型：未经轨迹校验的旧 `25 km/h` 摘要使用 `unverified-capped` 并把最终显示值留空，校验后才使用 `track` 结果。
 
 `travel --month` 的 `first_time` 在活跃月、空月和历史起点之前都稳定返回该车辆的首条骑行时间。韭号出行用它标出“数据从哪一天开始”，禁用更早月份，并在年度统计中跳过起点前的空查询；这既减少 ninecli/九号接口调用，也避免把“车辆还没有数据”误解成普通的零骑行月份。
 
@@ -96,10 +96,9 @@ pnpm package:mac:local
 pnpm package:win:local
 ```
 
-`pnpm check` also runs the SDK's DOM-only `typecheck:browser` gate, ensuring
-the platform-neutral session core remains importable without Node crypto
-types. This does not imply that the browser or mobile encryption provider is
-already available.
+`pnpm check` runs the Electron TypeScript typecheck, lint, formatting and test
+gates. The protocol research package remains a development-only workspace
+dependency and is not loaded by the production main process.
 
 `package:mac:local` 会生成 DMG 和 ZIP，`package:win:local` 会生成 NSIS 安装程序和 ZIP；两者都会从成品启动自动化冒烟，但都不是正式签名包。Windows 打包与验收必须在 Windows x64 上运行。
 
@@ -110,7 +109,7 @@ already available.
 ## 安全边界
 
 - 渲染层只能调用版本化、面向领域的桥接：登录、退出、运行时诊断、车辆列表、脱敏后的车辆/电池状态、行程列表、行程详情和用户主动触发的文件导出；不能传入任意命令或文件保存路径。
-- Electron 安装包不包含 Python、uv 或 ninecli 原生二进制，业务请求只经过 TypeScript SDK 的受控 Passport 与候选服务客户端；协议 parity 工具使用的 ninecli oracle 不会被生产入口导入。
+- Electron 安装包通过 `extraResources` 包含对应平台的 ninecli 原生二进制；业务请求只经过主进程的固定命令适配器，运行时不要求用户安装 Python、uv 或 ninecli。
 - `status` / `battery` 仅对普通上游临时错误做分区降级；认证、人机验证、二进制缺失、平台不支持或完整性失败继续按安全错误中止，不会用部分结果掩盖。
 - SDK 配置目录权限固定为 `0700`，已知配置和令牌文件固定为 `0600`；设置页可退出账号并按文件名清除令牌和车辆缓存。
 - 车辆 SN、实时状态中的经纬度和上游 `travel_id` 仅保留在 Electron 主进程，页面只接收会话内的临时编号与脱敏后的状态数据。
@@ -118,8 +117,8 @@ already available.
 - `status` 原始响应可能包含 `loc`。普通设备读取只在主进程解析所需状态并丢弃坐标，不把原始响应或经纬度交给页面；位置授权前不创建车辆地图，也不发起位置区域瓦片请求。授权后独立桥接会重新查询状态，页面只接收共享位置权限，以及允许情况下的坐标、锁车和 ACC 状态。显式拒绝时主进程剥离坐标，授权只保留在当前会话和当前车辆中。
 - 设备快照、月度列表和行程详情缓存仅存在于主进程内存，保存的是解析后的领域对象而不是九号原始响应；手动刷新绕过已完成缓存，退出登录、成功刷新车辆列表或应用退出后清空。
 - 不实现鸣笛、开座桶、启动或熄火能力。
-- ninecli 仅作为非官方、未完整开源的协议 oracle 留在开发工具链中，不进入安装包；生产客户端不执行外部 Python/CLI 子进程。
-- 密码和短信验证码只在 SDK 登录调用的内存边界内传递；项目不记录这些参数，也不把凭据写入渲染层日志。
+- ninecli 仅允许固定的只读与认证命令，生产客户端不暴露车辆控制命令、任意 argv 或 shell。
+- 密码和短信验证码只在 ninecli 子进程参数边界内传递；项目不记录这些参数，也不把凭据写入渲染层日志。
 - 短信登录不会绕过九号的网易易盾人机验证。若服务端返回 `90202 / send code need verify`，客户端会给出受控提示并停止，密码登录仍是默认且更稳定的入口。
 - 在线底图会向 OpenFreeMap 请求当前视野的样式、瓦片、字体和图标，因此服务方能推断正在查看的大致区域；应用不会把完整轨迹 JSON、九号账号、令牌或车辆 SN 作为地图请求参数发送。
 - 轨迹线、起终点与回放点只在本地 MapLibre 图层中绘制；若不希望产生第三方瓦片请求，可在无网环境使用自动回退的本地轨迹画布。
