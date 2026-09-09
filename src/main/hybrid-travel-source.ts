@@ -43,6 +43,10 @@ export const createHybridTravelReader = ({
         assertActive(requestGeneration);
         const complete = await paginated.rides(serialNumber, month);
         assertActive(requestGeneration);
+        const envelope = complete as { code?: unknown };
+        if (typeof envelope.code === "number" && envelope.code !== 0) {
+          throw new NinebotClientError("月度轨迹分页鉴权失败，请重新连接账号。", "auth");
+        }
         const result = parseRideMonth(complete, month);
         const uniqueIds = new Set(result.rides.map(({ travelId }) => travelId));
         if (
@@ -50,16 +54,28 @@ export const createHybridTravelReader = ({
           result.summary.ridesTruncated ||
           result.summary.rideCount < parsed.summary.rideCount ||
           uniqueIds.size !== result.rides.length
-        )
-          throw new Error("Incomplete month");
+        ) {
+          console.warn("ninecli travel pagination incomplete", {
+            month,
+            declaredCount: result.summary.rideCount,
+            returnedCount: result.rides.length,
+            uniqueCount: uniqueIds.size,
+          });
+          throw new NinebotClientError("月度轨迹分页返回不完整，请刷新重试。", "upstream");
+        }
         return complete;
       } catch (error) {
         if (error instanceof NinebotClientError && error.kind === "auth") throw error;
+        if (error instanceof NinebotClientError) throw error;
         if (error instanceof NinebotHttpError && (error.status === 401 || error.status === 403)) {
           throw new NinebotClientError("月度轨迹分页鉴权失败，请重新连接账号。", "auth");
         }
         // Do not leak protocol responses or silently return a truncated export.
-        throw new NinebotClientError("完整月份读取失败，请刷新重试；若持续失败，请重新连接账号。");
+        console.warn("ninecli travel pagination request failed", {
+          month,
+          errorType: error instanceof Error ? error.name : typeof error,
+        });
+        throw new NinebotClientError("月度轨迹分页请求失败，请刷新重试。", "upstream");
       }
     },
     rideDetail(serialNumber, travelId) {

@@ -74,10 +74,7 @@ describe("createHybridTravelReader", () => {
       };
       await expect(
         createHybridTravelReader({ ninecli, paginated }).rides("SN", "202609"),
-      ).rejects.toMatchObject({
-        kind: "upstream",
-        message: "完整月份读取失败，请刷新重试；若持续失败，请重新连接账号。",
-      });
+      ).rejects.toMatchObject({ kind: "upstream" });
     },
   );
 
