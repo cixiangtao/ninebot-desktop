@@ -329,7 +329,13 @@ export class NineCliClient {
   }
 
   async whoami() {
-    return this.runJson("whoami");
+    try {
+      return await this.runJson("whoami");
+    } catch (error) {
+      if (!(error instanceof NineCliError) || error.kind !== "upstream") throw error;
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      return this.runJson("whoami");
+    }
   }
 
   async vehicles() {
