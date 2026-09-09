@@ -20,6 +20,11 @@ const app = await electron.launch({
   env: { ...process.env, NINEBOT_CONFIG_DIR: legacyConfig },
 });
 const window = await app.firstWindow();
+window.on("console", (message) => {
+  if (message.type() === "error" || message.type() === "warning")
+    console.log("renderer", message.type(), message.text().slice(0, 240));
+});
+window.on("pageerror", (error) => console.log("renderer pageerror", error.message.slice(0, 240)));
 let auditLocationRequests = false;
 let locationMapRequestCount = 0;
 window.on("request", (request) => {
