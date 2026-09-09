@@ -45,6 +45,8 @@ export const createHybridTravelReader = ({
         let lastError: unknown;
         for (let attempt = 0; attempt < 2; attempt += 1) {
           try {
+            // Retry sequentially so only one encrypted month request is in flight.
+            // eslint-disable-next-line no-await-in-loop
             complete = await paginated.rides(serialNumber, month);
             lastError = undefined;
             break;
@@ -52,7 +54,10 @@ export const createHybridTravelReader = ({
             lastError = error;
             if (error instanceof NinebotHttpError && (error.status === 401 || error.status === 403))
               throw error;
-            if (attempt === 0) await new Promise((resolve) => setTimeout(resolve, 250));
+            if (attempt === 0) {
+              // eslint-disable-next-line no-await-in-loop
+              await new Promise((resolve) => setTimeout(resolve, 250));
+            }
           }
         }
         if (lastError !== undefined) throw lastError;
