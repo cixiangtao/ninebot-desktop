@@ -575,8 +575,8 @@ try {
       .count()) === 1;
   const liveStatisticsActiveDaysVisible =
     (await window.getByText("活跃天数", { exact: true }).count()) === 1;
-  const liveStatisticsTruncationVisible =
-    (await window.locator(".statistics-month-row i").count()) > 0;
+  const liveStatisticsCoverageComplete =
+    (await window.locator(".statistics-month-row i").count()) === 0;
   const liveActivityHeatmapVisible = await window.locator(".year-activity-card").isVisible();
   const liveActivityDayCount = await window
     .locator(".year-activity-grid .year-activity-day-active")
@@ -619,7 +619,7 @@ try {
     liveStatisticsSummaryCardCount !== 6 ||
     !liveStatisticsEnergyVisible ||
     !liveStatisticsActiveDaysVisible ||
-    !liveStatisticsTruncationVisible ||
+    !liveStatisticsCoverageComplete ||
     !liveActivityHeatmapVisible ||
     liveActivityDayCount < 1 ||
     !liveActivityInsightsVisible ||
@@ -1054,7 +1054,7 @@ try {
         summaryCardCount: liveStatisticsSummaryCardCount,
         energyVisible: liveStatisticsEnergyVisible,
         activeDaysVisible: liveStatisticsActiveDaysVisible,
-        truncationVisible: liveStatisticsTruncationVisible,
+        coverageComplete: liveStatisticsCoverageComplete,
         activityHeatmapVisible: liveActivityHeatmapVisible,
         activityDayCount: liveActivityDayCount,
         activityInsightsVisible: liveActivityInsightsVisible,
