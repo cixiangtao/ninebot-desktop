@@ -41,7 +41,21 @@ export const createHybridTravelReader = ({
       try {
         await refreshSession?.();
         assertActive(requestGeneration);
-        const complete = await paginated.rides(serialNumber, month);
+        let complete: unknown = undefined;
+        let lastError: unknown;
+        for (let attempt = 0; attempt < 2; attempt += 1) {
+          try {
+            complete = await paginated.rides(serialNumber, month);
+            lastError = undefined;
+            break;
+          } catch (error) {
+            lastError = error;
+            if (error instanceof NinebotHttpError && (error.status === 401 || error.status === 403))
+              throw error;
+            if (attempt === 0) await new Promise((resolve) => setTimeout(resolve, 250));
+          }
+        }
+        if (lastError !== undefined) throw lastError;
         assertActive(requestGeneration);
         const envelope = complete as { code?: unknown };
         if (typeof envelope.code === "number" && envelope.code !== 0) {
@@ -71,11 +85,19 @@ export const createHybridTravelReader = ({
           throw new NinebotClientError("月度轨迹分页鉴权失败，请重新连接账号。", "auth");
         }
         // Do not leak protocol responses or silently return a truncated export.
+        const errorMessage = error instanceof Error ? error.message : "unknown error";
+        const safeMessage = errorMessage.replace(/https?:\/\/[^\s)]+/g, "<redacted-url>");
         console.warn("ninecli travel pagination request failed", {
           month,
           errorType: error instanceof Error ? error.name : typeof error,
+          errorMessage: safeMessage.slice(0, 160),
         });
-        throw new NinebotClientError("月度轨迹分页请求失败，请刷新重试。", "upstream");
+        const category = /timeout|timed out|abort/i.test(errorMessage)
+          ? "请求超时"
+          : /fetch failed|network|econn|enotfound|tls/i.test(errorMessage)
+            ? "网络连接失败"
+            : "上游响应异常";
+        throw new NinebotClientError(`月度轨迹分页${category}，请刷新重试。`, "upstream");
       }
     },
     rideDetail(serialNumber, travelId) {
