@@ -26,13 +26,15 @@ describe("createHybridTravelReader", () => {
       ),
       rideDetail: vi.fn(),
     };
-    const reader = createHybridTravelReader({ ninecli, paginated });
+    const refreshSession = vi.fn().mockResolvedValue({ connected: true });
+    const reader = createHybridTravelReader({ ninecli, paginated, refreshSession });
 
     await expect(reader.rides("SN", "202609")).resolves.toEqual(
       expect.objectContaining({ data: expect.objectContaining({ times: 25 }) }),
     );
     expect(ninecli.rides).toHaveBeenCalledWith("SN", "202609");
     expect(paginated.rides).toHaveBeenCalledWith("SN", "202609");
+    expect(refreshSession).toHaveBeenCalledOnce();
   });
 
   it("keeps ninecli for complete months and ride details", async () => {

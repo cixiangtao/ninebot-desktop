@@ -117,7 +117,11 @@ app.whenReady().then(async () => {
   const ninecli = new NineCliClient(configDirectory, binaryPath);
   await ninecli.start();
   const paginatedTravel = createCandidateTravelReader({ configDirectory });
-  const travelReader = createHybridTravelReader({ ninecli, paginated: paginatedTravel });
+  const travelReader = createHybridTravelReader({
+    ninecli,
+    paginated: paginatedTravel,
+    refreshSession: () => ninecli.whoami(),
+  });
   registerIpcHandlers(ninecli, ninecli, travelReader, ninecli);
   app.on("before-quit", () => travelReader.clear?.());
   await createWindow();

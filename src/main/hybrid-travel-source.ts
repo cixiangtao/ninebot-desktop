@@ -13,9 +13,12 @@ import type { TravelReader } from "./travel-source.js";
 export const createHybridTravelReader = ({
   ninecli,
   paginated,
+  refreshSession,
 }: {
   ninecli: TravelReader;
   paginated: TravelReader;
+  /** Refreshes ninecli's persisted session before the secondary protocol reads it. */
+  refreshSession?: () => Promise<unknown>;
 }): TravelReader => {
   let generation = 0;
   const assertActive = (requestGeneration: number) => {
@@ -36,6 +39,8 @@ export const createHybridTravelReader = ({
       const parsed = parseRideMonth(firstPage, month);
       if (!parsed.summary.ridesTruncated) return firstPage;
       try {
+        await refreshSession?.();
+        assertActive(requestGeneration);
         const complete = await paginated.rides(serialNumber, month);
         assertActive(requestGeneration);
         const result = parseRideMonth(complete, month);
@@ -49,6 +54,7 @@ export const createHybridTravelReader = ({
           throw new Error("Incomplete month");
         return complete;
       } catch (error) {
+        if (error instanceof NinebotClientError && error.kind === "auth") throw error;
         if (error instanceof NinebotHttpError && (error.status === 401 || error.status === 403)) {
           throw new NinebotClientError("月度轨迹分页鉴权失败，请重新连接账号。", "auth");
         }
