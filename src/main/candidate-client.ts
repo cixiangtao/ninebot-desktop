@@ -5,7 +5,9 @@ import {
 } from "@jiuhao/ninebot-client/candidate-session";
 
 /** Default upper bound for a candidate request when the upstream is unavailable. */
-export const defaultCandidateRequestTimeoutMs = 15_000;
+// Monthly pagination can involve several sequential encrypted requests; keep
+// parity with the ninecli command timeout so a slow page is not cut off early.
+export const defaultCandidateRequestTimeoutMs = 45_000;
 
 /** Keep an environment override bounded so a stalled candidate cannot hold the UI indefinitely. */
 export const maxCandidateRequestTimeoutMs = 120_000;
