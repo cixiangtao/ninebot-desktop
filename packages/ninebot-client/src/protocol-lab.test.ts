@@ -99,6 +99,10 @@ describe("protocol lab", () => {
       expect(JSON.stringify(capture)).not.toContain("private-response-token");
       expect(JSON.stringify(capture)).not.toContain("encrypted-body");
     } finally {
+      // Node's fetch may leave the loopback keep-alive socket open; close idle
+      // connections before waiting for the server's close callback.
+      upstream.closeIdleConnections?.();
+      upstream.closeAllConnections?.();
       await Promise.all([
         recorder.close(),
         new Promise<void>((resolveClose, reject) =>

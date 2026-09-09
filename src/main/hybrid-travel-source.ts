@@ -45,8 +45,8 @@ export const createHybridTravelReader = ({
           try {
             // Refresh before every attempt: a failed first page may have consumed
             // an expired token while ninecli refreshes it asynchronously.
-          // eslint-disable-next-line no-await-in-loop
-          await refreshSession?.();
+            // eslint-disable-next-line no-await-in-loop
+            await refreshSession?.();
             assertActive(requestGeneration);
             // Retry sequentially so only one encrypted month request is in flight.
             // eslint-disable-next-line no-await-in-loop
