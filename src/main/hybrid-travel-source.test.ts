@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 import { createHybridTravelReader } from "./hybrid-travel-source.js";
 
 const payload = (count: number, rows: unknown[]) => ({
-  code: 0,
+  code: 1,
   data: { times: count, total_mileages: 10, duration: 60, list: rows },
 });
 

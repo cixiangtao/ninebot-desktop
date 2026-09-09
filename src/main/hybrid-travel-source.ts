@@ -66,10 +66,11 @@ export const createHybridTravelReader = ({
         if (lastError !== undefined) throw lastError;
         assertActive(requestGeneration);
         const envelope = complete as { code?: unknown };
-        if (typeof envelope.code === "number" && envelope.code !== 0) {
+        const businessCode = String(envelope.code ?? "");
+        if (businessCode !== "1") {
           console.warn("ninebot travel pagination business rejection", {
             month,
-            code: envelope.code,
+            code: businessCode || "missing",
           });
           throw new NinebotClientError("月度轨迹分页鉴权失败，请重新连接账号。", "auth");
         }
