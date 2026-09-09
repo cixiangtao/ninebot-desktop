@@ -39,12 +39,15 @@ export const createHybridTravelReader = ({
       const parsed = parseRideMonth(firstPage, month);
       if (!parsed.summary.ridesTruncated) return firstPage;
       try {
-        await refreshSession?.();
-        assertActive(requestGeneration);
         let complete: unknown = undefined;
         let lastError: unknown;
         for (let attempt = 0; attempt < 2; attempt += 1) {
           try {
+            // Refresh before every attempt: a failed first page may have consumed
+            // an expired token while ninecli refreshes it asynchronously.
+          // eslint-disable-next-line no-await-in-loop
+          await refreshSession?.();
+            assertActive(requestGeneration);
             // Retry sequentially so only one encrypted month request is in flight.
             // eslint-disable-next-line no-await-in-loop
             complete = await paginated.rides(serialNumber, month);
