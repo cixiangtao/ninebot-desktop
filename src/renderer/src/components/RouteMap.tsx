@@ -278,12 +278,14 @@ export const RouteMap = ({
 
   return (
     <div className="route-map" aria-label="轨迹回放地图">
-      <RouteFallbackCanvas
-        track={track}
-        playbackPosition={playbackPosition}
-        labelsVisible={labelsVisible}
-        routePulse={fallbackPulse}
-      />
+      {mapStatus !== "ready" ? (
+        <RouteFallbackCanvas
+          track={track}
+          playbackPosition={playbackPosition}
+          labelsVisible={labelsVisible}
+          routePulse={fallbackPulse}
+        />
+      ) : null}
       <div
         ref={containerRef}
         className={`online-map ${mapStatus === "ready" ? "online-map-ready" : ""}`}
