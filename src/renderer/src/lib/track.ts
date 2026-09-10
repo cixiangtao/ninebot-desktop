@@ -30,6 +30,11 @@ export interface ProjectedPoint extends TrackPoint {
   y: number;
 }
 
+export interface TrackMaximumPoint {
+  point: TrackPoint;
+  index: number;
+}
+
 export const playbackRates = [0.5, 1, 2, 4] as const;
 export type PlaybackRate = (typeof playbackRates)[number];
 
@@ -64,6 +69,18 @@ export const getSpeedZoneIndex = (speed: number) => {
 export const getSpeedColor = (speed: number) => {
   const zone = speedColorStops[getSpeedZoneIndex(speed)];
   return zone?.color ?? speedColorStops[0].color;
+};
+
+/** Returns the first valid sample with the highest observed speed. */
+export const getTrackMaximumPoint = (track: TrackPoint[]): TrackMaximumPoint | null => {
+  let maximum: TrackMaximumPoint | null = null;
+  for (const [index, point] of track.entries()) {
+    if (!Number.isFinite(point.speed)) continue;
+    if (maximum === null || point.speed > maximum.point.speed) {
+      maximum = { point, index };
+    }
+  }
+  return maximum;
 };
 
 /** Advances a fractional sample index using a stable base duration and selected playback rate. */

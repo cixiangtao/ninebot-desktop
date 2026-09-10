@@ -19,6 +19,7 @@ import {
   getSpeedColor,
   getTrackInterpolation,
   getTrackBounds,
+  getTrackMaximumPoint,
   interpolateTrackPoint,
   projectTrack,
   speedColorStops,
@@ -108,6 +109,16 @@ const createPlaybackElement = () => {
   return element;
 };
 
+const createMaximumElement = (speed: number) => {
+  const element = document.createElement("div");
+  element.className = "map-maximum-marker";
+  const label = document.createElement("span");
+  label.textContent = `极速 ${Math.round(speed)} km/h`;
+  element.append(label);
+  element.setAttribute("aria-label", `最高时速点，${Math.round(speed)} km/h`);
+  return element;
+};
+
 /** Displays an interactive online map with a local SVG fallback. */
 export const RouteMap = ({
   track,
@@ -122,6 +133,7 @@ export const RouteMap = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMapInstance | null>(null);
   const activeMarkerRef = useRef<Marker | null>(null);
+  const maximumMarkerRef = useRef<Marker | null>(null);
   const pulseTimeoutRef = useRef<number | null>(null);
   const displayTrack = useMemo(
     () => createMapDisplayTrack(track, coordinateDisplayMode),
@@ -139,6 +151,8 @@ export const RouteMap = ({
   }, [displayTrack]);
   const activePoint = interpolateTrackPoint(displayTrack, playbackPosition);
   const activeCoordinate = activePoint ? toMapCoordinate(activePoint) : null;
+  const maximum = useMemo(() => getTrackMaximumPoint(displayTrack), [displayTrack]);
+  const maximumCoordinate = maximum ? toMapCoordinate(maximum.point) : null;
   const previewAnchor = track[Math.floor(track.length / 2)];
   const previewShiftMeters = previewAnchor ? getCoordinatePreviewShiftMeters(previewAnchor) : null;
   const latestActiveCoordinateRef = useRef(activeCoordinate);
@@ -201,6 +215,15 @@ export const RouteMap = ({
       new Marker({ element: createEndpointElement("终", "end"), anchor: "bottom" })
         .setLngLat(endCoordinate)
         .addTo(map);
+      if (maximumCoordinate && maximum) {
+        const maximumMarker = new Marker({
+          element: createMaximumElement(maximum.point.speed),
+          anchor: "bottom",
+        })
+          .setLngLat(maximumCoordinate)
+          .addTo(map);
+        maximumMarkerRef.current = maximumMarker;
+      }
       const playbackMarker = new Marker({ element: createPlaybackElement(), anchor: "center" })
         .setLngLat(latestActiveCoordinateRef.current ?? startCoordinate)
         .addTo(map);
@@ -215,6 +238,8 @@ export const RouteMap = ({
       window.clearTimeout(loadTimeout);
       if (pulseTimeoutRef.current !== null) window.clearTimeout(pulseTimeoutRef.current);
       activeMarkerRef.current = null;
+      maximumMarkerRef.current?.remove();
+      maximumMarkerRef.current = null;
       mapRef.current = null;
       if (!removed) map.remove();
     };
@@ -342,6 +367,8 @@ const RouteFallbackCanvas = ({
   routePulse,
 }: RouteFallbackCanvasProps) => {
   const points = useMemo(() => projectTrack(track, 1000, 700, 118), [track]);
+  const maximum = useMemo(() => getTrackMaximumPoint(track), [track]);
+  const maximumPoint = maximum ? points[maximum.index] : null;
   const route = svgPath(points);
   const routeSegments = points.slice(0, -1).flatMap((from, index) => {
     const to = points[index + 1];
@@ -438,6 +465,9 @@ const RouteFallbackCanvas = ({
       </g>
       {start ? <MapPin x={start.x} y={start.y} label="起" tone="#10bda9" /> : null}
       {end ? <MapPin x={end.x} y={end.y} label="终" tone="#ff5b62" /> : null}
+      {maximum && maximumPoint ? (
+        <MapMaximumPin x={maximumPoint.x} y={maximumPoint.y} speed={maximum.point.speed} />
+      ) : null}
       {activePoint ? (
         <g transform={`translate(${activePoint.x} ${activePoint.y})`} className="route-marker">
           <circle r="19" fill="#ffffff" opacity="0.96" />
@@ -454,6 +484,34 @@ const RouteFallbackCanvas = ({
     </svg>
   );
 };
+
+interface MapMaximumPinProps {
+  x: number;
+  y: number;
+  speed: number;
+}
+
+const MapMaximumPin = ({ x, y, speed }: MapMaximumPinProps) => (
+  <g
+    transform={`translate(${x} ${y})`}
+    className="route-maximum-marker"
+    data-peak-speed={Math.round(speed)}
+  >
+    <title>最高时速点：{Math.round(speed)} km/h</title>
+    <path
+      d="M0 18 L-13 5 L-13 -10 L0 -23 L13 -10 L13 5Z"
+      fill="#f05a3f"
+      stroke="#ffffff"
+      strokeWidth="5"
+      strokeLinejoin="round"
+    />
+    <circle cy="-3" r="4" fill="#ffffff" />
+    <rect x="-44" y="-64" width="88" height="22" rx="11" fill="#18232f" />
+    <text y="-49" textAnchor="middle" fill="#ffffff" fontSize="11" fontWeight="760">
+      极速 {Math.round(speed)} km/h
+    </text>
+  </g>
+);
 
 const SpeedLegend = ({ loading }: { loading: boolean }) => (
   <div
