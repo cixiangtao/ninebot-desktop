@@ -125,18 +125,26 @@ describe("candidate travel source", () => {
   it("enriches the private cache from ninecli vehicle output without persisting it", async () => {
     const configDirectory = await createSessionDirectory();
     let observedVehicleType: string | undefined;
+    class LegacyVehicleReader {
+      readonly rows = [{ wnumber: "SN1234567890", businessType: 2, vehicle_type: 14363 }];
+
+      async vehicles() {
+        return this.rows;
+      }
+
+      async rides() {
+        throw new Error("legacy rides should not be called");
+      }
+
+      async rideDetail() {
+        throw new Error("legacy detail should not be called");
+      }
+    }
+    const legacy = new LegacyVehicleReader();
     const reader = createCandidateTravelReader({
-      legacy: {
-        rides: async () => {
-          throw new Error("legacy rides should not be called");
-        },
-        rideDetail: async () => {
-          throw new Error("legacy detail should not be called");
-        },
-        vehicles: async () => [{ wnumber: "SN1234567890", businessType: 2, vehicle_type: 14363 }],
-      },
+      legacy,
       configDirectory,
-      fallbackToLegacy: true,
+      useLegacyMetadata: true,
       candidateClientFactory: () => ({
         month: async ({ vehicleType, month }) => {
           observedVehicleType = vehicleType;
@@ -150,6 +158,26 @@ describe("candidate travel source", () => {
       data: { month: "202608" },
     });
     expect(observedVehicleType).toBe("14363");
+  });
+
+  it("does not turn candidate request errors into a truncated legacy month", async () => {
+    const configDirectory = await createSessionDirectory();
+    const reader = createCandidateTravelReader({
+      legacy: {
+        vehicles: async () => [{ wnumber: "SN1234567890", businessType: 2, vehicle_type: 14363 }],
+        rides: async () => ({ source: "legacy", data: { times: 20, list: [] } }),
+        rideDetail: async () => ({ source: "legacy" }),
+      },
+      configDirectory,
+      useLegacyMetadata: true,
+      candidateClientFactory: () => {
+        throw new Error("candidate transport unavailable");
+      },
+    });
+
+    await expect(reader.rides("SN1234567890", "202608")).rejects.toThrow(
+      "candidate transport unavailable",
+    );
   });
 
   it("cancels an in-flight month request without falling back", async () => {

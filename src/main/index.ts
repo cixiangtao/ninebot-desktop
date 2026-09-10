@@ -116,7 +116,11 @@ app.whenReady().then(async () => {
   });
   const ninecli = new NineCliClient(configDirectory, binaryPath);
   await ninecli.start();
-  const paginatedTravel = createCandidateTravelReader({ configDirectory });
+  const paginatedTravel = createCandidateTravelReader({
+    configDirectory,
+    legacy: ninecli,
+    useLegacyMetadata: true,
+  });
   const travelReader = createHybridTravelReader({
     ninecli,
     paginated: paginatedTravel,

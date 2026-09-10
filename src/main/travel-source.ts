@@ -4,7 +4,7 @@ import {
   createCandidateRequestTracker,
   readCandidateSession,
   readCandidateService,
-  readCandidateVehicles,
+  readCandidateVehiclesIfPresent,
   type CandidateService,
 } from "./candidate-context.js";
 import { createCandidateSessionClient } from "./candidate-client.js";
@@ -83,12 +83,12 @@ const readContext = async (
         );
   const [session, vehiclesValue] = await Promise.all([
     sessionPromise,
-    readCandidateVehicles(configDirectory),
+    readCandidateVehiclesIfPresent(configDirectory),
   ]);
-  if (!isRecord(vehiclesValue)) {
+  if (vehiclesValue !== null && !isRecord(vehiclesValue)) {
     throw new Error("Ninebot candidate travel session files are invalid");
   }
-  const vehicles = vehiclesValue as CachedVehicles;
+  const vehicles = (vehiclesValue ?? {}) as CachedVehicles;
   const cachedVehicle = vehicles.vehicles?.find((item) => item.wnumber === serialNumber);
   let legacyVehicle: Record<string, unknown> | null = null;
   if (!cachedVehicle?.vehicle_type && loadLegacyVehicles) {
@@ -124,14 +124,17 @@ export const createCandidateTravelReader = ({
   sessionProvider,
   candidateClientFactory = createCandidateSessionClient,
   fallbackToLegacy = false,
+  useLegacyMetadata = false,
 }: {
   legacy?: LegacyTravelClient;
   configDirectory: string;
   /** Supplies a fresh authenticated session before each candidate request. */
   sessionProvider?: () => Promise<NinebotAuthSession>;
   candidateClientFactory?: (session: NinebotCandidateSessionFields) => CandidateTravelClient;
-  /** Legacy oracle fallback is migration-only and must be explicitly enabled. */
+  /** Legacy request fallback is migration-only and must be explicitly enabled. */
   fallbackToLegacy?: boolean;
+  /** Reads vehicle type/service metadata from ninecli without falling back request results. */
+  useLegacyMetadata?: boolean;
 }): TravelReader => {
   const legacyClient = legacy;
   const requireLegacy = () => {
@@ -139,6 +142,10 @@ export const createCandidateTravelReader = ({
     return legacyClient;
   };
   const requestTracker = createCandidateRequestTracker();
+  const loadLegacyVehicles =
+    fallbackToLegacy || useLegacyMetadata
+      ? async () => requireLegacy().vehicles?.() ?? []
+      : undefined;
   return {
     clear: requestTracker.clear,
     async rides(serialNumber, month) {
@@ -148,7 +155,7 @@ export const createCandidateTravelReader = ({
         const context = await readContext(
           configDirectory,
           serialNumber,
-          fallbackToLegacy ? requireLegacy().vehicles : undefined,
+          loadLegacyVehicles,
           sessionProvider,
         );
         if (request.signal.aborted) {
@@ -156,13 +163,22 @@ export const createCandidateTravelReader = ({
         }
         try {
           candidateClient = candidateClientFactory(context.session);
-          return await candidateClient.month({
+          const result = await candidateClient.month({
             service: context.service,
             serialNumber,
             vehicleType: context.vehicleType,
             month,
             signal: request.signal,
           });
+          if (isRecord(result)) {
+            console.warn("ninebot candidate travel response", {
+              month,
+              code: result.code ?? "missing",
+              times: result.times ?? "missing",
+              listCount: Array.isArray(result.list) ? result.list.length : "invalid",
+            });
+          }
+          return result;
         } finally {
           candidateClient?.clear?.();
         }
@@ -181,7 +197,7 @@ export const createCandidateTravelReader = ({
         const context = await readContext(
           configDirectory,
           serialNumber,
-          fallbackToLegacy ? requireLegacy().vehicles : undefined,
+          loadLegacyVehicles,
           sessionProvider,
         );
         if (request.signal.aborted) {
