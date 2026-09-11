@@ -25,6 +25,7 @@ import {
 } from "react";
 import type {
   AccountProfile,
+  BridgeError,
   BridgeResult,
   MonthSummaryExportFormat,
   PasswordLoginInput,
@@ -153,8 +154,41 @@ const unconnectedVehicle: VehicleSummary = {
 };
 
 const unwrap = <T,>(result: BridgeResult<T>) => {
-  if (!result.ok) throw new Error(result.error.message);
+  if (!result.ok) {
+    const error = new Error(result.error.message) as Error & { code: BridgeError["code"] };
+    error.code = result.error.code;
+    throw error;
+  }
   return result.data;
+};
+
+const transientBridgeErrorCodes = new Set<BridgeError["code"]>(["UNKNOWN", "UPSTREAM_ERROR"]);
+const transientReadRetryDelaysMs = [500, 1_500, 3_000] as const;
+
+const delay = (milliseconds: number) =>
+  new Promise<void>((resolve) => {
+    window.setTimeout(resolve, milliseconds);
+  });
+
+const isTransientBridgeReadError = (cause: unknown) =>
+  cause instanceof Error &&
+  "code" in cause &&
+  transientBridgeErrorCodes.has(
+    (cause as { code?: BridgeError["code"] }).code as BridgeError["code"],
+  );
+
+const retryTransientBridgeRead = async <T,>(
+  read: () => Promise<T>,
+  retryDelays: readonly number[] = transientReadRetryDelaysMs,
+): Promise<T> => {
+  try {
+    return await read();
+  } catch (cause) {
+    const [nextDelay, ...remainingDelays] = retryDelays;
+    if (!isTransientBridgeReadError(cause) || nextDelay === undefined) throw cause;
+    await delay(nextDelay);
+    return retryTransientBridgeRead(read, remainingDelays);
+  }
 };
 
 const createRideSpeedVerification = (detail: RideDetail): RideSpeedVerification => ({
@@ -582,7 +616,8 @@ export default function App() {
       knownVehicle?: VehicleSummary,
       { refresh = false, loadFirstRideDetail }: LiveDataOptions = {},
     ) => {
-      if (!window.ninebot) return;
+      const bridge = window.ninebot;
+      if (!bridge) return;
       setDetailRefreshState({ status: "idle" });
       if (loadFirstRideDetail !== undefined) {
         rideDetailDeferredRef.current = !loadFirstRideDetail;
@@ -599,7 +634,9 @@ export default function App() {
         setView("rides");
       }
       try {
-        const nextVehicles = knownVehicle ? null : unwrap(await window.ninebot.vehicles.list());
+        const nextVehicles = knownVehicle
+          ? null
+          : await retryTransientBridgeRead(() => bridge.vehicles.list().then(unwrap));
         const nextVehicle = knownVehicle ?? nextVehicles?.[0];
         if (!nextVehicle) throw new Error("当前账号没有可读取的车辆。");
         if (requestId !== liveRequestRef.current) return;
@@ -631,12 +668,14 @@ export default function App() {
         setDetail(null);
         setSelectedRideId(null);
         seekPlayback(0);
-        const nextRideMonth = unwrap(
-          await window.ninebot.rides.list({
-            vehicleId: nextVehicle.id,
-            month: targetMonth,
-            refresh,
-          }),
+        const nextRideMonth = await retryTransientBridgeRead(() =>
+          bridge.rides
+            .list({
+              vehicleId: nextVehicle.id,
+              month: targetMonth,
+              refresh,
+            })
+            .then(unwrap),
         );
         if (requestId !== liveRequestRef.current) return;
         const nextRides = nextRideMonth.rides;
@@ -652,8 +691,8 @@ export default function App() {
           void loadYearStatistics(statisticsYearRef.current, nextVehicle);
         }
         if (!firstRide || !shouldLoadFirstRideDetail) return nextVehicle;
-        const nextDetail = unwrap(
-          await window.ninebot.rides.detail({ vehicleId: nextVehicle.id, rideId: firstRide.id }),
+        const nextDetail = await retryTransientBridgeRead(() =>
+          bridge.rides.detail({ vehicleId: nextVehicle.id, rideId: firstRide.id }).then(unwrap),
         );
         if (requestId !== liveRequestRef.current) return;
         rideDetailDeferredRef.current = false;

@@ -9,6 +9,7 @@ const candidateRequestTimeoutMs = 45_000;
 
 export const ninecliVersion = "0.1.7";
 const commandTimeoutMs = 45_000;
+const transientWhoamiRetryDelaysMs = [300, 900, 1_800] as const;
 const maxOutputLength = 12 * 1024 * 1024;
 
 const allowedCommands = [
@@ -145,6 +146,11 @@ export const getExpectedBinarySha256 = (
   platform: NodeJS.Platform = process.platform,
   architecture = process.arch,
 ) => expectedBinaryHashes[`${platform}-${architecture}`] ?? null;
+
+const delay = (milliseconds: number) =>
+  new Promise<void>((resolve) => {
+    setTimeout(resolve, milliseconds);
+  });
 
 interface BundledNineCliLocation {
   appPath: string;
@@ -329,13 +335,7 @@ export class NineCliClient {
   }
 
   async whoami() {
-    try {
-      return await this.runJson("whoami");
-    } catch (error) {
-      if (!(error instanceof NineCliError) || error.kind !== "upstream") throw error;
-      await new Promise((resolve) => setTimeout(resolve, 300));
-      return this.runJson("whoami");
-    }
+    return this.runJsonWithUpstreamRetries("whoami", [], transientWhoamiRetryDelaysMs);
   }
 
   async vehicles() {
@@ -504,6 +504,27 @@ export class NineCliClient {
       return JSON.parse(raw) as unknown;
     } catch {
       throw new NineCliError("ninecli 返回了无法解析的数据，请稍后重试。");
+    }
+  }
+
+  private async runJsonWithUpstreamRetries(
+    command: AllowedCommand,
+    args: string[],
+    retryDelays: readonly number[],
+  ): Promise<unknown> {
+    try {
+      return await this.runJson(command, args);
+    } catch (error) {
+      const [nextDelay, ...remainingDelays] = retryDelays;
+      if (
+        !(error instanceof NineCliError) ||
+        error.kind !== "upstream" ||
+        nextDelay === undefined
+      ) {
+        throw error;
+      }
+      await delay(nextDelay);
+      return this.runJsonWithUpstreamRetries(command, args, remainingDelays);
     }
   }
 
