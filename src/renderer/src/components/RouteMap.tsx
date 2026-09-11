@@ -43,6 +43,9 @@ const MAP_LOAD_TIMEOUT_MS = 10_000;
 const ROUTE_SOURCE_ID = "ride-route";
 const ROUTE_CASING_LAYER_ID = "ride-route-casing";
 const ROUTE_LAYER_ID = "ride-route-line";
+const MAXIMUM_SOURCE_ID = "ride-maximum";
+const MAXIMUM_LABEL_LAYER_ID = "ride-maximum-label";
+const MAXIMUM_IMAGE_ID = "ride-maximum-image";
 type LinePaint = NonNullable<Extract<AddLayerObject, { type: "line" }>["paint"]>;
 const routeSpeedColorExpression: NonNullable<LinePaint["line-color"]> = [
   "step",
@@ -86,7 +89,7 @@ const fitRoute = (map: MapLibreMapInstance, bounds: TrackBounds, animated: boole
 
 const setMapLabelsVisible = (map: MapLibreMapInstance, visible: boolean) => {
   for (const layer of map.getStyle().layers ?? []) {
-    if (layer.type === "symbol") {
+    if (layer.type === "symbol" && layer.id !== MAXIMUM_LABEL_LAYER_ID) {
       map.setLayoutProperty(layer.id, "visibility", visible ? "visible" : "none");
     }
   }
@@ -109,14 +112,39 @@ const createPlaybackElement = () => {
   return element;
 };
 
-const createMaximumElement = (speed: number) => {
-  const element = document.createElement("div");
-  element.className = "map-maximum-marker";
-  const label = document.createElement("span");
-  label.textContent = `极速 ${Math.round(speed)} km/h`;
-  element.append(label);
-  element.setAttribute("aria-label", `最高时速点，${Math.round(speed)} km/h`);
-  return element;
+const createMaximumImage = (speed: number) => {
+  const canvas = document.createElement("canvas");
+  canvas.width = 132;
+  canvas.height = 64;
+  const context = canvas.getContext("2d");
+  if (!context) return null;
+  const label = `极速 ${Math.round(speed)} km/h`;
+  context.font = "760 15px -apple-system, BlinkMacSystemFont, sans-serif";
+  const labelWidth = Math.ceil(context.measureText(label).width);
+  const bubbleWidth = Math.max(104, labelWidth + 24);
+  const bubbleHeight = 34;
+  const bubbleLeft = Math.round((canvas.width - bubbleWidth) / 2);
+  const bubbleTop = 4;
+  const radius = bubbleHeight / 2;
+  context.fillStyle = "#f05a3f";
+  context.strokeStyle = "#ffffff";
+  context.lineWidth = 4;
+  context.beginPath();
+  context.roundRect(bubbleLeft, bubbleTop, bubbleWidth, bubbleHeight, radius);
+  context.fill();
+  context.stroke();
+  context.beginPath();
+  context.moveTo(canvas.width / 2 - 9, bubbleTop + bubbleHeight - 1);
+  context.lineTo(canvas.width / 2, canvas.height - 3);
+  context.lineTo(canvas.width / 2 + 9, bubbleTop + bubbleHeight - 1);
+  context.closePath();
+  context.fill();
+  context.stroke();
+  context.fillStyle = "#ffffff";
+  context.textAlign = "center";
+  context.textBaseline = "middle";
+  context.fillText(label, canvas.width / 2, bubbleTop + bubbleHeight / 2 + 1);
+  return context.getImageData(0, 0, canvas.width, canvas.height);
 };
 
 /** Displays an interactive online map with a local SVG fallback. */
@@ -133,7 +161,6 @@ export const RouteMap = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<MapLibreMapInstance | null>(null);
   const activeMarkerRef = useRef<Marker | null>(null);
-  const maximumMarkerRef = useRef<Marker | null>(null);
   const pulseTimeoutRef = useRef<number | null>(null);
   const displayTrack = useMemo(
     () => createMapDisplayTrack(track, coordinateDisplayMode),
@@ -208,6 +235,35 @@ export const RouteMap = ({
         layout: { "line-cap": "round", "line-join": "round" },
         paint: { "line-color": routeSpeedColorExpression, "line-width": 7 },
       });
+      if (maximumCoordinate && maximum) {
+        const maximumImage = createMaximumImage(maximum.point.speed);
+        if (maximumImage) {
+          map.addImage(MAXIMUM_IMAGE_ID, maximumImage, { pixelRatio: 1 });
+        }
+        map.addSource(MAXIMUM_SOURCE_ID, {
+          type: "geojson",
+          data: {
+            type: "Feature",
+            properties: {
+              speed: Math.round(maximum.point.speed),
+            },
+            geometry: { type: "Point", coordinates: maximumCoordinate },
+          },
+        });
+        if (maximumImage) {
+          map.addLayer({
+            id: MAXIMUM_LABEL_LAYER_ID,
+            type: "symbol",
+            source: MAXIMUM_SOURCE_ID,
+            layout: {
+              "icon-image": MAXIMUM_IMAGE_ID,
+              "icon-anchor": "bottom",
+              "icon-allow-overlap": true,
+              "icon-ignore-placement": true,
+            },
+          });
+        }
+      }
 
       new Marker({ element: createEndpointElement("起", "start"), anchor: "bottom" })
         .setLngLat(startCoordinate)
@@ -215,15 +271,6 @@ export const RouteMap = ({
       new Marker({ element: createEndpointElement("终", "end"), anchor: "bottom" })
         .setLngLat(endCoordinate)
         .addTo(map);
-      if (maximumCoordinate && maximum) {
-        const maximumMarker = new Marker({
-          element: createMaximumElement(maximum.point.speed),
-          anchor: "bottom",
-        })
-          .setLngLat(maximumCoordinate)
-          .addTo(map);
-        maximumMarkerRef.current = maximumMarker;
-      }
       const playbackMarker = new Marker({ element: createPlaybackElement(), anchor: "center" })
         .setLngLat(latestActiveCoordinateRef.current ?? startCoordinate)
         .addTo(map);
@@ -238,8 +285,6 @@ export const RouteMap = ({
       window.clearTimeout(loadTimeout);
       if (pulseTimeoutRef.current !== null) window.clearTimeout(pulseTimeoutRef.current);
       activeMarkerRef.current = null;
-      maximumMarkerRef.current?.remove();
-      maximumMarkerRef.current = null;
       mapRef.current = null;
       if (!removed) map.remove();
     };

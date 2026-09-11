@@ -1169,40 +1169,6 @@ select:focus-visible {
   box-shadow: 0 5px 14px rgb(32 54 66 / 30%);
 }
 
-.map-maximum-marker {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  min-height: 30px;
-  padding: 0 10px;
-  border: 3px solid #ffffff;
-  border-radius: 999px;
-  color: #ffffff;
-  background: #f05a3f;
-  box-shadow: 0 6px 16px rgb(32 54 66 / 28%);
-  font-size: 11px;
-  font-weight: 760;
-  white-space: nowrap;
-}
-
-.map-maximum-marker::after {
-  position: absolute;
-  bottom: -9px;
-  left: 50%;
-  width: 12px;
-  height: 12px;
-  border-right: 3px solid #ffffff;
-  border-bottom: 3px solid #ffffff;
-  background: #f05a3f;
-  content: "";
-  transform: translateX(-50%) rotate(45deg);
-}
-
-.map-maximum-marker > span {
-  position: relative;
-  z-index: 1;
-}
-
 .map-controls {
   position: absolute;
   right: 24px;
