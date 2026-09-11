@@ -969,6 +969,10 @@ select:focus-visible {
   display: block;
 }
 
+.route-map:has(.online-map-ready) .route-fallback-canvas {
+  display: none;
+}
+
 .online-map {
   z-index: 2;
   opacity: 0;
