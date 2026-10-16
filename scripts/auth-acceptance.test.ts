@@ -317,12 +317,31 @@ describe("fresh SDK authentication acceptance", () => {
         stage: "login",
         outcome: "failed",
         reason: "passport",
+        passportRejection: "unknown",
         ...(typeof code === "number" ? { businessCode: code } : {}),
       });
       expect(JSON.stringify(report)).not.toContain(secret);
       await expect(rig.store.load()).resolves.toBeNull();
     },
   );
+
+  it("distinguishes explicit human-verification text from an undocumented code 2", async () => {
+    const rig = createRig();
+    vi.mocked(rig.provider.loginWithPassword).mockRejectedValue(
+      new PassportLoginBusinessError(2, `human verification required ${secret}`),
+    );
+    const report = await rig.run();
+    expect(report.checks[0]).toEqual({
+      stage: "login",
+      outcome: "failed",
+      reason: "passport",
+      businessCode: 2,
+      passportRejection: "human-verification",
+    });
+    expect(JSON.stringify(report)).not.toContain(secret);
+    expect(rig.provider.refresh).not.toHaveBeenCalled();
+    expect(report.checks.at(-1)).toEqual({ stage: "logout", outcome: "passed" });
+  });
 });
 
 describe("acceptance input", () => {

@@ -42,17 +42,50 @@ export class PassportLoginHttpError extends Error {
   }
 }
 
+/** Categories inferred only from explicit server descriptions, not undocumented codes. */
+export type PassportRejectionKind =
+  | "human-verification"
+  | "invalid-credentials"
+  | "rate-limited"
+  | "unknown";
+
+const classifyRejection = (description: string | null): PassportRejectionKind => {
+  const text = description ?? "";
+  if (
+    /captcha|human[\s-]*(?:verification|check)|人机(?:验证|校验)|滑块(?:验证|校验)|易盾|yidun|send code need verify/i.test(
+      text,
+    )
+  ) {
+    return "human-verification";
+  }
+  if (
+    /too many (?:attempts|requests)|rate[\s-]*limit|请求过于频繁|操作太频繁|尝试次数过多/i.test(
+      text,
+    )
+  ) {
+    return "rate-limited";
+  }
+  if (
+    /(?:invalid|incorrect|wrong) (?:password|credentials)|password (?:is )?(?:invalid|incorrect|wrong)|密码(?:错误|不正确)|用户名或密码错误/i.test(
+      text,
+    )
+  ) {
+    return "invalid-credentials";
+  }
+  return "unknown";
+};
+
+/** Preserves the business code and a bounded category without retaining upstream text/data. */
 export class PassportLoginBusinessError extends Error {
   readonly resultCode: number | string | null;
+  readonly rejection: PassportRejectionKind;
 
   constructor(resultCode: number | string | null, resultDesc: string | null) {
-    super(
-      resultDesc
-        ? `Ninebot passport request failed: ${resultDesc}`
-        : "Ninebot passport request failed",
-    );
+    const rejection = classifyRejection(resultDesc);
+    super(`Ninebot passport request rejected: ${rejection}`);
     this.name = "PassportLoginBusinessError";
     this.resultCode = resultCode;
+    this.rejection = rejection;
   }
 }
 

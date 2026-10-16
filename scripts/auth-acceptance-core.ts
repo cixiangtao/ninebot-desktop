@@ -16,6 +16,7 @@ import {
   type NinebotDeviceContext,
   type NinebotPasswordCredentials,
   type NinebotTransport,
+  type PassportRejectionKind,
 } from "@jiuhao/ninebot-client";
 import { decodeGzipBody } from "@jiuhao/ninebot-client/response-node";
 
@@ -54,6 +55,8 @@ export interface AuthAcceptanceCheck {
     | "business-login";
   httpStatus?: number;
   businessCode?: number;
+  /** Text-derived diagnostic category; an undocumented numeric code alone remains unknown. */
+  passportRejection?: PassportRejectionKind;
   count?: number;
 }
 
@@ -134,6 +137,7 @@ const failureCheck = (stage: AuthAcceptanceStage, error: unknown): AuthAcceptanc
       stage,
       outcome: "failed",
       reason: "passport",
+      passportRejection: error.rejection,
       ...(/^\d{1,6}$/.test(code) ? { businessCode: Number(code) } : {}),
     };
   }

@@ -188,6 +188,7 @@ export {
 export type {
   NinebotPassportLoginClient,
   PassportLoginClientOptions,
+  PassportRejectionKind,
   PassportResponse,
   PassportTransport,
 } from "./passport-login-client.ts";

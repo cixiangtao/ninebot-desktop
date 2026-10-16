@@ -7,6 +7,33 @@ import {
 const json = (value: unknown) => new TextEncoder().encode(JSON.stringify(value));
 
 describe("Passport login client", () => {
+  it.each([
+    [2, null, "unknown"],
+    [2, "login rejected", "unknown"],
+    [2, "captcha verification required", "human-verification"],
+    [90202, "send code need verify", "human-verification"],
+    [2, "请先完成人机验证", "human-verification"],
+    [2, "invalid credentials", "invalid-credentials"],
+    [2, "密码不正确", "invalid-credentials"],
+    [2, "too many attempts", "rate-limited"],
+  ] as const)(
+    "classifies code %s only using explicit description %s",
+    (code, description, rejection) => {
+      const error = new PassportLoginBusinessError(code, description);
+      expect(error.resultCode).toBe(code);
+      expect(error.rejection).toBe(rejection);
+      expect(error.message).toBe(`Ninebot passport request rejected: ${rejection}`);
+    },
+  );
+
+  it("does not retain potentially private upstream descriptions in error objects", () => {
+    const description = "captcha required: SYNTHETIC_PRIVATE_CHALLENGE_DATA";
+    const error = new PassportLoginBusinessError(2, description);
+    expect(error.rejection).toBe("human-verification");
+    expect(error.stack).not.toContain("SYNTHETIC_PRIVATE_CHALLENGE_DATA");
+    expect(JSON.stringify(error)).not.toContain("SYNTHETIC_PRIVATE_CHALLENGE_DATA");
+  });
+
   it("sends the verified password request and parses the session", async () => {
     const send = vi.fn().mockResolvedValue({
       status: 200,
