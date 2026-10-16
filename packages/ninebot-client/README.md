@@ -98,6 +98,15 @@ credentials, encrypted responses, and gzip. New-account login and refresh still
 need acceptance against the real Ninebot service. The desktop production entry
 continues to use ninecli for authentication.
 
+From this repository, `pnpm protocol:auth -- --service=ebike --month=202609`
+runs the real-service acceptance flow with terminal credential prompts and a
+fresh temporary directory. It checks persisted login/refresh, profile and
+read-only service access, then logout restoration and cleanup. Empty vehicle or
+ride samples produce an incomplete result. See the repository's
+[acceptance guide](../../docs/PROTOCOL_RESEARCH.md#真实-sdk-认证验收) for scope,
+exit codes and noninteractive input. This command still requires a real account
+run before the new authentication path is eligible for production use.
+
 The private `0.0.0` API changed: Passport login/refresh now return
 `NinebotPassportSession` (no business UID), `parsePassportRefreshSession` accepts
 the previous Passport session, and `createNinebotPassportAuthProvider` requires

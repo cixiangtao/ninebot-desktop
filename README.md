@@ -29,6 +29,8 @@ NINEBOT_CONFIG_DIR=/absolute/path/to/ninecli-config pnpm dev
 
 SDK 新增 `@jiuhao/ninebot-client/auth-node` 两阶段认证入口：先取得 Passport 令牌，再调用加密 business login，以业务响应的 `data.uid` 建立完整会话后才保存；Passport 中的 `uid` 不作为业务 UID。入口包含刷新、文件存储和退出清理，退出会同时删除新旧两种令牌文件，避免重启后恢复旧会话；新设备使用已观察到的 Android 协议默认元数据。本地模拟服务端已覆盖认证闭环与失败路径，真实九号新账号登录和刷新仍待验收，因此尚未接入生产 Electron。用法与兼容变化见 [SDK 文档](packages/ninebot-client/README.md)。短信请求仍遵循服务端人机校验边界。
 
+真实认证验收可运行 `pnpm protocol:auth -- --month=202609`，按终端提示输入账号、区号和不回显的密码。工具在新的临时目录中完成两阶段登录、资料读取、会话恢复、强制刷新及刷新后恢复，再读取选定车辆的状态、电池、月度首屏和一条行程详情，最后退出并检查会话无法恢复；正常结束或处理失败后删除临时目录。默认检查电自，电摩使用 `--service=motor`，多车辆可指定 `--vehicle-index=1`。只输出阶段结果与计数，无车或月份无行程时标为未覆盖并以退出码 2 结束；完整通过为 0，失败为 1。此工具不依赖已有 ninecli 登录态，范围及机器输入方式见[认证验收说明](docs/PROTOCOL_RESEARCH.md#真实-sdk-认证验收)。
+
 候选请求默认最多等待 15 秒；VPN 或上游较慢时可通过 `NINEBOT_CANDIDATE_TIMEOUT_MS` 调整为正整数毫秒，超过 120 秒会按 120 秒执行，空值或非法值回到 15 秒。超时后该次读取按 SDK 错误边界结束，不会偷偷切换到 ninecli，也不会改变数据源开关或会话凭据。
 
 SDK 根入口同时导出 `createNinebotCandidateSessionClient` 和 `createNinebotFetchCandidateSessionClient`，把同一份内存会话元数据适配为车辆列表、status、battery、月度和详情五类只读调用；fetch 工厂默认使用已验证的九号服务地址，也支持局部覆盖 origin（未覆盖的服务仍保留默认地址）和 fetch 实现。它不提供登录、令牌文件读写或车辆控制；调用方负责会话生命周期和凭据保护，退出登录时可调用返回对象的 `clear()` 阻止后续请求并释放会话引用，可通过 `@jiuhao/ninebot-client/candidate-session` 单独导入。协议回放或测试可注入 `clock`、`nonceFactory` 和 `requestIdFactory`，生产环境默认仍使用系统时间与安全随机值。
