@@ -29,6 +29,8 @@
     "protocol:report": "node scripts/protocol-capture-report.ts",
     "preprotocol:parity": "pnpm run build:sdk",
     "protocol:parity": "node scripts/protocol-parity.ts",
+    "preprotocol:auth": "pnpm run build:sdk",
+    "protocol:auth": "node scripts/auth-acceptance.ts",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
     "lint": "oxlint .",
     "format": "oxfmt . --write",
