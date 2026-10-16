@@ -76,6 +76,7 @@ describe("ninecli runtime policy", () => {
     expect(error.kind).toBe("verification");
     expect(error.message).toContain("人机验证");
     expect(error.message).not.toContain("90202");
+    expect(error.message).not.toContain("改用密码登录");
   });
 
   it("pins the verified macOS arm64 and Windows x64 binary digests", () => {

@@ -227,7 +227,7 @@ export const classifyNineCliFailure = (stdout: string, stderr: string) => {
   const output = `${stderr}\n${stdout}`;
   if (/resultCode[=:]90202|send code need verify|captcha|yidun|NECaptcha/i.test(output)) {
     return new NineCliError(
-      "九号要求先完成人机验证；ninecli 0.1.7 暂不支持该验证，请改用密码登录。",
+      "九号要求先完成人机验证，当前登录流程暂不支持。请在九号官方客户端完成登录。",
       "verification",
     );
   }

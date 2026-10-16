@@ -239,7 +239,7 @@ export const LoginSheet = ({
         <p className="login-warning mt-4 text-xs leading-5 text-slate-500">
           {mode === "password"
             ? "注意：密码只在登录调用期间保留在本机内存，不会写入磁盘或渲染层日志。"
-            : "短信发送可能触发网易易盾人机验证；客户端不会尝试绕过该挑战，服务端要求验证时请改用密码登录。"}
+            : "短信或密码登录都可能触发人机验证。当前客户端暂不支持完成该验证，请使用九号官方客户端登录。"}
         </p>
       </section>
     </div>
