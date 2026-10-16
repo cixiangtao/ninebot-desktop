@@ -23,11 +23,11 @@ pnpm dev
 NINEBOT_CONFIG_DIR=/absolute/path/to/ninecli-config pnpm dev
 ```
 
-仓库保留 Node.js/TypeScript 协议研究工具用于离线 parity 和响应解析测试；生产桌面端固定通过随包 ninecli 访问九号服务。协议记录器仅监听本机且默认不保存 Body 原文，使用方式和私有样本边界见[九号协议研究计划](docs/PROTOCOL_RESEARCH.md)。
+仓库保留 Node.js/TypeScript 协议研究工具用于离线 parity 和响应解析测试；生产桌面端以随包 ninecli 为主，车辆列表与月度补充分页使用 TypeScript 协议桥。协议记录器仅监听本机且默认不保存 Body 原文，使用方式和私有样本边界见[九号协议研究计划](docs/PROTOCOL_RESEARCH.md)。
 
-正式应用以 ninecli 为主运行时。Electron 只允许 `whoami`、`login`、`login-code`、`vehicles`、`status`、`battery` 和 `travel` 这一组只读或认证命令，并在执行前验证随包二进制；运行时输出先在主进程解析为脱敏领域对象，再进入 IPC。ninecli 的 `travel --month` 只提供首屏逐次明细，因此主进程在检测到截断时，使用窄范围 TypeScript 协议桥重新分页读取完整月份（包含第一页）。登录、会话、车辆、状态、电池和轨迹详情仍由 ninecli 提供，不恢复整套 TS SDK 迁移。分页缺失、重复或失败会明确报错，不静默导出首屏。
+正式应用以 ninecli 为主运行时。Electron 只允许 `whoami`、`login`、`login-code`、`vehicles`、`status`、`battery` 和 `travel` 这一组只读或认证命令，并在执行前验证随包二进制；运行时输出先在主进程解析为脱敏领域对象，再进入 IPC。ninecli 的 `travel --month` 只提供首屏逐次明细，因此主进程在检测到截断时，使用窄范围 TypeScript 协议桥重新分页读取完整月份（包含第一页）。登录、会话、状态、电池和轨迹详情仍由 ninecli 提供；车辆列表使用 TypeScript reader。分页缺失、重复或失败会明确报错，不静默导出首屏。
 
-认证使用纯 SDK Passport 会话客户端（密码登录、whoami、令牌保存/刷新和退出登录）。首次账号接入时，车辆 reader 会按已验证的电自 `65` / 电摩 `64` 服务族发现码获取并缓存真实车型元数据；后续车辆、状态、电池和骑行请求都会先向会话管理器取得新鲜令牌，临近过期时自动刷新。短信请求遵循九号服务端人机校验边界，不绕过或模拟验证。
+SDK 新增 `@jiuhao/ninebot-client/auth-node` 两阶段认证入口：先取得 Passport 令牌，再调用加密 business login，以业务响应的 `data.uid` 建立完整会话后才保存；Passport 中的 `uid` 不作为业务 UID。入口包含刷新、文件存储和退出清理，退出会同时删除新旧两种令牌文件，避免重启后恢复旧会话；新设备使用已观察到的 Android 协议默认元数据。本地模拟服务端已覆盖认证闭环与失败路径，真实九号新账号登录和刷新仍待验收，因此尚未接入生产 Electron。用法与兼容变化见 [SDK 文档](packages/ninebot-client/README.md)。短信请求仍遵循服务端人机校验边界。
 
 候选请求默认最多等待 15 秒；VPN 或上游较慢时可通过 `NINEBOT_CANDIDATE_TIMEOUT_MS` 调整为正整数毫秒，超过 120 秒会按 120 秒执行，空值或非法值回到 15 秒。超时后该次读取按 SDK 错误边界结束，不会偷偷切换到 ninecli，也不会改变数据源开关或会话凭据。
 

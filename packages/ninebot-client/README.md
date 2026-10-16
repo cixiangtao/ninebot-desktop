@@ -25,11 +25,13 @@ logout cleanup, and defensive session copies without retaining passwords.
 Vehicle control remains out of scope. Callers must keep credentials out of
 source control and logs.
 
-`createNinebotPassportAuthProvider` adapts the Passport login client to this
-shared lifecycle. Password login, `whoami`, token refresh, and local logout can
-therefore use one provider contract. SMS requests intentionally throw
-`NinebotHumanVerificationRequiredError` until the upstream human-verification
-challenge is completed; the SDK does not bypass or simulate that challenge.
+Password authentication now has two stages: Passport returns account tokens,
+then encrypted `POST /user/user/login` establishes the business UID. Passport
+`uid` and `business_uid` fields are never used as the business identity.
+`createNinebotPassportAuthProvider` requires an `initializeBusinessSession`
+callback and returns a complete session only after both stages succeed. SMS
+requests intentionally throw `NinebotHumanVerificationRequiredError` until the
+upstream human-verification challenge is completed.
 
 The lifecycle layer can be imported without pulling in Node-only crypto:
 
@@ -37,12 +39,70 @@ The lifecycle layer can be imported without pulling in Node-only crypto:
 import { NinebotAuthSessionManager } from "@jiuhao/ninebot-client/auth";
 ```
 
-The Passport client also exposes the verified password-login, refresh, and
-`whoami` request boundaries. The Node entry exports
-`createNinebotPassportSigner`, which reconstructs the sorted raw query
-canonical string and SHA-256 signature observed in ninecli 0.1.7. The
-`whoami` call defaults to a `Bearer` authorization header, while hosts may
-still inject a signer when testing a protocol version change.
+The Passport client exposes the reconstructed password-login, refresh, and
+`whoami` boundaries. The Node entry exports `createNinebotPassportSigner`,
+which reconstructs the sorted raw query canonical string and SHA-256 signature
+observed in ninecli 0.1.7. `whoami` sends the raw access token in Authorization,
+without a `Bearer` prefix. Hosts may inject a signer for protocol tests.
+
+## Node authentication
+
+The new `auth-node` factory composes Passport, encrypted business login, gzip
+response decoding, device metadata, and file-backed session management:
+
+```ts
+import { createNinebotNodeAuthSessionManager } from "@jiuhao/ninebot-client/auth-node";
+
+const auth = createNinebotNodeAuthSessionManager({
+  directory: "/absolute/private/ninebot-sdk",
+});
+
+await auth.restore(); // Local files only; this does not verify upstream validity.
+await auth.loginWithPassword({
+  areaCode: "86",
+  user: usernameFromUserInput,
+  password: passwordFromUserInput,
+});
+
+const session = await auth.ensureSession(); // Refreshes near expiry when available.
+// Pass session.accessToken and session.businessUid to authorized read-only clients.
+await auth.logout();
+```
+
+Use a private, isolated directory for acceptance testing. A successful Passport
+response alone is insufficient: business login must return the observed success
+code `1` (numeric or string) and a nonempty string `data.uid`. Missing UUID,
+business failure, invalid UID, or HTTP failure rejects login without replacing
+the previous complete session. Passwords and intermediate Passport sessions are
+not written to the session file. Refresh updates account tokens and retains the
+business UID from the completed login.
+
+New device contexts use the observed Android protocol defaults (`13`, `Xiaomi`,
+region `bj`); existing device metadata is preserved. These values describe the
+wire protocol context. `deviceDefaults` affects newly generated contexts only.
+The factory accepts partial `origins`, a custom `fetch`, and `timeoutMs` (15 seconds
+by default), or an injected `transport` that takes precedence over those options.
+`now` controls business service time and expiry checks; Passport timestamps use
+the Passport request builder's system clock.
+
+The store writes `auth-session.json` with restricted permissions and can read an
+existing complete legacy `tokens.json`. An incomplete legacy session without a
+business UID must log in again. Explicit logout removes both token files so a
+restart cannot restore the legacy session. Use a separate directory if the
+legacy session must remain available to another application. Device metadata is
+retained. Concurrent refreshes are shared; superseded login/refresh results
+cannot replace a newer account or restore credentials after logout.
+
+This implementation has passed local HTTP integration tests using synthetic
+credentials, encrypted responses, and gzip. New-account login and refresh still
+need acceptance against the real Ninebot service. The desktop production entry
+continues to use ninecli for authentication.
+
+The private `0.0.0` API changed: Passport login/refresh now return
+`NinebotPassportSession` (no business UID), `parsePassportRefreshSession` accepts
+the previous Passport session, and `createNinebotPassportAuthProvider` requires
+its business initializer options. Complete sessions remain
+`NinebotAuthSession`. Custom runtime adapters must supply both login stages.
 
 ## Build
 
@@ -57,10 +117,9 @@ The generated declaration and JavaScript files are written to this package's
 `dist/` directory. The package is not published by the current release
 workflow.
 
-`typecheck:browser` compiles only `candidate-contracts` and
-`candidate-session-core` against the DOM library with Node types excluded. It
-is a boundary check for the platform-neutral layer, not proof that a browser
-crypto provider has been implemented.
+`typecheck:browser` checks the platform-neutral session, auth, Passport, and
+web crypto/transport layers against the DOM library without Node-only imports.
+It does not make the Node service clients or file stores browser-compatible.
 
 ## Minimal usage
 
