@@ -338,3 +338,11 @@ pnpm protocol:auth -- --service=ebike --month=202609
 无交互运行时支持 `--credentials-stdin`，从标准输入读取一个含 `user`、`password`、可选 `areaCode` 的 JSON 对象，最多 16 KiB。应由私有凭据输入渠道提供，不要把账号密码写进命令行或仓库文件。需要直接解析 stdout JSON 时，先执行 `pnpm run build:sdk`，再直接运行 `node scripts/auth-acceptance.ts --credentials-stdin ...`；pnpm 包装命令可能额外输出构建日志。
 
 该工具的 `passed` 证明 SDK 在所选样本上能从新登录进入只读调用，不证明所有账号/车型覆盖，不等于与 ninecli 的字段级 parity，也不自动切换生产入口。本轮仅用离线替身和伪终端验证验收流程，未使用真实账号执行此命令。
+
+### 2026-10-16 Passport 首次登录拒绝反馈
+
+维护者实际运行认证验收，返回 `login: failed`、`reason: passport`、`businessCode: 2`，本地 `logout` 检查通过。这表明本次尝试在 Passport 阶段被拒绝，尚未到达业务 UID 初始化、刷新和只读数据检查；不能把这些后续能力标记为通过，也不能根据该结果判定 RSA/AES 或 business login 失败。
+
+该报告未携带服务端描述，当前没有错误码 `2` 的权威语义映射，因此人机验证、凭据问题及其他风控条件仍待区分。新报告增加 `passportRejection`，仅根据响应描述中的明确文本归类为 `human-verification`、`invalid-credentials`、`rate-limited` 或 `unknown`；码值本身不参与分类。SDK 错误不保留原始描述或挑战数据，验收报告继续只输出固定类别及受限业务码。
+
+[ninecli 0.1.7 发布说明](https://pypi.org/project/ninecli/0.1.7/)列出了密码 `login` 和短信 `login-code` 命令，但不能据此证明当前账号可以免交互登录。现有 SDK 只实现基础密码请求，没有获取、展示、完成和回传人机挑战的流程；若上游要求验证，必须补上正常交互接入，或由合法取得的会话进入 SDK 生命周期。后一种路线只能验收已有会话的业务初始化、刷新和读取，不能替代首次登录门禁。当前暂停把纯密码免交互登录视为已知可行入口，保留生产认证路径及真实认证门禁，不反复尝试账号，也不以修改签名或语言替代人机验证。

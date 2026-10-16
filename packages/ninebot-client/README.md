@@ -107,6 +107,15 @@ ride samples produce an incomplete result. See the repository's
 exit codes and noninteractive input. This command still requires a real account
 run before the new authentication path is eligible for production use.
 
+Password authentication can also be blocked by an interactive upstream check.
+The basic request does not implement challenge presentation or submission.
+`PassportLoginBusinessError.rejection` and the acceptance report's
+`passportRejection` classify explicit server descriptions into bounded categories;
+undocumented codes (including `2`) alone remain `unknown`. The error retains no
+raw server description or challenge data. A verification requirement needs a
+normal interactive integration or a separately authorized existing-session flow;
+request parity alone does not establish that a fresh login will succeed.
+
 The private `0.0.0` API changed: Passport login/refresh now return
 `NinebotPassportSession` (no business UID), `parsePassportRefreshSession` accepts
 the previous Passport session, and `createNinebotPassportAuthProvider` requires
