@@ -120,6 +120,8 @@ export class NinebotAuthSessionManager {
   private refreshPromise: Promise<NinebotAuthSession> | null = null;
   private readonly now: () => number;
   private readonly refreshSkewMs: number;
+  private generation = 0;
+  private persistence: Promise<void> = Promise.resolve();
 
   constructor(private readonly options: NinebotAuthSessionManagerOptions) {
     this.now = options.now ?? Date.now;
@@ -131,7 +133,10 @@ export class NinebotAuthSessionManager {
 
   /** Loads a persisted session without contacting the upstream service. */
   async restore(): Promise<NinebotAuthSession | null> {
-    const stored = await this.options.store.load();
+    const generation = ++this.generation;
+    this.refreshPromise = null;
+    const stored = await this.persist(() => this.options.store.load());
+    this.assertCurrent(generation);
     this.session = stored === null ? null : validateSession(stored);
     return this.getSession();
   }
@@ -151,9 +156,11 @@ export class NinebotAuthSessionManager {
   }
 
   async loginWithPassword(credentials: NinebotPasswordCredentials) {
+    const generation = ++this.generation;
+    this.refreshPromise = null;
     const nextSession = validateSession(await this.options.provider.loginWithPassword(credentials));
-    await this.replaceSession(nextSession);
-    return this.getSession() as NinebotAuthSession;
+    await this.replaceSession(nextSession, generation);
+    return cloneSession(nextSession);
   }
 
   async requestSmsCode(input: NinebotSmsCodeRequest) {
@@ -161,9 +168,11 @@ export class NinebotAuthSessionManager {
   }
 
   async loginWithSmsCode(input: NinebotSmsLoginInput) {
+    const generation = ++this.generation;
+    this.refreshPromise = null;
     const nextSession = validateSession(await this.options.provider.loginWithSmsCode(input));
-    await this.replaceSession(nextSession);
-    return this.getSession() as NinebotAuthSession;
+    await this.replaceSession(nextSession, generation);
+    return cloneSession(nextSession);
   }
 
   /**
@@ -178,7 +187,7 @@ export class NinebotAuthSessionManager {
   /** Refreshes explicitly and persists the replacement session. */
   async refresh(): Promise<NinebotAuthSession> {
     if (this.refreshPromise !== null) return cloneSession(await this.refreshPromise);
-    const operation = this.performRefresh();
+    const operation = this.performRefresh(this.generation);
     this.refreshPromise = operation;
     try {
       return cloneSession(await operation);
@@ -190,16 +199,12 @@ export class NinebotAuthSessionManager {
   /** Clears local credentials even when an optional upstream revoke call fails. */
   async logout(): Promise<void> {
     const current = this.session;
+    this.generation += 1;
     this.session = null;
-    let upstreamError: unknown;
-    try {
-      if (current !== null) await this.options.provider.logout?.(current);
-    } catch (error) {
-      upstreamError = error;
-    } finally {
-      await this.options.store.clear();
-    }
-    if (upstreamError !== undefined) throw upstreamError;
+    this.refreshPromise = null;
+    // Queue clearing after any save already in progress, before contacting upstream.
+    await this.persist(() => this.options.store.clear());
+    if (current !== null) await this.options.provider.logout?.(current);
   }
 
   private requireSession() {
@@ -207,18 +212,49 @@ export class NinebotAuthSessionManager {
     return cloneSession(this.session);
   }
 
-  private async replaceSession(nextSession: NinebotAuthSession) {
-    await this.options.store.save(nextSession);
-    this.session = cloneSession(nextSession);
+  private assertCurrent(generation: number) {
+    if (generation !== this.generation) throw new Error("Ninebot auth operation was superseded");
   }
 
-  private async performRefresh(): Promise<NinebotAuthSession> {
+  private persist<T>(operation: () => Promise<T>): Promise<T> {
+    const pending = this.persistence.then(operation);
+    this.persistence = pending.then(
+      () => undefined,
+      () => undefined,
+    );
+    return pending;
+  }
+
+  private async replaceSession(
+    nextSession: NinebotAuthSession,
+    generation: number,
+    expectedSession?: NinebotAuthSession,
+  ) {
+    await this.persist(async () => {
+      this.assertCurrent(generation);
+      if (expectedSession !== undefined && this.session !== expectedSession) {
+        throw new Error("Ninebot auth operation was superseded");
+      }
+      const previous = this.session;
+      await this.options.store.save(nextSession);
+      if (generation !== this.generation) {
+        // A newer attempt may fail before it writes; do not leave this stale save on disk.
+        if (previous === null) await this.options.store.clear();
+        else await this.options.store.save(cloneSession(previous));
+      }
+      this.assertCurrent(generation);
+      this.session = cloneSession(nextSession);
+    });
+  }
+
+  private async performRefresh(generation: number): Promise<NinebotAuthSession> {
+    const source = this.session;
     const current = this.requireSession();
     if (!this.options.provider.refresh) {
       throw new Error("Ninebot auth provider does not support token refresh");
     }
     const nextSession = validateSession(await this.options.provider.refresh(current));
-    await this.replaceSession(nextSession);
+    await this.replaceSession(nextSession, generation, source ?? undefined);
     return nextSession;
   }
 
