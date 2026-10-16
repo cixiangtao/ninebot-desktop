@@ -37,7 +37,6 @@ describe("Passport login client", () => {
     ).resolves.toEqual({
       accessToken: "access",
       refreshToken: "refresh",
-      businessUid: "business",
       expiresAtMs: 1_790_735_062_000,
     });
     expect(send).toHaveBeenCalledWith(
@@ -60,7 +59,7 @@ describe("Passport login client", () => {
 
     await expect(
       client.loginWithPassword({ areaCode: "+86", username: "user", password: "password" }),
-    ).resolves.toMatchObject({ accessToken: "a", businessUid: "u" });
+    ).resolves.toMatchObject({ accessToken: "a" });
     expect(decode).toHaveBeenCalled();
   });
 
@@ -80,11 +79,10 @@ describe("Passport login client", () => {
     });
 
     await expect(
-      client.refresh({ accessToken: "access", refreshToken: "refresh", businessUid: "business" }),
+      client.refresh({ accessToken: "access", refreshToken: "refresh" }),
     ).resolves.toEqual({
       accessToken: "new-access",
       refreshToken: "new-refresh",
-      businessUid: "business",
     });
     const request = send.mock.calls[0]?.[0];
     expect(request?.path).toBe("/v3/user/refresh");
@@ -107,7 +105,7 @@ describe("Passport login client", () => {
     });
 
     await expect(
-      client.whoami({ accessToken: "access", refreshToken: "refresh", businessUid: "business" }),
+      client.whoami({ accessToken: "access", refreshToken: "refresh" }),
     ).resolves.toEqual({ username: "user", hasPassword: true });
     const request = send.mock.calls[0]?.[0];
     expect(request?.path).toBe("/v5/user");
@@ -129,7 +127,6 @@ describe("Passport login client", () => {
     await client.whoami({
       accessToken: "raw-access",
       refreshToken: "refresh",
-      businessUid: "business",
     });
     expect(send.mock.calls[0]?.[0]?.headers.authorization).toBe("raw-access");
   });
@@ -152,7 +149,7 @@ describe("Passport login client", () => {
 
     await expect(
       client.loginWithPassword({ areaCode: "+86", username: "user", password: "password" }),
-    ).resolves.toMatchObject({ accessToken: "a", businessUid: "u" });
+    ).resolves.toMatchObject({ accessToken: "a" });
   });
 
   it("normalizes a string access-token validity returned by Passport", async () => {

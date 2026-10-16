@@ -9,7 +9,7 @@ import {
   type BuildPassportWhoamiRequestOptions,
   type PassportRequest,
 } from "./passport-auth.ts";
-import type { NinebotAuthSession } from "./auth.ts";
+import type { NinebotPassportSession } from "./auth.ts";
 import { createNinebotPassportWebSigner } from "./passport-signer.ts";
 
 export interface PassportResponse {
@@ -28,7 +28,7 @@ export interface PassportLoginClientOptions {
   signer?: BuildPasswordLoginRequestOptions["signer"];
   refreshSigner?: BuildRefreshRequestOptions["signer"];
   whoamiSigner?: BuildPassportWhoamiRequestOptions["signer"];
-  authorizationFactory?: (session: NinebotAuthSession) => string;
+  authorizationFactory?: (session: NinebotPassportSession) => string;
   responseBodyDecoder?: (response: PassportResponse) => Uint8Array | Promise<Uint8Array>;
 }
 
@@ -111,11 +111,11 @@ export const createNinebotPassportLoginClient = ({
   // Passport's /v5/user endpoint expects the JWT as the raw Authorization value.
   // It is deliberately not prefixed with `Bearer`; ninecli sends the token verbatim.
   const authorization =
-    authorizationFactory ?? ((session: NinebotAuthSession) => session.accessToken);
+    authorizationFactory ?? ((session: NinebotPassportSession) => session.accessToken);
   return {
     async loginWithPassword(
       input: Omit<BuildPasswordLoginRequestOptions, "signer">,
-    ): Promise<NinebotAuthSession> {
+    ): Promise<NinebotPassportSession> {
       const request = await buildPasswordLoginRequest({ ...input, signer: loginSigner });
       const response = await transport.send(request);
       if (response.status < 200 || response.status >= 300) {
@@ -127,7 +127,7 @@ export const createNinebotPassportLoginClient = ({
       }
       return parsePassportLoginSession(envelope.data);
     },
-    async refresh(session: NinebotAuthSession): Promise<NinebotAuthSession> {
+    async refresh(session: NinebotPassportSession): Promise<NinebotPassportSession> {
       const request = await buildRefreshRequest({
         accessToken: session.accessToken,
         refreshToken: session.refreshToken ?? "",
@@ -141,9 +141,9 @@ export const createNinebotPassportLoginClient = ({
       if (!isSuccessCode(envelope.resultCode)) {
         throw new PassportLoginBusinessError(envelope.resultCode, envelope.resultDesc);
       }
-      return parsePassportRefreshSession(envelope.data, session.businessUid, session.uuid);
+      return parsePassportRefreshSession(envelope.data, session);
     },
-    async whoami<T = unknown>(session: NinebotAuthSession): Promise<T> {
+    async whoami<T = unknown>(session: NinebotPassportSession): Promise<T> {
       const request = await buildWhoamiPassportRequest({
         authorization: authorization(session),
         signer: whoamiRequestSigner,

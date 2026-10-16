@@ -1,4 +1,4 @@
-import type { NinebotAuthSession } from "./auth.ts";
+import type { NinebotPassportSession } from "./auth.ts";
 
 /** Passport request shape shared with any transport implementation. */
 export interface PassportRequest {
@@ -312,8 +312,6 @@ export const buildWhoamiPassportRequest = async ({
 interface PassportLoginData {
   access_token?: unknown;
   refresh_token?: unknown;
-  business_uid?: unknown;
-  uid?: unknown;
   uuid?: unknown;
   accessTokenValidity?: unknown;
 }
@@ -340,44 +338,36 @@ const readExpiry = (value: unknown) => {
   return parsed < 1_000_000_000_000 ? parsed * 1_000 : parsed;
 };
 
-/** Converts a verified Passport login data object into the shared session contract. */
-export const parsePassportLoginSession = (data: unknown): NinebotAuthSession => {
+/** Parses account tokens only; Passport uid fields never establish business identity. */
+export const parsePassportLoginSession = (data: unknown): NinebotPassportSession => {
   if (!data || typeof data !== "object" || Array.isArray(data)) {
     throw new Error("Ninebot passport login response data is invalid");
   }
   const record = data as PassportLoginData;
-  const businessUid = record.business_uid ?? record.uid;
   const expiresAtMs = readExpiry(record.accessTokenValidity);
   return {
     accessToken: requireText(record.access_token, "access_token"),
     refreshToken: requireText(record.refresh_token, "refresh_token"),
-    businessUid: requireText(businessUid, "business_uid"),
     ...(record.uuid === undefined ? {} : { uuid: requireText(record.uuid, "uuid") }),
     ...(expiresAtMs === undefined ? {} : { expiresAtMs }),
   };
 };
 
-/** Parses refresh data while retaining the prior business uid when the response omits it. */
+/** Parses replacement account tokens, retaining UUID/expiry when upstream omits them. */
 export const parsePassportRefreshSession = (
   data: unknown,
-  previousBusinessUid: string,
-  previousUuid?: string,
-): NinebotAuthSession => {
-  if (!previousBusinessUid.trim()) throw new Error("Ninebot passport business uid is invalid");
+  previous: NinebotPassportSession,
+): NinebotPassportSession => {
   if (!data || typeof data !== "object" || Array.isArray(data)) {
     throw new Error("Ninebot passport refresh response data is invalid");
   }
   const record = data as PassportLoginData;
-  const expiresAtMs = readExpiry(record.accessTokenValidity);
+  const expiresAtMs = readExpiry(record.accessTokenValidity) ?? previous.expiresAtMs;
+  const uuid = record.uuid ?? previous.uuid;
   return {
     accessToken: requireText(record.access_token, "access_token"),
     refreshToken: requireText(record.refresh_token, "refresh_token"),
-    businessUid: requireText(record.business_uid ?? previousBusinessUid, "business_uid"),
-    ...(record.uuid === undefined
-      ? previousUuid === undefined
-        ? {}
-        : { uuid: previousUuid }
-      : { uuid: requireText(record.uuid, "uuid") }),
+    ...(uuid === undefined ? {} : { uuid: requireText(uuid, "uuid") }),
     ...(expiresAtMs === undefined ? {} : { expiresAtMs }),
   };
 };

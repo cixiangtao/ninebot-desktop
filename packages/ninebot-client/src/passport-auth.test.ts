@@ -61,7 +61,7 @@ describe("Passport password-login boundary", () => {
         business_uid: "business",
         phone: "+8613800000000",
       }),
-    ).toEqual({ accessToken: "access", refreshToken: "refresh", businessUid: "business" });
+    ).toEqual({ accessToken: "access", refreshToken: "refresh" });
   });
 
   it("preserves the optional uuid needed by business metadata bootstrap", () => {
@@ -75,7 +75,6 @@ describe("Passport password-login boundary", () => {
     ).toMatchObject({
       accessToken: "access",
       refreshToken: "refresh",
-      businessUid: "business",
       uuid: "0123456789abcdef0123456789abcdef",
     });
   });
@@ -84,15 +83,28 @@ describe("Passport password-login boundary", () => {
     expect(
       parsePassportRefreshSession(
         { access_token: "next-access", refresh_token: "next-refresh" },
-        "business",
-        "0123456789abcdef0123456789abcdef",
+        {
+          accessToken: "old-access",
+          refreshToken: "old-refresh",
+          uuid: "0123456789abcdef0123456789abcdef",
+        },
       ),
     ).toMatchObject({
       accessToken: "next-access",
       refreshToken: "next-refresh",
-      businessUid: "business",
       uuid: "0123456789abcdef0123456789abcdef",
     });
+  });
+
+  it("accepts Passport tokens without a business UID and ignores account uid fields", () => {
+    expect(
+      parsePassportLoginSession({
+        access_token: "a",
+        refresh_token: "r",
+        uid: "account-id",
+        business_uid: "untrusted-business-id",
+      }),
+    ).toEqual({ accessToken: "a", refreshToken: "r" });
   });
 
   it("rejects a login response that cannot drive business requests", () => {

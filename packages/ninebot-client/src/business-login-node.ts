@@ -11,6 +11,8 @@ import {
   type NinebotEncryptedRequestEnvelope,
 } from "./crypto-envelope.ts";
 import type { NinebotResponse, NinebotRequest, NinebotTransport } from "./transport.ts";
+import { NinebotHttpError } from "./client.ts";
+import { decodeGzipBody } from "./response-node.ts";
 
 export interface NinebotBusinessLoginResponseCandidate<T = unknown> {
   code: number | string | null;
@@ -269,8 +271,11 @@ export const createBusinessLoginClient = ({
       }),
       ...(signal === undefined ? {} : { signal }),
     });
+    if (response.status < 200 || response.status >= 300) {
+      throw new NinebotHttpError(response.status);
+    }
     return decodeBusinessLoginResponse<T>({
-      responseBody: response.body,
+      responseBody: decodeGzipBody(response),
       keyData: encoded.keyData,
     });
   },

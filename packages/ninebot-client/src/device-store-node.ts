@@ -61,7 +61,10 @@ const writeAtomic = async (path: string, value: unknown) => {
   }
 };
 
-/** Persists SDK-owned device metadata and migrates an existing legacy config read-only. */
+/**
+ * Persists SDK device metadata and reads an existing legacy config without rewriting it.
+ * New contexts use the Android protocol defaults observed in ninecli, not host OS values.
+ */
 export const createFileNinebotDeviceContextStore = ({
   directory,
   fileName = "device-context.json",
@@ -74,8 +77,8 @@ export const createFileNinebotDeviceContextStore = ({
   const generated: NinebotDeviceContext = {
     deviceId: deviceIdFactory(),
     region: defaults.region ?? "bj",
-    osVersion: defaults.osVersion ?? process.platform,
-    osModel: defaults.osModel ?? `${process.platform}-${process.arch}`,
+    osVersion: defaults.osVersion ?? "13",
+    osModel: defaults.osModel ?? "Xiaomi",
   };
 
   return {

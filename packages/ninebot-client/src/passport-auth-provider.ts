@@ -1,6 +1,7 @@
 import type {
   NinebotAuthProvider,
   NinebotAuthSession,
+  NinebotPassportSession,
   NinebotSmsCodeRequest,
   NinebotSmsLoginInput,
 } from "./auth.ts";
@@ -10,9 +11,14 @@ import type { BuildPasswordLoginRequestOptions } from "./passport-auth.ts";
 export interface NinebotPassportAuthClient {
   loginWithPassword(
     input: Omit<BuildPasswordLoginRequestOptions, "signer">,
-  ): Promise<NinebotAuthSession>;
-  refresh(session: NinebotAuthSession): Promise<NinebotAuthSession>;
-  whoami<T = unknown>(session: NinebotAuthSession): Promise<T>;
+  ): Promise<NinebotPassportSession>;
+  refresh(session: NinebotPassportSession): Promise<NinebotPassportSession>;
+  whoami<T = unknown>(session: NinebotPassportSession): Promise<T>;
+}
+
+/** Completes the encrypted business login and returns its independently validated UID. */
+export interface NinebotPassportAuthProviderOptions {
+  initializeBusinessSession: (session: NinebotPassportSession) => Promise<string>;
 }
 
 /** Stable error exposed when the upstream requires an interactive human check. */
@@ -26,7 +32,8 @@ export class NinebotHumanVerificationRequiredError extends Error {
 }
 
 /**
- * Adapts the verified Passport client to the shared auth/session lifecycle.
+ * Combines Passport account authentication with the required business login stage.
+ * Only a completed business bootstrap produces a persistable session.
  *
  * SMS endpoints deliberately fail closed: the upstream currently requires a human
  * verification challenge, so this adapter never pretends that a code was sent or
@@ -35,13 +42,20 @@ export class NinebotHumanVerificationRequiredError extends Error {
  */
 export const createNinebotPassportAuthProvider = (
   client: NinebotPassportAuthClient,
+  { initializeBusinessSession }: NinebotPassportAuthProviderOptions,
 ): NinebotAuthProvider => ({
-  loginWithPassword: (credentials) =>
-    client.loginWithPassword({
+  async loginWithPassword(credentials) {
+    const passport = await client.loginWithPassword({
       areaCode: credentials.areaCode,
       username: credentials.user,
       password: credentials.password,
-    }),
+    });
+    const businessUid = await initializeBusinessSession(passport);
+    if (typeof businessUid !== "string" || !businessUid.trim()) {
+      throw new Error("Ninebot business login returned an invalid uid");
+    }
+    return { ...passport, businessUid };
+  },
   requestSmsCode: async (_input: NinebotSmsCodeRequest) => {
     throw new NinebotHumanVerificationRequiredError();
   },
@@ -49,5 +63,8 @@ export const createNinebotPassportAuthProvider = (
     throw new NinebotHumanVerificationRequiredError();
   },
   whoami: <T = unknown>(session: NinebotAuthSession) => client.whoami<T>(session),
-  refresh: (session) => client.refresh(session),
+  async refresh(session: NinebotAuthSession) {
+    const passport = await client.refresh(session);
+    return { ...passport, businessUid: session.businessUid };
+  },
 });

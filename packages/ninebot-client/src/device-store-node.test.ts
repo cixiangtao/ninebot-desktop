@@ -11,6 +11,15 @@ afterEach(async () => {
 });
 
 describe("file device context store", () => {
+  it("uses observed Android defaults rather than host OS metadata on a fresh install", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "ninebot-device-store-"));
+    directories.push(directory);
+    await expect(createFileNinebotDeviceContextStore({ directory }).load()).resolves.toMatchObject({
+      osVersion: "13",
+      osModel: "Xiaomi",
+      region: "bj",
+    });
+  });
   it("generates and persists SDK-owned metadata when no legacy config exists", async () => {
     const directory = await mkdtemp(join(tmpdir(), "ninebot-device-store-"));
     directories.push(directory);

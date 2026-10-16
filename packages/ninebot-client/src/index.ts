@@ -140,6 +140,7 @@ export type {
   NinebotAuthSessionManagerOptions,
   NinebotAuthSessionStore,
   NinebotPasswordCredentials,
+  NinebotPassportSession,
   NinebotSmsCodeRequest,
   NinebotSmsLoginInput,
 } from "./auth.ts";
@@ -194,7 +195,17 @@ export {
   createNinebotPassportAuthProvider,
   NinebotHumanVerificationRequiredError,
 } from "./passport-auth-provider.ts";
-export type { NinebotPassportAuthClient } from "./passport-auth-provider.ts";
+export type {
+  NinebotPassportAuthClient,
+  NinebotPassportAuthProviderOptions,
+} from "./passport-auth-provider.ts";
+export { createNinebotNodeAuthSessionManager } from "./auth-node.ts";
+export type { CreateNinebotNodeAuthSessionManagerOptions } from "./auth-node.ts";
+export {
+  createNinebotBusinessSessionInitializer,
+  NinebotBusinessSessionError,
+} from "./business-session-node.ts";
+export type { CreateNinebotBusinessSessionInitializerOptions } from "./business-session-node.ts";
 export {
   createNinebotCandidateSessionClient,
   createNinebotFetchCandidateSessionClient,

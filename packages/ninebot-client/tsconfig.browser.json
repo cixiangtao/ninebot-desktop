@@ -4,6 +4,7 @@
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "types": [],
     "allowImportingTsExtensions": true,
     "noEmit": true,
     "strict": true,
@@ -18,6 +19,7 @@
     "src/passport-auth.ts",
     "src/passport-signer.ts",
     "src/passport-login-client.ts",
+    "src/passport-auth-provider.ts",
     "src/crypto-web.ts",
     "src/crypto-web-codec.ts",
     "src/transport-web.ts"

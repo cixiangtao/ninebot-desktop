@@ -17,16 +17,20 @@ export interface NinebotSmsLoginInput extends NinebotSmsCodeRequest {
   code: string;
 }
 
-/** Persistable authenticated material required by the read-only service clients. */
-export interface NinebotAuthSession {
+/** Account credentials returned by Passport, before business identity is initialized. */
+export interface NinebotPassportSession {
   accessToken: string;
-  businessUid: string;
   /** Passport UUID required by the business metadata bootstrap request. */
   uuid?: string;
   /** Optional absolute expiry supplied by the verified auth response. */
   expiresAtMs?: number;
   /** Optional refresh token supplied by the verified auth response. */
   refreshToken?: string;
+}
+
+/** Complete authenticated material accepted by storage and vehicle service clients. */
+export interface NinebotAuthSession extends NinebotPassportSession {
+  businessUid: string;
 }
 
 /** Async persistence boundary for the authenticated session. */
