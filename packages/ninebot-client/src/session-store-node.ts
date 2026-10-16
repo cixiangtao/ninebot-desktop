@@ -84,6 +84,7 @@ const readSessionFile = async (path: string): Promise<NinebotAuthSession | null>
  * When the new file is absent, an optional legacy ninecli token file can be read without
  * modifying it. Saving always uses the new camelCase file, allowing a later migration
  * step to remove the legacy runtime without losing an existing account session.
+ * Explicit logout removes both formats so restore cannot resurrect legacy credentials.
  */
 export const createFileNinebotAuthSessionStore = ({
   directory,
@@ -113,6 +114,8 @@ export const createFileNinebotAuthSessionStore = ({
       }
     },
     async clear() {
+      // Clear the fallback first; a failed deletion must not look like a successful logout.
+      if (legacyPath !== sessionPath) await rm(legacyPath, { force: true });
       await rm(sessionPath, { force: true });
     },
   };

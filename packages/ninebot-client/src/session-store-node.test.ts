@@ -90,7 +90,7 @@ describe("file-backed Ninebot auth session store", () => {
     });
   });
 
-  it("clears only the new session file", async () => {
+  it("clears both session formats so a restart cannot restore legacy credentials", async () => {
     const { directory, store } = await createStore();
     await store.save({ accessToken: "token", businessUid: "uid" });
     await writeFile(
@@ -100,12 +100,12 @@ describe("file-backed Ninebot auth session store", () => {
 
     await store.clear();
 
-    await expect(store.load()).resolves.toEqual({
-      accessToken: "legacy",
-      businessUid: "legacy",
+    await expect(createFileNinebotAuthSessionStore({ directory }).load()).resolves.toBeNull();
+    await expect(readFile(join(directory, "tokens.json"), "utf8")).rejects.toMatchObject({
+      code: "ENOENT",
     });
-    await expect(readFile(join(directory, "tokens.json"), "utf8")).resolves.toContain(
-      '"access_token":"legacy"',
-    );
+    await expect(readFile(join(directory, "auth-session.json"), "utf8")).rejects.toMatchObject({
+      code: "ENOENT",
+    });
   });
 });
