@@ -44,11 +44,30 @@ const createPeer = async () => {
         const refresh = request.url === "/v3/user/refresh";
         if (refresh) {
           expect(JSON.parse(body.toString())).toEqual({
-            accessToken: "account-token",
+            access_token: "account-token",
             device: "ANDROID",
-            refreshToken: "refresh-token",
+            refresh_token: "refresh-token",
           });
           expect(request.headers.authorization).toBeUndefined();
+          // Independent peer checks the actual wire signature with fixed protocol
+          // metadata and Node crypto, never the SDK's canonical/signing helper.
+          const signingFields = {
+            access_token: "account-token",
+            app_version: "610063322",
+            clientKey: "e177176a-3b3e-1513-e26e-d1123034cb66",
+            device: "ANDROID",
+            os: "Android",
+            os_language: "zh-hans-cn",
+            os_version: "13",
+            refresh_token: "refresh-token",
+            timestamp: request.headers.timestamp,
+            url: "/v3/user/refresh",
+          };
+          const canonical = Object.entries(signingFields)
+            .toSorted(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0))
+            .map(([key, value]) => `${key}=${value}`)
+            .join("&");
+          expect(request.headers.sign).toBe(createHash("sha256").update(canonical).digest("hex"));
           if (state.rejectRefresh) {
             response.writeHead(200, { "content-type": "application/json" });
             response.end(

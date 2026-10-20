@@ -34,6 +34,7 @@ type AuthClient = Pick<
 export interface RefreshRequestObservation {
   methodAndPathMatch: boolean;
   expectedFieldsOnly: boolean;
+  tokenFieldNames: "snake-case" | "camel-case" | "other";
   accessMatchesRestoredSession: boolean;
   refreshMatchesRestoredSession: boolean;
   deviceAndroid: boolean;
@@ -45,7 +46,7 @@ export interface RefreshRequestObservation {
 }
 
 export interface AuthAcceptanceDiagnostics {
-  version: 2;
+  version: 3;
   /** Omitted when an injected auth factory bypasses the default Fetch transport. */
   passportRedirectPolicy?: "reject";
   loginMode: "password";
@@ -87,11 +88,23 @@ export const observeAcceptanceRefreshRequest = (
       request.path === "/v3/user/refresh",
     expectedFieldsOnly:
       Object.keys(fields).length === 3 &&
-      ["accessToken", "device", "refreshToken"].every((key) => Object.hasOwn(fields, key)),
+      ["access_token", "device", "refresh_token"].every((key) => Object.hasOwn(fields, key)),
+    tokenFieldNames:
+      Object.hasOwn(fields, "access_token") &&
+      Object.hasOwn(fields, "refresh_token") &&
+      !Object.hasOwn(fields, "accessToken") &&
+      !Object.hasOwn(fields, "refreshToken")
+        ? "snake-case"
+        : Object.hasOwn(fields, "accessToken") &&
+            Object.hasOwn(fields, "refreshToken") &&
+            !Object.hasOwn(fields, "access_token") &&
+            !Object.hasOwn(fields, "refresh_token")
+          ? "camel-case"
+          : "other",
     accessMatchesRestoredSession:
-      typeof fields.accessToken === "string" && fields.accessToken === session.accessToken,
+      typeof fields.access_token === "string" && fields.access_token === session.accessToken,
     refreshMatchesRestoredSession:
-      typeof fields.refreshToken === "string" && fields.refreshToken === session.refreshToken,
+      typeof fields.refresh_token === "string" && fields.refresh_token === session.refreshToken,
     deviceAndroid: fields.device === "ANDROID",
     authorizationPresent: !!header("authorization"),
     contentTypeJson: header("content-type").toLowerCase().startsWith("application/json"),
@@ -294,7 +307,7 @@ export const runNinebotAuthAcceptance = async ({
   let stage: AuthAcceptanceStage = "login";
   let auth: AuthClient | undefined;
   const diagnostics: AuthAcceptanceDiagnostics = {
-    version: 2,
+    version: 3,
     loginMode: "password",
     ...(suppliedCreateAuth ? {} : { passportRedirectPolicy: "reject" as const }),
   };

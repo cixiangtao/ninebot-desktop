@@ -217,7 +217,7 @@ export const buildPasswordLoginRequest = async ({
   };
 };
 
-/** Builds the verified Passport refresh request shape observed from ninecli. */
+/** Builds the snake-case refresh body recovered from the official Android client. */
 export const buildRefreshRequest = async ({
   accessToken,
   refreshToken,
@@ -232,7 +232,9 @@ export const buildRefreshRequest = async ({
   timestampMs = Date.now(),
   signer,
 }: BuildRefreshRequestOptions): Promise<PassportRequest> => {
-  const body = textEncoder.encode(JSON.stringify({ accessToken, device, refreshToken }));
+  const body = textEncoder.encode(
+    JSON.stringify({ access_token: accessToken, device, refresh_token: refreshToken }),
+  );
   const timestamp = String(timestampMs);
   const sign = await signer({
     method: "POST",

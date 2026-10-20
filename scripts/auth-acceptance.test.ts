@@ -107,7 +107,7 @@ describe("fresh SDK authentication acceptance", () => {
       { stage: "logout", outcome: "passed" },
     ]);
     expect(report.diagnostics).toMatchObject({
-      version: 2,
+      version: 3,
       loginMode: "password",
       restoredMaterialsMatchSaved: true,
       refreshAttempt: {
@@ -202,7 +202,7 @@ describe("fresh SDK authentication acceptance", () => {
           authOnly: true,
         });
         expect(report.diagnostics).toMatchObject({
-          version: 2,
+          version: 3,
           passportRedirectPolicy: "reject",
           restoredMaterialsMatchSaved: true,
         });
@@ -281,6 +281,7 @@ describe("fresh SDK authentication acceptance", () => {
     expect(observation).toEqual({
       methodAndPathMatch: true,
       expectedFieldsOnly: true,
+      tokenFieldNames: "snake-case",
       accessMatchesRestoredSession: true,
       refreshMatchesRestoredSession: true,
       deviceAndroid: true,
@@ -304,9 +305,26 @@ describe("fresh SDK authentication acceptance", () => {
     };
     expect(observeAcceptanceRefreshRequest(wrong, session)).toMatchObject({
       expectedFieldsOnly: false,
+      tokenFieldNames: "other",
+      accessMatchesRestoredSession: false,
+      refreshMatchesRestoredSession: true,
+    });
+    const legacy = observeAcceptanceRefreshRequest(
+      {
+        ...request,
+        body: new TextEncoder().encode(
+          JSON.stringify({ accessToken: secret, refreshToken: secret, device: "ANDROID" }),
+        ),
+      },
+      session,
+    );
+    expect(legacy).toMatchObject({
+      expectedFieldsOnly: false,
+      tokenFieldNames: "camel-case",
       accessMatchesRestoredSession: false,
       refreshMatchesRestoredSession: false,
     });
+    expect(JSON.stringify(legacy)).not.toContain(secret);
     expect(() =>
       observeAcceptanceRefreshRequest(
         { ...request, body: new TextEncoder().encode(secret) },

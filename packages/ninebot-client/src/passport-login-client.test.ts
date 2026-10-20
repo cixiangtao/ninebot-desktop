@@ -10,8 +10,16 @@ import { createNinebotPassportWebSigner } from "./passport-signer.ts";
 const json = (value: unknown) => new TextEncoder().encode(JSON.stringify(value));
 
 describe("Passport login client", () => {
-  it("matches the saved original refresh body and signature without adding Authorization", async () => {
-    // ev_b46d71aecaf9ec360d47dbe9349211f533481ac1201acb20873bbc8f43a4e5a8; not rerun.
+  it("uses the official Android refresh fields and signs those exact wire names", async () => {
+    // Official APK 6.10.12 PassportApiClient.refreshAccessToken uses snake-case keys.
+    // Expected SHA-256 was independently computed with Python hashlib over the
+    // literal sorted fields; it does not use the SDK canonical/signing helper.
+    // A fixed synthetic vector proves serialization/signing, not online success.
+    const legacyNinecli = {
+      // ev_b46d71aecaf9ec360d47dbe9349211f533481ac1201acb20873bbc8f43a4e5a8; not rerun.
+      body: '{"accessToken":"synthetic-access","device":"ANDROID","refreshToken":"synthetic-refresh"}',
+      sign: "6e752bc716b65eaca0d840d7e1aa7e035aa9449154fbd439554bec20816f2f44",
+    };
     const request = await buildRefreshRequest({
       accessToken: "synthetic-access",
       refreshToken: "synthetic-refresh",
@@ -19,11 +27,14 @@ describe("Passport login client", () => {
       signer: createNinebotPassportWebSigner().refresh,
     });
     expect(new TextDecoder().decode(request.body)).toBe(
-      '{"accessToken":"synthetic-access","device":"ANDROID","refreshToken":"synthetic-refresh"}',
+      '{"access_token":"synthetic-access","device":"ANDROID","refresh_token":"synthetic-refresh"}',
     );
     expect(request.headers.sign).toBe(
-      "6e752bc716b65eaca0d840d7e1aa7e035aa9449154fbd439554bec20816f2f44",
+      "8eab06f0706a97a3ffe5f5964655cf461f2deaa967d7a081886a78105a0b4c6c",
     );
+    // Keep the historical original fixture as a negative contract comparison.
+    expect(new TextDecoder().decode(request.body)).not.toBe(legacyNinecli.body);
+    expect(request.headers.sign).not.toBe(legacyNinecli.sign);
     expect(request.headers.authorization).toBeUndefined();
   });
 
@@ -219,7 +230,7 @@ describe("Passport login client", () => {
     expect(decode).toHaveBeenCalled();
   });
 
-  it("refreshes with the verified request shape and retains the business uid", async () => {
+  it("refreshes with the official snake-case body while retaining the session API", async () => {
     const send = vi.fn().mockResolvedValue({
       status: 200,
       headers: {},
@@ -228,10 +239,11 @@ describe("Passport login client", () => {
         data: { access_token: "new-access", refresh_token: "new-refresh" },
       }),
     });
+    const refreshSigner = vi.fn(() => "refresh-signature");
     const client = createNinebotPassportLoginClient({
       transport: { send },
       signer: () => "login-signature",
-      refreshSigner: () => "refresh-signature",
+      refreshSigner,
     });
 
     await expect(
@@ -243,8 +255,10 @@ describe("Passport login client", () => {
     const request = send.mock.calls[0]?.[0];
     expect(request?.path).toBe("/v3/user/refresh");
     expect(new TextDecoder().decode(request?.body)).toBe(
-      '{"accessToken":"access","device":"ANDROID","refreshToken":"refresh"}',
+      '{"access_token":"access","device":"ANDROID","refresh_token":"refresh"}',
     );
+    expect(refreshSigner).toHaveBeenCalledWith(expect.objectContaining({ body: request.body }));
+    expect(request.headers.sign).toBe("refresh-signature");
   });
 
   it("loads whoami through the verified profile request boundary", async () => {
