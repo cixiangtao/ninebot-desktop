@@ -1,6 +1,6 @@
 # 官方 APK 刷新字段差异与修复
 
-2026-10-20，按用户明确要求使用本机 REA 技能继续认证兼容性逆向。已从官方 Android 包实际刷新方法恢复一项具体差异：**JSON 应为 access_token / refresh_token，旧 ninecli 与此前 SDK 却发送 accessToken / refreshToken**。当前修复改正字段并对实际 wire body 签名，尚未执行真实刷新，不能宣布在线问题或一期验收完成。
+2026-10-20，按用户明确要求使用本机 REA 技能继续认证兼容性逆向。已从官方 Android 包实际刷新方法恢复一项具体差异：**JSON 应为 access_token / refresh_token，旧 ninecli 与此前 SDK 却发送 accessToken / refreshToken**。当前修复改正字段并对实际 wire body 签名；后续用户报告v3密码认证CLI全链路通过。代理没有执行真实认证，SMS/真实GUI等仍未验收，不能宣布一期整体完成。
 
 ## 技能、工具和实际边界
 
@@ -55,8 +55,8 @@
 
 ## 当前验收与剩余边界
 
-v2报告直接HTTP200/90002已排除重定向假设，应保留这个结论。现在有了具体协议字段修复，后续若用户自行选择运行一次新auth-only验收，v3应显示tokenFieldNames=snake-case、expectedFieldsOnly=true及对应材料一致；成功仍须完整refresh→restore-refreshed→profile-refreshed→logout通过。代理没有执行该真实验收，也不要求用户取得不现实的官方示例。
+v2报告直接HTTP200/90002排除重定向假设。修复后，主对话于2026-10-20转交用户自行运行的v3报告：password login、profile、restore、refresh、restore-refreshed、profile-refreshed、logout全部passed，overall passed。由此记录该账号密码路径CLI验收通过；不是代理再次登录，也不扩展为所有账号、SMS或GUI已通过。无需为同一成功路径重复验收。
 
-若v3仍直接90002，应基于已恢复的方法及实际调用者继续缩小配置差异，不能重复无差别重测或猜字段请求真实服务。服务器时机规则、所有客户端可选加密配置及真实刷新成功仍未被本轮证据覆盖。
+当前剩余范围是SMS及人机挑战、真实桌面GUI连接状态、领域读取和默认运行时切换等；见 [一期认证验收](AUTH_PHASE1.md)。本轮凭据问题仅做方案评估，不创建密码存储或持久访问。
 
 本机完整解析脚本、方法逐指令JSON、signing交叉核对和失败诊断保存在任务目录 `rea-followup-20261020/`；APK/DEX/第三方反编译全文不提交仓库。Hopper辅助资源关闭仍是不确定结果，未把这项工具故障说成所有逆向分析不可行。
