@@ -237,6 +237,38 @@ export const classifyNineCliFailure = (stdout: string, stderr: string) => {
   return new NineCliError("ninecli 请求失败，请稍后重试。", "upstream");
 };
 
+/** ninecli can exit 0 and print "SMS sent" for a rejected Passport response. */
+export const assertNineCliSmsSent = (stdout: string): void => {
+  let response: unknown;
+  try {
+    // --json still prints a human-readable preamble before the final JSON object.
+    const start = stdout.search(/(?:^|\n)\s*\{/);
+    if (start < 0) throw new Error();
+    response = JSON.parse(stdout.slice(start).trim());
+  } catch {
+    throw new NineCliError("无法确认验证码发送结果，请稍后重试。");
+  }
+  if (response === null || typeof response !== "object" || Array.isArray(response)) {
+    throw new NineCliError("无法确认验证码发送结果，请稍后重试。");
+  }
+  const record = response as Record<string, unknown>;
+  if (record.resultCode === 90202 || record.resultCode === "90202") {
+    throw new NineCliError(
+      "九号要求先完成人机验证；请在官方客户端完成验证后再重试。",
+      "verification",
+    );
+  }
+  if (
+    (record.resultCode !== 90000 && record.resultCode !== "90000") ||
+    (record.code !== undefined && record.code !== 0 && record.code !== "0") ||
+    (record.resultDesc !== undefined &&
+      record.resultDesc !== null &&
+      typeof record.resultDesc !== "string")
+  ) {
+    throw new NineCliError("验证码请求未成功，请稍后重试。");
+  }
+};
+
 const collectProcess = (
   executable: string,
   args: string[],
@@ -320,7 +352,8 @@ export class NineCliClient {
   }
 
   async requestSmsCode(phone: string, areaCode: string) {
-    await this.run("login-code", ["--area", areaCode, "--phone", phone], false);
+    const response = await this.run("login-code", ["--area", areaCode, "--phone", phone], true);
+    assertNineCliSmsSent(response);
   }
 
   async loginWithSmsCode(phone: string, areaCode: string, code: string) {
