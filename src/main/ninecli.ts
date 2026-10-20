@@ -349,6 +349,7 @@ export class NineCliClient {
 
   async login(user: string, areaCode: string, password: string) {
     await this.run("login", ["--area", areaCode, "--user", user, "--password", password], false);
+    await this.requireCompleteSession();
   }
 
   async requestSmsCode(phone: string, areaCode: string) {
@@ -358,6 +359,7 @@ export class NineCliClient {
 
   async loginWithSmsCode(phone: string, areaCode: string, code: string) {
     await this.run("login-code", ["--area", areaCode, "--phone", phone, "--code", code], false);
+    await this.requireCompleteSession();
   }
 
   async logout() {
@@ -368,7 +370,25 @@ export class NineCliClient {
   }
 
   async whoami() {
+    await this.requireCompleteSession();
     return this.runJsonWithUpstreamRetries("whoami", [], transientWhoamiRetryDelaysMs);
+  }
+
+  private async requireCompleteSession() {
+    try {
+      const value: unknown = JSON.parse(
+        await readFile(join(this.configDirectory, "tokens.json"), "utf8"),
+      );
+      if (value === null || typeof value !== "object" || Array.isArray(value)) throw new Error();
+      const fields = value as Record<string, unknown>;
+      for (const key of ["access_token", "refresh_token", "uuid", "business_uid"]) {
+        if (typeof fields[key] !== "string" || !fields[key].trim()) throw new Error();
+      }
+    } catch {
+      // Native finishLogin can persist Passport-only tokens, then exit 0 after a
+      // Business failure. Preserve that file but never promote it to connected.
+      throw new NineCliError("登录会话尚不完整，请重新连接九号账号完成登录。", "auth");
+    }
   }
 
   async vehicles() {

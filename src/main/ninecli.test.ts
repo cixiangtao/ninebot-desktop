@@ -23,6 +23,63 @@ afterEach(async () => {
 });
 
 describe("ninecli runtime policy", () => {
+  it.each(["password", "sms"] as const)(
+    "requires complete Business material after native %s exit 0",
+    async (method) => {
+      const directory = await mkdtemp(join(tmpdir(), "ninecli-auth-completion-"));
+      temporaryDirectories.push(directory);
+      const client = new NineCliClient(directory, "unused-synthetic-binary");
+      const run = vi
+        .spyOn(client as unknown as { run: (...args: unknown[]) => Promise<string> }, "run")
+        .mockResolvedValue("synthetic exit 0");
+      const tokens = {
+        access_token: "synthetic-access",
+        refresh_token: "synthetic-refresh",
+        uuid: "synthetic-uuid",
+      };
+      const login = () =>
+        method === "password"
+          ? client.login("synthetic", "86", "synthetic")
+          : client.loginWithSmsCode("15500000000", "86", "123456");
+      await writeFile(join(directory, "tokens.json"), JSON.stringify(tokens));
+      await expect(login()).rejects.toMatchObject({ kind: "auth" });
+      expect(JSON.parse(await readFile(join(directory, "tokens.json"), "utf8"))).toEqual(tokens);
+      await writeFile(
+        join(directory, "tokens.json"),
+        JSON.stringify({ ...tokens, business_uid: "synthetic-business" }),
+      );
+      await expect(login()).resolves.toBeUndefined();
+      expect(run).toHaveBeenCalledTimes(2);
+    },
+  );
+
+  it("never calls whoami for absent or partial native sessions", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "ninecli-auth-status-"));
+    temporaryDirectories.push(directory);
+    const client = new NineCliClient(directory, "unused-synthetic-binary");
+    const run = vi
+      .spyOn(
+        client as unknown as {
+          runJsonWithUpstreamRetries: (...args: unknown[]) => Promise<unknown>;
+        },
+        "runJsonWithUpstreamRetries",
+      )
+      .mockResolvedValue({ username: "synthetic" });
+    await expect(client.whoami()).rejects.toMatchObject({ kind: "auth" });
+    await writeFile(join(directory, "tokens.json"), '{"access_token":"synthetic"}');
+    await expect(client.whoami()).rejects.toMatchObject({ kind: "auth" });
+    expect(run).not.toHaveBeenCalled();
+    await writeFile(
+      join(directory, "tokens.json"),
+      JSON.stringify({
+        access_token: "synthetic",
+        refresh_token: "synthetic",
+        uuid: "synthetic",
+        business_uid: "synthetic",
+      }),
+    );
+    await expect(client.whoami()).resolves.toEqual({ username: "synthetic" });
+  });
   it("checks structured SMS results even when the process reports success", async () => {
     const client = new NineCliClient("unused-synthetic-directory", "unused-synthetic-binary");
     const run = vi.spyOn(
