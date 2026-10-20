@@ -192,11 +192,13 @@ export {
   createNinebotPassportLoginClient,
   PassportLoginBusinessError,
   PassportLoginHttpError,
+  PassportRefreshMaterialError,
 } from "./passport-login-client.ts";
 export type {
   NinebotPassportLoginClient,
   PassportLoginClientOptions,
   PassportRejectionKind,
+  PassportDescriptionSource,
   PassportResponse,
   PassportTransport,
 } from "./passport-login-client.ts";

@@ -28,6 +28,7 @@ const createPeer = async () => {
     status: 200,
     payload: { code: 1, data: { uid: "business-from-bootstrap" } } as unknown,
     uuid: "0123456789abcdef0123456789abcdef" as string | undefined,
+    rejectRefresh: false,
   };
   const paths: string[] = [];
   const businessRequests: Record<string, unknown>[] = [];
@@ -41,6 +42,21 @@ const createPeer = async () => {
       let payload: unknown;
       if (request.url === "/v6/user/login" || request.url === "/v3/user/refresh") {
         const refresh = request.url === "/v3/user/refresh";
+        if (refresh) {
+          expect(JSON.parse(body.toString())).toEqual({
+            accessToken: "account-token",
+            device: "ANDROID",
+            refreshToken: "refresh-token",
+          });
+          expect(request.headers.authorization).toBeUndefined();
+          if (state.rejectRefresh) {
+            response.writeHead(200, { "content-type": "application/json" });
+            response.end(
+              JSON.stringify({ resultCode: 90002, desc: "args missing synthetic-private-text" }),
+            );
+            return;
+          }
+        }
         payload = {
           resultCode: 90000,
           data: {
@@ -133,6 +149,24 @@ const createPeer = async () => {
 const credentials = { user: "synthetic-user", areaCode: "86", password: "synthetic-password" };
 
 describe("Node two-stage authentication over loopback HTTP", () => {
+  it("preserves complete login material through restore even when explicit immediate refresh returns 90002", async () => {
+    const peer = await createPeer();
+    const first = peer.createManager();
+    const loggedIn = await first.loginWithPassword(credentials);
+    const restored = peer.createManager();
+    await expect(restored.restore()).resolves.toEqual(loggedIn);
+    peer.state.rejectRefresh = true;
+    await expect(restored.refresh()).rejects.toMatchObject({
+      resultCode: 90002,
+      rejection: "invalid-request",
+      descriptionSource: "desc",
+    });
+    expect(restored.getSession()).toEqual(loggedIn);
+    await expect(peer.createManager().restore()).resolves.toEqual(loggedIn);
+    expect(peer.paths).toEqual(["/v6/user/login", "/user/user/login", "/v3/user/refresh"]);
+    expect(peer.failures).toEqual([]);
+    await restored.logout();
+  });
   it("bootstraps without Passport uid, refreshes, restores and clears both session formats", async () => {
     const peer = await createPeer();
     const auth = peer.createManager();

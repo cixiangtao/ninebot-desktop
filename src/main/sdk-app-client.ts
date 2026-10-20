@@ -4,6 +4,7 @@ import {
   NinebotBusinessSessionError,
   NinebotHumanVerificationRequiredError,
   PassportLoginHttpError,
+  PassportRefreshMaterialError,
   type NinebotAuthSessionManager,
 } from "@jiuhao/ninebot-client";
 import type { RuntimeSecurityStatus } from "../shared/contracts.js";
@@ -16,6 +17,8 @@ const passportAuthCodes = new Set(["90016", "90017", "90018", "90019", "00002", 
 
 /** Converts Passport transport failures to the renderer's stable client error contract. */
 export const normalizeSdkAuthError = (error: unknown): unknown => {
+  if (error instanceof PassportRefreshMaterialError)
+    return new NinebotClientError("当前会话缺少刷新资料，请重新连接九号账号。", "auth");
   if (error instanceof NinebotAuthSessionUnavailableError)
     return new NinebotClientError("请先连接九号账号。", "auth");
   if (error instanceof NinebotHumanVerificationRequiredError)
@@ -31,6 +34,8 @@ export const normalizeSdkAuthError = (error: unknown): unknown => {
       );
     if (error.rejection === "invalid-credentials")
       return new NinebotClientError("账号或密码不正确，请检查后重试。", "auth");
+    if (error.rejection === "invalid-request")
+      return new NinebotClientError("九号未接受认证请求参数，请稍后重试。", "upstream");
     if (error.rejection === "rate-limited")
       return new NinebotClientError("认证请求过于频繁，请稍后重试。", "upstream");
     return new NinebotClientError(

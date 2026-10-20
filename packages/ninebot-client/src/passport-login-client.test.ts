@@ -2,11 +2,73 @@ import { describe, expect, it, vi } from "vitest";
 import {
   createNinebotPassportLoginClient,
   PassportLoginBusinessError,
+  PassportRefreshMaterialError,
 } from "./passport-login-client.ts";
+import { buildRefreshRequest } from "./passport-auth.ts";
+import { createNinebotPassportWebSigner } from "./passport-signer.ts";
 
 const json = (value: unknown) => new TextEncoder().encode(JSON.stringify(value));
 
 describe("Passport login client", () => {
+  it("matches the saved original refresh body and signature without adding Authorization", async () => {
+    // ev_b46d71aecaf9ec360d47dbe9349211f533481ac1201acb20873bbc8f43a4e5a8; not rerun.
+    const request = await buildRefreshRequest({
+      accessToken: "synthetic-access",
+      refreshToken: "synthetic-refresh",
+      timestampMs: 1792146206810,
+      signer: createNinebotPassportWebSigner().refresh,
+    });
+    expect(new TextDecoder().decode(request.body)).toBe(
+      '{"accessToken":"synthetic-access","device":"ANDROID","refreshToken":"synthetic-refresh"}',
+    );
+    expect(request.headers.sign).toBe(
+      "6e752bc716b65eaca0d840d7e1aa7e035aa9449154fbd439554bec20816f2f44",
+    );
+    expect(request.headers.authorization).toBeUndefined();
+  });
+
+  it.each([
+    { accessToken: "synthetic" },
+    { accessToken: "synthetic", refreshToken: "" },
+    { accessToken: "synthetic", refreshToken: " \t" },
+    { accessToken: "", refreshToken: "synthetic" },
+  ])("never sends refresh with missing/blank material", async (session) => {
+    const send = vi.fn();
+    const client = createNinebotPassportLoginClient({ transport: { send } });
+    await expect(client.refresh(session)).rejects.toBeInstanceOf(PassportRefreshMaterialError);
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it.each(["resultDesc", "desc", "message"] as const)(
+    "classifies explicit parameter errors from %s without retaining text",
+    async (field) => {
+      const client = createNinebotPassportLoginClient({
+        transport: {
+          send: async () => ({
+            status: 200,
+            headers: {},
+            body: json({ resultCode: 90002, [field]: "args missing SYNTHETIC_PRIVATE_TEXT" }),
+          }),
+        },
+      });
+      try {
+        await client.refresh({ accessToken: "synthetic", refreshToken: "synthetic" });
+        throw new Error("expected rejection");
+      } catch (error) {
+        expect(error).toMatchObject({
+          resultCode: 90002,
+          rejection: "invalid-request",
+          descriptionSource: field,
+        });
+        expect(JSON.stringify(error)).not.toContain("SYNTHETIC_PRIVATE_TEXT");
+        expect(String(error)).not.toContain("SYNTHETIC_PRIVATE_TEXT");
+      }
+    },
+  );
+
+  it("does not infer a refresh rejection category from 90002 alone", () => {
+    expect(new PassportLoginBusinessError(90002, null).rejection).toBe("unknown");
+  });
   it.each(["password", "refresh", "profile"] as const)(
     "rejects a conflicting top-level code in %s",
     async (operation) => {
