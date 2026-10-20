@@ -59,6 +59,14 @@ export interface NinebotAuthSessionManagerOptions {
   refreshSkewMs?: number;
 }
 
+/** A signed-out state is distinct from transport and malformed-response failures. */
+export class NinebotAuthSessionUnavailableError extends Error {
+  constructor() {
+    super("Ninebot auth session is not available");
+    this.name = "NinebotAuthSessionUnavailableError";
+  }
+}
+
 const defaultRefreshSkewMs = 60_000;
 
 const cloneSession = (session: NinebotAuthSession): NinebotAuthSession => {
@@ -212,7 +220,7 @@ export class NinebotAuthSessionManager {
   }
 
   private requireSession() {
-    if (this.session === null) throw new Error("Ninebot auth session is not available");
+    if (this.session === null) throw new NinebotAuthSessionUnavailableError();
     return cloneSession(this.session);
   }
 

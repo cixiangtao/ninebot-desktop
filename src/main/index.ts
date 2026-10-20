@@ -11,6 +11,7 @@ import { getBundledNineCliBinaryPath, NineCliClient } from "./ninecli.js";
 import { createCandidateTravelReader } from "./travel-source.js";
 import { createHybridTravelReader } from "./hybrid-travel-source.js";
 import { createCandidateVehicleReader } from "./vehicle-source.js";
+import { createSdkDesktopRuntime, resolveDesktopAuthSource } from "./sdk-desktop-runtime.js";
 
 protocol.registerSchemesAsPrivileged([
   {
@@ -115,24 +116,30 @@ app.whenReady().then(async () => {
     isPackaged: app.isPackaged,
     resourcesPath: process.resourcesPath,
   });
-  const ninecli = new NineCliClient(configDirectory, binaryPath);
-  await ninecli.start();
-  const paginatedTravel = createCandidateTravelReader({
-    configDirectory,
-    legacy: ninecli,
-    useLegacyMetadata: true,
-  });
-  const travelReader = createHybridTravelReader({
-    ninecli,
-    paginated: paginatedTravel,
-    refreshSession: () => ninecli.whoami(),
-  });
-  const vehicleReader = createCandidateVehicleReader({ configDirectory });
-  registerIpcHandlers(ninecli, ninecli, travelReader, vehicleReader);
-  app.on("before-quit", () => {
-    travelReader.clear?.();
-    vehicleReader.clear?.();
-  });
+  if (resolveDesktopAuthSource(process.env) === "sdk") {
+    const client = await createSdkDesktopRuntime({ configDirectory });
+    registerIpcHandlers(client);
+    app.on("before-quit", () => client.clear?.());
+  } else {
+    const ninecli = new NineCliClient(configDirectory, binaryPath);
+    await ninecli.start();
+    const paginatedTravel = createCandidateTravelReader({
+      configDirectory,
+      legacy: ninecli,
+      useLegacyMetadata: true,
+    });
+    const travelReader = createHybridTravelReader({
+      ninecli,
+      paginated: paginatedTravel,
+      refreshSession: () => ninecli.whoami(),
+    });
+    const vehicleReader = createCandidateVehicleReader({ configDirectory });
+    registerIpcHandlers(ninecli, ninecli, travelReader, vehicleReader);
+    app.on("before-quit", () => {
+      travelReader.clear?.();
+      vehicleReader.clear?.();
+    });
+  }
   await createWindow();
 
   app.on("activate", () => {

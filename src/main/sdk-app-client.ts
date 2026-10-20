@@ -1,5 +1,8 @@
 import {
   PassportLoginBusinessError,
+  NinebotAuthSessionUnavailableError,
+  NinebotBusinessSessionError,
+  NinebotHumanVerificationRequiredError,
   PassportLoginHttpError,
   type NinebotAuthSessionManager,
 } from "@jiuhao/ninebot-client";
@@ -13,14 +16,45 @@ const passportAuthCodes = new Set(["90016", "90017", "90018", "90019", "00002", 
 
 /** Converts Passport transport failures to the renderer's stable client error contract. */
 export const normalizeSdkAuthError = (error: unknown): unknown => {
+  if (error instanceof NinebotAuthSessionUnavailableError)
+    return new NinebotClientError("请先连接九号账号。", "auth");
+  if (error instanceof NinebotHumanVerificationRequiredError)
+    return new NinebotClientError(
+      "九号要求先完成人机验证；请在官方客户端完成验证后再重试。",
+      "verification",
+    );
   if (error instanceof PassportLoginBusinessError) {
-    const kind = passportAuthCodes.has(String(error.resultCode)) ? "auth" : "upstream";
-    return new NinebotClientError(error.message, kind);
+    if (error.rejection === "human-verification")
+      return new NinebotClientError(
+        "九号要求先完成人机验证；请在官方客户端完成验证后再重试。",
+        "verification",
+      );
+    if (error.rejection === "invalid-credentials")
+      return new NinebotClientError("账号或密码不正确，请检查后重试。", "auth");
+    if (error.rejection === "rate-limited")
+      return new NinebotClientError("认证请求过于频繁，请稍后重试。", "upstream");
+    return new NinebotClientError(
+      passportAuthCodes.has(String(error.resultCode))
+        ? "登录状态已失效，请重新连接九号账号。"
+        : "九号未接受认证请求，请确认登录方式后重试。",
+      passportAuthCodes.has(String(error.resultCode)) ? "auth" : "upstream",
+    );
   }
-  if (error instanceof PassportLoginHttpError) {
-    return new NinebotClientError("九号认证服务暂时不可用，请稍后重试。", "upstream");
-  }
-  return error;
+  if (error instanceof NinebotBusinessSessionError)
+    return new NinebotClientError(
+      error.kind === "missing-credentials"
+        ? "认证资料不完整，请重新连接九号账号。"
+        : "账号认证后的业务初始化未完成，请稍后重试。",
+      error.kind === "missing-credentials" ? "auth" : "upstream",
+    );
+  if (error instanceof PassportLoginHttpError)
+    return new NinebotClientError(
+      error.status === 401 || error.status === 403
+        ? "登录状态已失效，请重新连接九号账号。"
+        : "九号认证服务暂时不可用，请稍后重试。",
+      error.status === 401 || error.status === 403 ? "auth" : "upstream",
+    );
+  return new NinebotClientError("认证请求未完成，请检查网络或本地存储后重试。", "upstream");
 };
 
 export interface NinebotSdkAppClientOptions {
