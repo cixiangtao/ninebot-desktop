@@ -55,6 +55,7 @@ export interface AuthAcceptanceCheck {
     | "business-login";
   httpStatus?: number;
   businessCode?: number;
+  businessCodeField?: "code";
   /** Text-derived diagnostic category; an undocumented numeric code alone remains unknown. */
   passportRejection?: PassportRejectionKind;
   count?: number;
@@ -63,6 +64,7 @@ export interface AuthAcceptanceCheck {
 /** Passing covers one selected vehicle/service/month, not parity or other accounts. */
 export interface AuthAcceptanceReport {
   outcome: "passed" | "failed" | "incomplete";
+  scope: "authentication" | "full-readonly";
   service: NinebotCandidateService;
   month: string;
   checks: AuthAcceptanceCheck[];
@@ -76,6 +78,8 @@ export interface AuthAcceptanceOptions {
   service: NinebotCandidateService;
   month: string;
   vehicleIndex?: number;
+  /** Authentication lifecycle only; no vehicle, telemetry, location or trip reads. */
+  authOnly?: boolean;
   signal?: AbortSignal;
   createAuth?: () => AuthClient;
   loadDevice?: () => Promise<NinebotDeviceContext>;
@@ -138,6 +142,7 @@ const failureCheck = (stage: AuthAcceptanceStage, error: unknown): AuthAcceptanc
       outcome: "failed",
       reason: "passport",
       passportRejection: error.rejection,
+      ...(error.responseField === "code" ? { businessCodeField: "code" as const } : {}),
       ...(/^\d{1,6}$/.test(code) ? { businessCode: Number(code) } : {}),
     };
   }
@@ -164,6 +169,7 @@ export const runNinebotAuthAcceptance = async ({
   service,
   month,
   vehicleIndex = 0,
+  authOnly = false,
   signal,
   createAuth = () =>
     createNinebotNodeAuthSessionManager({
@@ -242,74 +248,76 @@ export const runNinebotAuthAcceptance = async ({
     stage = "profile-refreshed";
     requireProfile(await auth.whoami());
     pass();
-    stage = "vehicles";
-    const vehicles = await read((client) =>
-      client.listVehicles({ service, vehicleType: service === "ebike" ? "65" : "64" }),
-    );
-    if (!isSuccess(vehicles.code) || !Array.isArray(vehicles.data)) invalidResponse();
-    if (vehicles.data.length === 0) {
-      pass(0);
-      for (const skipped of ["status", "battery", "month", "detail"] as const) {
-        checks.push({ stage: skipped, outcome: "skipped", reason: "no-vehicle" });
-      }
-    } else {
-      const vehicle: unknown = vehicles.data[vehicleIndex];
-      if (!isRecord(vehicle)) invalidResponse();
-      const serialNumber = vehicle.wnumber ?? vehicle.sn;
-      const model = vehicle.vehicle_type;
-      if (
-        typeof serialNumber !== "string" ||
-        !serialNumber.trim() ||
-        !(
-          (typeof model === "string" && /^\d+$/.test(model)) ||
-          (typeof model === "number" && Number.isSafeInteger(model) && model > 0)
-        )
-      ) {
-        invalidResponse();
-      }
-      const vehicleType = String(model);
-      pass(vehicles.data.length);
-      stage = "status";
-      const status = await read((client) => client.status({ service, serialNumber }));
-      if (!isSuccess(status.code) || !Array.isArray(status.data) || status.data.length === 0)
-        invalidResponse();
-      pass(status.data.length);
-      stage = "battery";
-      const battery = await read((client) => client.battery({ service, serialNumber }));
-      if (
-        !isSuccess(battery.code) ||
-        !isRecord(battery.data) ||
-        Object.keys(battery.data).length === 0
-      )
-        invalidResponse();
-      pass();
-      stage = "month";
-      const rides = await read((client) =>
-        client.month({ service, serialNumber, vehicleType, month }),
+    if (!authOnly) {
+      stage = "vehicles";
+      const vehicles = await read((client) =>
+        client.listVehicles({ service, vehicleType: service === "ebike" ? "65" : "64" }),
       );
-      if (
-        (rides.code !== null && !isSuccess(rides.code)) ||
-        rides.month !== month ||
-        !Array.isArray(rides.list)
-      )
-        invalidResponse();
-      pass(rides.list.length);
-      stage = "detail";
-      if (rides.list.length === 0) checks.push({ stage, outcome: "skipped", reason: "no-trip" });
-      else {
-        const trip = rides.list[0];
-        const travelId = trip?.travel_id ?? trip?.travelId ?? trip?.id;
-        if (typeof travelId !== "string" || !travelId.trim()) invalidResponse();
-        const detail = await read((client) =>
-          client.detail({ service, serialNumber, vehicleType, travelId }),
-        );
+      if (!isSuccess(vehicles.code) || !Array.isArray(vehicles.data)) invalidResponse();
+      if (vehicles.data.length === 0) {
+        pass(0);
+        for (const skipped of ["status", "battery", "month", "detail"] as const) {
+          checks.push({ stage: skipped, outcome: "skipped", reason: "no-vehicle" });
+        }
+      } else {
+        const vehicle: unknown = vehicles.data[vehicleIndex];
+        if (!isRecord(vehicle)) invalidResponse();
+        const serialNumber = vehicle.wnumber ?? vehicle.sn;
+        const model = vehicle.vehicle_type;
         if (
-          (detail.code !== null && !isSuccess(detail.code)) ||
-          typeof detail.trail !== "string" ||
-          !detail.trail.trim()
+          typeof serialNumber !== "string" ||
+          !serialNumber.trim() ||
+          !(
+            (typeof model === "string" && /^\d+$/.test(model)) ||
+            (typeof model === "number" && Number.isSafeInteger(model) && model > 0)
+          )
+        ) {
+          invalidResponse();
+        }
+        const vehicleType = String(model);
+        pass(vehicles.data.length);
+        stage = "status";
+        const status = await read((client) => client.status({ service, serialNumber }));
+        if (!isSuccess(status.code) || !Array.isArray(status.data) || status.data.length === 0)
+          invalidResponse();
+        pass(status.data.length);
+        stage = "battery";
+        const battery = await read((client) => client.battery({ service, serialNumber }));
+        if (
+          !isSuccess(battery.code) ||
+          !isRecord(battery.data) ||
+          Object.keys(battery.data).length === 0
         )
           invalidResponse();
         pass();
+        stage = "month";
+        const rides = await read((client) =>
+          client.month({ service, serialNumber, vehicleType, month }),
+        );
+        if (
+          (rides.code !== null && !isSuccess(rides.code)) ||
+          rides.month !== month ||
+          !Array.isArray(rides.list)
+        )
+          invalidResponse();
+        pass(rides.list.length);
+        stage = "detail";
+        if (rides.list.length === 0) checks.push({ stage, outcome: "skipped", reason: "no-trip" });
+        else {
+          const trip = rides.list[0];
+          const travelId = trip?.travel_id ?? trip?.travelId ?? trip?.id;
+          if (typeof travelId !== "string" || !travelId.trim()) invalidResponse();
+          const detail = await read((client) =>
+            client.detail({ service, serialNumber, vehicleType, travelId }),
+          );
+          if (
+            (detail.code !== null && !isSuccess(detail.code)) ||
+            typeof detail.trail !== "string" ||
+            !detail.trail.trim()
+          )
+            invalidResponse();
+          pass();
+        }
       }
     }
   } catch (error) {
@@ -324,6 +332,7 @@ export const runNinebotAuthAcceptance = async ({
     }
   }
   return {
+    scope: authOnly ? "authentication" : "full-readonly",
     service,
     month,
     checks,

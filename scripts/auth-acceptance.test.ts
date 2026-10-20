@@ -86,6 +86,47 @@ const createRig = () => {
 };
 
 describe("fresh SDK authentication acceptance", () => {
+  it("identifies top-level code rejections without confusing them with resultCode", async () => {
+    const rig = createRig();
+    vi.mocked(rig.provider.loginWithPassword).mockRejectedValue(
+      new PassportLoginBusinessError(2, secret, "code"),
+    );
+    const report = await rig.run({ authOnly: true });
+    expect(report.checks[0]).toMatchObject({
+      stage: "login",
+      outcome: "failed",
+      businessCode: 2,
+      businessCodeField: "code",
+      passportRejection: "unknown",
+    });
+    expect(report.scope).toBe("authentication");
+    expect(JSON.stringify(report)).not.toContain(secret);
+  });
+  it("auth-only validates the full authentication lifecycle without any domain clients", async () => {
+    const rig = createRig();
+    const createClient = vi.fn(() => {
+      throw new Error("unexpected domain access");
+    });
+    const loadDevice = vi.fn(async () => device);
+    const report = await rig.run({ authOnly: true, createClient, loadDevice });
+    expect(report.scope).toBe("authentication");
+    expect(report.outcome).toBe("passed");
+    expect(report.checks.map((check) => check.stage)).toEqual([
+      "login",
+      "profile",
+      "restore",
+      "refresh",
+      "restore-refreshed",
+      "profile-refreshed",
+      "logout",
+    ]);
+    expect(createClient).not.toHaveBeenCalled();
+    expect(loadDevice).not.toHaveBeenCalled();
+    expect(rig.contexts).toHaveLength(0);
+    await expect(rig.store.load()).resolves.toBeNull();
+    expect(JSON.stringify(report)).not.toContain(secret);
+  });
+
   it("checks persisted refresh tokens and uses them for every domain read without leaking values", async () => {
     const rig = createRig();
     const report = await rig.run();
@@ -345,6 +386,11 @@ describe("fresh SDK authentication acceptance", () => {
 });
 
 describe("acceptance input", () => {
+  it("parses the bounded authentication-only mode", () => {
+    expect(parseAuthAcceptanceArguments(["--auth-only"]).authOnly).toBe(true);
+    expect(() => parseAuthAcceptanceArguments(["--auth-only", "--auth-only"])).toThrow();
+  });
+
   it("computes the previous calendar month correctly at month end", () => {
     expect(parseAuthAcceptanceArguments([], new Date(2026, 2, 31)).month).toBe("202602");
     expect(parseAuthAcceptanceArguments([], new Date(2026, 0, 31)).month).toBe("202512");
@@ -385,6 +431,12 @@ describe("acceptance input", () => {
         "--credentials-stdin",
         "--month=202608",
       ]),
-    ).toEqual({ service: "motor", vehicleIndex: 1, credentialsStdin: true, month: "202608" });
+    ).toEqual({
+      service: "motor",
+      vehicleIndex: 1,
+      credentialsStdin: true,
+      month: "202608",
+      authOnly: false,
+    });
   });
 });

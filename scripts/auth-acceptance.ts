@@ -12,12 +12,13 @@ const usage = `Usage: pnpm protocol:auth -- [options]
   --service=ebike|motor   Service family to validate (default: ebike).
   --vehicle-index=N      Zero-based index in the discovered vehicle list (default: 0).
   --month=YYYYMM         Month containing a ride (default: previous calendar month).
+  --auth-only           Validate login/Business/profile/restore/refresh/logout without vehicle reads.
   --credentials-stdin    Read {"user","password","areaCode"} JSON from stdin instead of TTY prompts.
   --help                 Show this help without reading credentials or contacting Ninebot.
 
 Creates a fresh private temporary directory; never reads an existing account configuration.
 Runs real password login, profile, restore, refresh, vehicle/status/battery/month/detail reads,
-then local logout. Removes the temporary directory on normal completion or handled failure.
+then local logout. With --auth-only, no vehicle/status/battery/month/detail reads occur. Removes the temporary directory on normal completion or handled failure.
 Only stage results and counts are printed. No retries or ninecli fallback.
 Exit codes: 0 passed, 1 failed, 2 incomplete (no vehicle or no ride).
 `;
@@ -31,12 +32,14 @@ export const parseAuthAcceptanceArguments = (args: string[], now = new Date()) =
   previous.setMonth(previous.getMonth() - 1);
   let month = `${previous.getFullYear()}${String(previous.getMonth() + 1).padStart(2, "0")}`;
   let credentialsStdin = false;
+  let authOnly = false;
   const seen = new Set<string>();
   for (const arg of args.filter((value) => value !== "--")) {
     const name = arg.split("=")[0]!;
     if (seen.has(name)) throw new Error("Duplicate acceptance option");
     seen.add(name);
-    if (arg === "--credentials-stdin") credentialsStdin = true;
+    if (arg === "--auth-only") authOnly = true;
+    else if (arg === "--credentials-stdin") credentialsStdin = true;
     else if (arg === "--service=ebike") service = "ebike";
     else if (arg === "--service=motor") service = "motor";
     else if (arg.startsWith("--month=")) month = arg.slice("--month=".length);
@@ -50,7 +53,7 @@ export const parseAuthAcceptanceArguments = (args: string[], now = new Date()) =
     vehicleIndex > 999
   )
     throw new Error("Invalid acceptance option");
-  return { service, month, vehicleIndex, credentialsStdin };
+  return { service, month, vehicleIndex, credentialsStdin, authOnly };
 };
 
 /** Validates input without ever including the rejected value in an error. */
