@@ -1,8 +1,10 @@
 # 一期认证验收（2026-10-20）
 
-最新状态：用户自行运行 v3 auth-only 验收并报告 overall passed，password login、profile、restore、refresh、restore-refreshed、profile-refreshed、logout 七阶段全部通过。**该账号的密码认证 CLI 生命周期已通过；SMS、人机挑战和真实桌面 GUI 仍未验收，一期整体不能据此全部宣布完成。**
+最新状态：用户自行新增专用传统 login 钥匙串条目，通过 Keychain 入口运行 v3 auth-only 验收并报告 overall passed，password login、profile、restore、refresh、restore-refreshed、profile-refreshed、logout 七阶段全部通过。**该账号的密码认证 CLI 生命周期已通过；SMS、人机挑战和真实桌面 GUI 仍未验收，一期整体不能据此全部宣布完成。**
 
-来源为用户报告，由主对话 `01a15445-dbe5-747e-b370-4757dc0bf0eb` 于2026-10-20转交；本轮未重新登录或独立观察真实请求，也未保存凭据或原始响应。字段修复与逆向依据见 [官方APK刷新差异](AUTH_REFRESH_APK_EVIDENCE.md)。凭据交接的只读评估见 [本地凭据交接方案](AUTH_CREDENTIAL_HANDOFF.md)。
+来源为用户报告，由主对话 `01a15445-dbe5-747e-b370-4757dc0bf0eb` 于2026-10-20转交；本轮未重新登录或独立观察真实请求，也未保存凭据或原始响应。字段修复与逆向依据见 [官方APK刷新差异](AUTH_REFRESH_APK_EVIDENCE.md)。用户报告的 Keychain 取用成功及凭据交接边界见 [本地凭据交接方案](AUTH_CREDENTIAL_HANDOFF.md)。
+
+用户随后确认首次 `keychain-cancelled` 来自确认输入多一个空格，修正后报告 `authentication` / `ebike` / `password`、snake-case、HTTP 200，全链路通过。保持 `READ ONCE` 精确匹配规则；不继续同一路径复测，也没有由助手读取密码或运行真实请求。该结果不扩大为 SMS、桌面 GUI 或默认运行时切换验收。
 
 ## 最低验收清单
 
