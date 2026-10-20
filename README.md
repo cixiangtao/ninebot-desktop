@@ -27,7 +27,7 @@ NINEBOT_CONFIG_DIR=/absolute/path/to/ninecli-config pnpm dev
 
 正式应用以 ninecli 为主运行时。Electron 只允许 `whoami`、`login`、`login-code`、`vehicles`、`status`、`battery` 和 `travel` 这一组只读或认证命令，并在执行前验证随包二进制；运行时输出先在主进程解析为脱敏领域对象，再进入 IPC。ninecli 的 `travel --month` 只提供首屏逐次明细，因此主进程在检测到截断时，使用窄范围 TypeScript 协议桥重新分页读取完整月份（包含第一页）。登录、会话、状态、电池和轨迹详情仍由 ninecli 提供；车辆列表使用 TypeScript reader。分页缺失、重复或失败会明确报错，不静默导出首屏。
 
-SDK 新增 `@jiuhao/ninebot-client/auth-node` 两阶段认证入口：先取得 Passport 令牌，再调用加密 business login，以业务响应的 `data.uid` 建立完整会话后才保存；Passport 中的 `uid` 不作为业务 UID。入口包含刷新、文件存储和退出清理，退出会同时删除新旧两种令牌文件，避免重启后恢复旧会话；新设备使用已观察到的 Android 协议默认元数据。本地模拟服务端已覆盖认证闭环与失败路径，真实九号新账号登录和刷新仍待验收；Electron 已提供 `NINEBOT_AUTH_SOURCE=sdk` 显式入口，默认运行时未切换，详见[一期认证验收](docs/AUTH_PHASE1.md)。用法与兼容变化见 [SDK 文档](packages/ninebot-client/README.md)。短信请求仍遵循服务端人机校验边界。
+SDK 新增 `@jiuhao/ninebot-client/auth-node` 两阶段认证入口：先取得 Passport 令牌，再调用加密 business login，以业务响应的 `data.uid` 建立完整会话后才保存；Passport 中的 `uid` 不作为业务 UID。入口包含刷新、文件存储和退出清理，退出会同时删除新旧两种令牌文件，避免重启后恢复旧会话；新设备使用已观察到的 Android 协议默认元数据。本地模拟服务端已覆盖认证闭环与失败路径，用户提供的一次新密码登录、Business、资料及恢复已通过，但刷新返回90002，完整认证验收未通过；Electron 已提供 `NINEBOT_AUTH_SOURCE=sdk` 显式入口，默认运行时未切换，详见[一期认证验收](docs/AUTH_PHASE1.md)。用法与兼容变化见 [SDK 文档](packages/ninebot-client/README.md)。短信请求仍遵循服务端人机校验边界。
 
 最小真实认证验收可运行 `pnpm protocol:auth -- --auth-only`，不读取车辆或行程；完整只读验收可运行 `pnpm protocol:auth -- --month=202609`，按终端提示输入账号、区号和不回显的密码。工具在新的临时目录中完成两阶段登录、资料读取、会话恢复、强制刷新及刷新后恢复，再读取选定车辆的状态、电池、月度首屏和一条行程详情，最后退出并检查会话无法恢复；正常结束或处理失败后删除临时目录。默认检查电自，电摩使用 `--service=motor`，多车辆可指定 `--vehicle-index=1`。只输出阶段结果与计数，无车或月份无行程时标为未覆盖并以退出码 2 结束；完整通过为 0，失败为 1。此工具不依赖已有 ninecli 登录态，范围及机器输入方式见[认证验收说明](docs/PROTOCOL_RESEARCH.md#真实-sdk-认证验收)。
 
