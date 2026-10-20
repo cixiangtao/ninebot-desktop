@@ -1,3 +1,6 @@
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import {
   createMemoryNinebotAuthSessionStore,
@@ -14,6 +17,7 @@ import { registerIpcHandlers } from "./ipc.js";
 const mocks = vi.hoisted(() => ({
   handlers: new Map<string, (...args: unknown[]) => Promise<BridgeResult<unknown>>>(),
   sessions: [] as unknown[],
+  clears: 0,
 }));
 vi.mock("electron", () => ({
   ipcMain: {
@@ -33,14 +37,24 @@ vi.mock("./vehicle-source.js", () => ({
       mocks.sessions.push(await sessionProvider());
       return [];
     },
-    clear: () => undefined,
+    clear: () => {
+      mocks.clears += 1;
+    },
   }),
 }));
 vi.mock("./telemetry-source.js", () => ({
-  createCandidateTelemetryReader: () => ({ clear: () => undefined }),
+  createCandidateTelemetryReader: () => ({
+    clear: () => {
+      mocks.clears += 1;
+    },
+  }),
 }));
 vi.mock("./travel-source.js", () => ({
-  createCandidateTravelReader: () => ({ clear: () => undefined }),
+  createCandidateTravelReader: () => ({
+    clear: () => {
+      mocks.clears += 1;
+    },
+  }),
 }));
 
 const invoke = (name: string, input?: unknown) => mocks.handlers.get(name)!(null, input);
@@ -48,6 +62,7 @@ const invoke = (name: string, input?: unknown) => mocks.handlers.get(name)!(null
 describe("SDK desktop authentication through real IPC handlers (synthetic providers)", () => {
   it("propagates expired-session refresh rejection from domain reads as AUTH_REQUIRED", async () => {
     mocks.sessions.length = 0;
+    mocks.clears = 0;
     const session = {
       accessToken: "synthetic",
       refreshToken: "synthetic",
@@ -73,8 +88,26 @@ describe("SDK desktop authentication through real IPC handlers (synthetic provid
     expect(result).toMatchObject({ ok: false, error: { code: "AUTH_REQUIRED" } });
     expect(JSON.stringify(result)).not.toContain("synthetic-private");
     expect(mocks.sessions).toHaveLength(0);
+    expect(mocks.clears).toBeGreaterThanOrEqual(3);
     await expect(store.load()).resolves.toEqual(session);
   });
+  it("the real desktop SDK factory never adopts or deletes a legacy session", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "ninebot-sdk-isolation-"));
+    const legacy = "synthetic old session, deliberately not SDK JSON";
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+    try {
+      await writeFile(join(directory, "tokens.json"), legacy);
+      const client = await createSdkDesktopRuntime({ configDirectory: directory });
+      expect(warn).not.toHaveBeenCalled();
+      await expect(client.whoami()).rejects.toMatchObject({ kind: "auth" });
+      await client.logout();
+      expect(await readFile(join(directory, "tokens.json"), "utf8")).toBe(legacy);
+    } finally {
+      warn.mockRestore();
+      await rm(directory, { recursive: true, force: true });
+    }
+  });
+
   it("requires explicit SDK selection", () => {
     expect(resolveDesktopAuthSource({})).toBe("legacy");
     expect(resolveDesktopAuthSource({ NINEBOT_AUTH_SOURCE: "sdk" })).toBe("sdk");

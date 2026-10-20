@@ -332,6 +332,8 @@ export interface YearSummaryExportInput {
 
 export interface NinebotBridge {
   auth: {
+    /** Current-session reads require reconnection; notification never clears stored tokens. */
+    onSessionExpired: (listener: () => void) => () => void;
     status: () => Promise<BridgeResult<AuthStatus>>;
     profile: () => Promise<BridgeResult<AccountProfile>>;
     passwordLogin: (input: PasswordLoginInput) => Promise<BridgeResult<AuthStatus>>;

@@ -101,8 +101,8 @@ export const LoginSheet = ({
               连接九号账号
             </h2>
             <p className="mt-2 max-w-[42ch] text-sm leading-6 text-slate-600">
-              凭据只在本机 SDK 会话中短暂使用。客户端仅查询车辆状态、电池信息和骑行记录，
-              不包含车辆控制能力。
+              凭据通过加密连接提交给九号。认证成功后，本机会保存登录令牌以便下次恢复连接。
+              客户端不包含车辆控制能力。
             </p>
           </div>
           <button className="icon-button" type="button" onClick={onClose} aria-label="关闭登录">
@@ -221,7 +221,7 @@ export const LoginSheet = ({
             />
             {codeSent && !error ? (
               <p className="login-sms-success" role="status">
-                验证码请求已发送，请查看短信。验证码只会提交给本机 SDK 会话。
+                验证码请求已发送，请查看短信。验证码将提交给九号完成认证。
               </p>
             ) : null}
             <LoginError message={error} />

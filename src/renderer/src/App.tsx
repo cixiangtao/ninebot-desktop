@@ -246,18 +246,28 @@ const createEmptyMonthSummary = (month: string): RideMonthSummary => ({
   longestDayMileageKm: null,
 });
 
-const UnauthenticatedPanel = ({ onConnect }: { onConnect: () => void }) => (
+const UnauthenticatedPanel = ({
+  onConnect,
+  connected,
+}: {
+  onConnect: () => void;
+  connected: boolean;
+}) => (
   <div className="unauthenticated-page">
     <section className="unauthenticated-card">
       <span className="unauthenticated-icon">
         <CircleUserRound size={28} />
       </span>
       <p>九号账号</p>
-      <h1>连接账号后查看真实数据</h1>
-      <span>当前未连接九号账号。为了避免混淆，这里不会展示演示行程、车辆状态或虚构统计。</span>
+      <h1>{connected ? "账号已连接，暂无车辆数据" : "连接账号后查看真实数据"}</h1>
+      <span>
+        {connected
+          ? "认证已完成。可重新检查车辆，或在账号设置中查看连接状态。"
+          : "当前未连接九号账号。为了避免混淆，这里不会展示演示行程、车辆状态或虚构统计。"}
+      </span>
       <button type="button" onClick={onConnect}>
         <CircleUserRound size={17} />
-        连接九号账号
+        {connected ? "重新检查车辆" : "连接九号账号"}
       </button>
     </section>
   </div>
@@ -316,6 +326,7 @@ const createDemoRollingStatistics = (referenceMonth: string): MonthRideStatistic
 
 export default function App() {
   const [mode, setMode] = useState<DataMode>("unauthenticated");
+  const [accountConnected, setAccountConnected] = useState(false);
   const [view, setView] = useState<AppView>("rides");
   const [vehicles, setVehicles] = useState<VehicleSummary[]>([]);
   const [vehicle, setVehicle] = useState<VehicleSummary>(unconnectedVehicle);
@@ -449,6 +460,83 @@ export default function App() {
     playbackPositionRef.current = position;
     setPlaybackPosition(position);
   }, []);
+
+  const resetAuthenticatedView = useCallback(
+    (reconnect = false) => {
+      ++liveRequestRef.current;
+      ++snapshotRequestRef.current;
+      ++locationRequestRef.current;
+      ++statisticsRequestRef.current;
+      resetComparison();
+      resetRideSpeedVerification();
+      setAccountConnected(false);
+      setLoading(false);
+      setLoginBusy(false);
+      setSecurityOpen(false);
+      setLoginOpen(reconnect);
+      setError(reconnect ? "登录状态已失效，请重新连接九号账号。" : null);
+      setAccountProfile(null);
+      setAccountProfileError(null);
+      setMode("unauthenticated");
+      historyStartTimeRef.current = null;
+      setHistoryStartTime(null);
+      setVehicles([]);
+      setMonth(thisMonth);
+      setMonthPickerYear(getMonthYear(thisMonth));
+      setMonthPickerOpen(false);
+      setVehicle(unconnectedVehicle);
+      vehicleRef.current = unconnectedVehicle;
+      setVehiclePickerOpen(false);
+      vehicleSnapshotRef.current = null;
+      setVehicleSnapshot(null);
+      setSnapshotUpdatedAt(null);
+      setSnapshotError(null);
+      snapshotLoadingRef.current = false;
+      dispatchSnapshotMonitor({ type: "reset" });
+      setVehicleLocation(null);
+      setLocationPermission("unknown");
+      setLocationAuthorized(false);
+      setLocationLoading(false);
+      setLocationError(null);
+      setLocationUpdatedAt(null);
+      setStatisticsYear(currentYear);
+      statisticsYearRef.current = currentYear;
+      setStatistics(null);
+      setRollingStatisticsMonths([]);
+      setStatisticsSourceMonths([]);
+      setStatisticsLoading(false);
+      setStatisticsProgress({ loaded: 0, total: 0 });
+      setStatisticsError(null);
+      setYearExportOpen(false);
+      setYearExportError(null);
+      setYearExportNotice(null);
+      setExportOpen(false);
+      setExportError(null);
+      setExportNotice(null);
+      setMonthExportOpen(false);
+      setMonthExportError(null);
+      setMonthExportNotice(null);
+      setRides([]);
+      setRideDays([]);
+      setSelectedRideDay(null);
+      setRideMonthSummary(createEmptyMonthSummary(thisMonth));
+      setDetail(null);
+      setSelectedRideId(null);
+      setDetailRefreshState({ status: "idle" });
+      if (viewRef.current === "comparison") {
+        viewRef.current = "rides";
+        setView("rides");
+      }
+      setIsPlaying(false);
+      seekPlayback(0);
+    },
+    [currentYear, thisMonth, resetComparison, resetRideSpeedVerification, seekPlayback],
+  );
+
+  useEffect(
+    () => window.ninebot?.auth.onSessionExpired?.(() => resetAuthenticatedView(true)),
+    [resetAuthenticatedView],
+  );
 
   const loadVehicleSnapshot = useCallback(
     async (
@@ -638,8 +726,12 @@ export default function App() {
           ? null
           : await retryTransientBridgeRead(() => bridge.vehicles.list().then(unwrap));
         const nextVehicle = knownVehicle ?? nextVehicles?.[0];
-        if (!nextVehicle) throw new Error("当前账号没有可读取的车辆。");
         if (requestId !== liveRequestRef.current) return;
+        if (!nextVehicle) {
+          resetAuthenticatedView();
+          setAccountConnected(true);
+          return;
+        }
         if (nextVehicles) setVehicles(nextVehicles);
         vehicleRef.current = nextVehicle;
         setVehicle(nextVehicle);
@@ -713,6 +805,7 @@ export default function App() {
       loadVehicleSnapshot,
       loadYearStatistics,
       rememberRideSpeedVerification,
+      resetAuthenticatedView,
       resetComparison,
       resetRideSpeedVerification,
       seekPlayback,
@@ -721,9 +814,15 @@ export default function App() {
 
   useEffect(() => {
     if (!window.ninebot) return;
-    void window.ninebot.auth.status().then((result) => {
-      if (result.ok && result.data.connected) void loadLiveData(thisMonth);
-    });
+    void window.ninebot.auth
+      .status()
+      .then((result) => {
+        if (result.ok && result.data.connected) {
+          setAccountConnected(true);
+          void loadLiveData(thisMonth);
+        } else if (!result.ok) setError(result.error.message);
+      })
+      .catch(() => setError("无法检查登录状态，请稍后重试。"));
   }, [loadLiveData, thisMonth]);
 
   useEffect(() => {
@@ -941,6 +1040,7 @@ export default function App() {
       setSecurityStatus(null);
       setAccountProfile(null);
       setAccountProfileError(null);
+      setAccountConnected(true);
       setLoginOpen(false);
       await loadLiveData(month);
     } catch (cause) {
@@ -974,6 +1074,7 @@ export default function App() {
       setSecurityStatus(null);
       setAccountProfile(null);
       setAccountProfileError(null);
+      setAccountConnected(true);
       setLoginOpen(false);
       await loadLiveData(month);
     } catch (cause) {
@@ -1101,60 +1202,7 @@ export default function App() {
     setSecurityError(null);
     try {
       unwrap(await window.ninebot.auth.logout());
-      setAccountProfile(null);
-      setAccountProfileError(null);
-      setMode("unauthenticated");
-      historyStartTimeRef.current = null;
-      setHistoryStartTime(null);
-      setVehicles([]);
-      setMonth(thisMonth);
-      setMonthPickerYear(getMonthYear(thisMonth));
-      setMonthPickerOpen(false);
-      setVehicle(unconnectedVehicle);
-      vehicleRef.current = unconnectedVehicle;
-      setVehiclePickerOpen(false);
-      vehicleSnapshotRef.current = null;
-      setVehicleSnapshot(null);
-      setSnapshotUpdatedAt(null);
-      setSnapshotError(null);
-      snapshotLoadingRef.current = false;
-      dispatchSnapshotMonitor({ type: "reset" });
-      setVehicleLocation(null);
-      setLocationPermission("unknown");
-      setLocationAuthorized(false);
-      setLocationLoading(false);
-      setLocationError(null);
-      setLocationUpdatedAt(null);
-      setStatisticsYear(currentYear);
-      statisticsYearRef.current = currentYear;
-      setStatistics(null);
-      setRollingStatisticsMonths([]);
-      setStatisticsSourceMonths([]);
-      setStatisticsLoading(false);
-      setStatisticsProgress({ loaded: 0, total: 0 });
-      setStatisticsError(null);
-      setYearExportOpen(false);
-      setYearExportError(null);
-      setYearExportNotice(null);
-      setExportOpen(false);
-      setExportError(null);
-      setExportNotice(null);
-      setMonthExportOpen(false);
-      setMonthExportError(null);
-      setMonthExportNotice(null);
-      setRides([]);
-      setRideDays([]);
-      setSelectedRideDay(null);
-      setRideMonthSummary(createEmptyMonthSummary(thisMonth));
-      setDetail(null);
-      setSelectedRideId(null);
-      setDetailRefreshState({ status: "idle" });
-      if (viewRef.current === "comparison") {
-        viewRef.current = "rides";
-        setView("rides");
-      }
-      setIsPlaying(false);
-      seekPlayback(0);
+      resetAuthenticatedView();
       setSecurityStatus(unwrap(await window.ninebot.runtime.security()));
     } catch (cause) {
       setSecurityError(cause instanceof Error ? cause.message : "无法清除本地登录令牌。");
@@ -1478,12 +1526,12 @@ export default function App() {
               <button
                 className="account-connect-card"
                 type="button"
-                onClick={() => setLoginOpen(true)}
+                onClick={() => (accountConnected ? openSecurity() : setLoginOpen(true))}
               >
                 <CircleUserRound size={21} />
                 <span>
-                  <strong>尚未连接账号</strong>
-                  <small>连接后加载你的车辆</small>
+                  <strong>{accountConnected ? "账号已连接" : "尚未连接账号"}</strong>
+                  <small>{accountConnected ? "当前暂无车辆数据" : "连接后加载你的车辆"}</small>
                 </span>
               </button>
             )}
@@ -1674,7 +1722,7 @@ export default function App() {
             onClick={() => setLoginOpen(true)}
           >
             <CircleUserRound size={17} />
-            {mode === "live" ? "重新连接账号" : "连接九号账号"}
+            {mode === "live" || accountConnected ? "重新连接账号" : "连接九号账号"}
           </button>
         </div>
       </aside>
@@ -1743,7 +1791,10 @@ export default function App() {
 
         <div className="relative min-h-0 flex-1 overflow-hidden">
           {mode === "unauthenticated" ? (
-            <UnauthenticatedPanel onConnect={() => setLoginOpen(true)} />
+            <UnauthenticatedPanel
+              connected={accountConnected}
+              onConnect={() => (accountConnected ? void loadLiveData(month) : setLoginOpen(true))}
+            />
           ) : view === "device" ? (
             <VehicleDashboard
               vehicle={vehicle}

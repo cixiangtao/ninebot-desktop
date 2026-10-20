@@ -318,13 +318,21 @@ export const registerIpcHandlers = (
     if (resetRideSequence) rideSequence = 0;
   };
 
+  const handleSessionReadError = <T>(error: unknown): BridgeResult<T> => {
+    const result = handleError<T>(error);
+    if (!result.ok && result.error.code === "AUTH_REQUIRED") clearSessionState(true);
+    return result;
+  };
+
   ipcMain.handle(ipcChannels.authStatus, async (): Promise<BridgeResult<AuthStatus>> => {
     try {
       await client.whoami();
       return ok({ connected: true });
     } catch (error) {
-      if (error instanceof NinebotClientError && error.kind === "auth")
+      if (error instanceof NinebotClientError && error.kind === "auth") {
+        clearSessionState(true);
         return ok({ connected: false });
+      }
       return handleError(error);
     }
   });
@@ -333,7 +341,7 @@ export const registerIpcHandlers = (
     try {
       return ok(parseAccountProfile(await client.whoami()));
     } catch (error) {
-      return handleError(error);
+      return handleSessionReadError(error);
     }
   });
 
@@ -410,7 +418,7 @@ export const registerIpcHandlers = (
       });
       return ok(summaries);
     } catch (error) {
-      return handleError(error);
+      return handleSessionReadError(error);
     }
   });
 
@@ -432,7 +440,7 @@ export const registerIpcHandlers = (
           ),
         );
       } catch (error) {
-        return handleError(error);
+        return handleSessionReadError(error);
       }
     },
   );
@@ -448,7 +456,7 @@ export const registerIpcHandlers = (
         }
         return ok(parseVehicleLocationRead(await telemetryReader.vehicleStatus(serialNumber)));
       } catch (error) {
-        return handleError(error);
+        return handleSessionReadError(error);
       }
     },
   );
@@ -486,7 +494,7 @@ export const registerIpcHandlers = (
           ),
         );
       } catch (error) {
-        return handleError(error);
+        return handleSessionReadError(error);
       }
     },
   );
@@ -512,7 +520,7 @@ export const registerIpcHandlers = (
           ),
         );
       } catch (error) {
-        return handleError(error);
+        return handleSessionReadError(error);
       }
     },
   );
@@ -544,7 +552,7 @@ export const registerIpcHandlers = (
         if (batch.rides.length === 0 && batch.failures[0]) throw batch.failures[0].error;
         return ok({ rides: batch.rides, failedRideCount: batch.failures.length });
       } catch (error) {
-        return handleError(error);
+        return handleSessionReadError(error);
       }
     },
   );
@@ -569,7 +577,7 @@ export const registerIpcHandlers = (
         await writeFile(selection.filePath, document.content, { encoding: "utf8", mode: 0o600 });
         return ok({ saved: true, fileName: basename(selection.filePath) });
       } catch (error) {
-        return handleError(error);
+        return handleSessionReadError(error);
       }
     },
   );
@@ -602,7 +610,7 @@ export const registerIpcHandlers = (
         await writeFile(selection.filePath, document.content, { encoding: "utf8", mode: 0o600 });
         return ok({ saved: true, fileName: basename(selection.filePath) });
       } catch (error) {
-        return handleError(error);
+        return handleSessionReadError(error);
       }
     },
   );
@@ -627,7 +635,7 @@ export const registerIpcHandlers = (
         await writeFile(selection.filePath, document.content, { encoding: "utf8", mode: 0o600 });
         return ok({ saved: true, fileName: basename(selection.filePath) });
       } catch (error) {
-        return handleError(error);
+        return handleSessionReadError(error);
       }
     },
   );
