@@ -54,7 +54,7 @@ SDK 对无法恢复的本地材料保留文件、显示未连接；不会自动�
 
 本轮本地实现提交：`af7f113` 短信误报、`0c3107e` SDK 短信、`dde8636` 桌面入口、`609d59e` 双码冲突、`2c0439b` 最小验收、`9f55cda` 半成品会话、`bfba1dd` 领域刷新错误。均未推送。
 
-当前下一步：用户可在本机私密终端使用同一条 auth-only 命令重测，提供新版脱敏 JSON 即可。代理没有得到再次使用真实 token 或发请求的授权。无需仅因刷新失败就推定密码错误或反复试密码；没有刷新成功证据仍不能宣布一期完成。
+当前下一步及新版报告判读以 [Passport 重定向保护与一次针对性验收](AUTH_PASSPORT_REDIRECT.md) 为准。当前已补充可独立复现的传输保护，尚未证明它解释真实 90002；不要反复运行同一无差别登录。代理本轮未使用真实 token 或发送真实认证请求，没有刷新成功证据仍不能宣布一期完成。
 
 ## 新真实反馈：刷新 90002 的诊断边界
 
@@ -64,7 +64,7 @@ SDK 对无法恢复的本地材料保留文件、显示未连接；不会自动�
 
 本轮修复并不扩大成功码：缺 access/refresh 材料时客户端在本地抛固定错误，验收 reason 为 missing-refresh-material；明确的 args missing 等说明按文本归为 invalid-request，而单独 90002 仍为 unknown。分类现在可读取 resultDesc、desc、message，错误对象只保留固定分类和字段来源，不保留上游说明。缺材料防护不能直接解释本次报告，因为新登录和恢复本就要求并保留了 refresh token。
 
-新版报告增加 diagnostics.version=1：
+上一版报告增加 diagnostics.version=1（当前 version=2 另见上面的重定向说明）：
 
 - restoredMaterialsMatchSaved：恢复前后五项材料精确一致。
 - refreshAttempt：access/refresh 是否非空、是否仍与最初登录一致、有效期状态和距登录完成的粗时间分桶。profile 可能触发自动刷新；令牌与最初登录不同并不等于恢复损坏。
