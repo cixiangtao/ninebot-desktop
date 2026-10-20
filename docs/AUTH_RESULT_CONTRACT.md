@@ -43,3 +43,5 @@ Business参考锚点`0x10027c4ec..0x10027c594`：原版只接受数字0/1和非�
 下一切片是五个Passport操作的请求/签名字节合同，再接两阶段和生命周期组件。仍待补Business成功全路径受控回放、低层序列化/加解密证据及真实首登/刷新验收；这些不阻塞本纯函数切片，也不因本切片通过而被视为完成。接入旧配置前才需要明确Passport-only恢复策略；完整替代短信路径还需正常人机挑战交互范围。
 
 2026-10-20 后续修复：生产 Passport password/refresh/profile 在 resultCode 之前检查可选顶层 code，拒绝明确失败码和畸形类型，防止 code=2/resultCode=90000 的冲突被接纳。缺失/null 的兼容行为保留；两个字段的数字0/90000与字符串0/90000为当前TS显式成功集合，不宣称与原版所有边界相同。`referenceCurrentTsPassportGate`及注入差分测试同步更新；固定原版参考和历史 Evidence ID 未改写。Business 成功集合仍未扩大，assessAuthResult 仍未作为生产默认策略接入。
+
+基础认证、SDK短信及显式桌面入口的后续实现与当前验收状态见[一期认证验收](AUTH_PHASE1.md)。以上纯函数合同仍独立，不从离线结果推定真实认证完成。

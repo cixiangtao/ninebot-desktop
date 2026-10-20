@@ -30,8 +30,11 @@ then encrypted `POST /user/user/login` establishes the business UID. Passport
 `uid` and `business_uid` fields are never used as the business identity.
 `createNinebotPassportAuthProvider` requires an `initializeBusinessSession`
 callback and returns a complete session only after both stages succeed. SMS
-requests intentionally throw `NinebotHumanVerificationRequiredError` until the
-upstream human-verification challenge is completed.
+requests now call the observed Passport send-code/consume-code endpoints with
+SHA-256 signing; SMS login uses the same Business bootstrap. A server challenge
+is surfaced as a bounded error without claiming that SMS was sent. Embedded
+human-challenge interaction is not implemented. See the [phase-one acceptance
+checklist](../../docs/AUTH_PHASE1.md); fresh-account online acceptance is pending.
 
 The lifecycle layer can be imported without pulling in Node-only crypto:
 
