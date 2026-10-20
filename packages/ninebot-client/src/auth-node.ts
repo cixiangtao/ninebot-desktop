@@ -28,7 +28,7 @@ export interface CreateNinebotNodeAuthSessionManagerOptions {
 /**
  * Composes Node password authentication, encrypted business bootstrap and file storage.
  * Construction makes no requests; restore reads local complete sessions, while login
- * persists only after both stages succeed. SMS challenges remain explicitly unsupported.
+ * persists only after both stages succeed. SMS server challenges are surfaced without claiming a code was sent.
  */
 export const createNinebotNodeAuthSessionManager = ({
   directory,
@@ -70,6 +70,7 @@ export const createNinebotNodeAuthSessionManager = ({
   const passport = createNinebotPassportLoginClient({
     transport,
     responseBodyDecoder: decodeGzipBody,
+    smsRegion: async () => (await device.load()).region,
   });
   return new NinebotAuthSessionManager({
     provider: createNinebotPassportAuthProvider(passport, { initializeBusinessSession }),

@@ -12,6 +12,8 @@ export interface NinebotPassportAuthClient {
   loginWithPassword(
     input: Omit<BuildPasswordLoginRequestOptions, "signer">,
   ): Promise<NinebotPassportSession>;
+  requestSmsCode?(input: NinebotSmsCodeRequest): Promise<void>;
+  loginWithSmsCode?(input: NinebotSmsLoginInput): Promise<NinebotPassportSession>;
   refresh(session: NinebotPassportSession): Promise<NinebotPassportSession>;
   whoami<T = unknown>(session: NinebotPassportSession): Promise<T>;
 }
@@ -35,9 +37,8 @@ export class NinebotHumanVerificationRequiredError extends Error {
  * Combines Passport account authentication with the required business login stage.
  * Only a completed business bootstrap produces a persistable session.
  *
- * SMS endpoints deliberately fail closed: the upstream currently requires a human
- * verification challenge, so this adapter never pretends that a code was sent or
- * accepts an unverified code. Local session persistence and token refresh remain
+ * SMS uses the injected client and shares the same Business bootstrap. A client
+ * without SMS capability fails as unsupported; server challenges stay errors. Local session persistence and token refresh remain
  * available through `NinebotAuthSessionManager`.
  */
 export const createNinebotPassportAuthProvider = (
@@ -56,11 +57,17 @@ export const createNinebotPassportAuthProvider = (
     }
     return { ...passport, businessUid };
   },
-  requestSmsCode: async (_input: NinebotSmsCodeRequest) => {
-    throw new NinebotHumanVerificationRequiredError();
+  requestSmsCode: async (input: NinebotSmsCodeRequest) => {
+    if (!client.requestSmsCode) throw new Error("Passport SMS capability is unavailable");
+    await client.requestSmsCode(input);
   },
-  loginWithSmsCode: async (_input: NinebotSmsLoginInput) => {
-    throw new NinebotHumanVerificationRequiredError();
+  loginWithSmsCode: async (input: NinebotSmsLoginInput) => {
+    if (!client.loginWithSmsCode) throw new Error("Passport SMS capability is unavailable");
+    const passport = await client.loginWithSmsCode(input);
+    const businessUid = await initializeBusinessSession(passport);
+    if (typeof businessUid !== "string" || !businessUid.trim())
+      throw new Error("Ninebot business login returned an invalid uid");
+    return { ...passport, businessUid };
   },
   whoami: <T = unknown>(session: NinebotAuthSession) => client.whoami<T>(session),
   async refresh(session: NinebotAuthSession) {

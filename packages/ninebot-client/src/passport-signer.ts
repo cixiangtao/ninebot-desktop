@@ -3,6 +3,7 @@ import {
   type PassportRefreshRequestSigner,
   type PassportRequestSigner,
   type PassportWhoamiRequestSigner,
+  type PassportSmsRequestSigner,
 } from "./passport-auth.ts";
 
 const textEncoder = new TextEncoder();
@@ -22,8 +23,10 @@ export const createNinebotPassportWebSigner = (): {
   login: PassportRequestSigner;
   refresh: PassportRefreshRequestSigner;
   whoami: PassportWhoamiRequestSigner;
+  sms: PassportSmsRequestSigner;
 } => ({
   login: async (input) => signCanonical(buildPassportCanonicalString(input)),
   refresh: async (input) => signCanonical(buildPassportCanonicalString(input)),
   whoami: async (input) => signCanonical(buildPassportCanonicalString(input)),
+  sms: async (input) => signCanonical(buildPassportCanonicalString(input)),
 });

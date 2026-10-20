@@ -1,5 +1,7 @@
 import {
   buildRefreshRequest,
+  buildPassportSmsRequest,
+  type PassportSmsRequestSigner,
   buildPasswordLoginRequest,
   buildWhoamiPassportRequest,
   parsePassportLoginSession,
@@ -9,7 +11,11 @@ import {
   type BuildPassportWhoamiRequestOptions,
   type PassportRequest,
 } from "./passport-auth.ts";
-import type { NinebotPassportSession } from "./auth.ts";
+import type {
+  NinebotSmsCodeRequest,
+  NinebotSmsLoginInput,
+  NinebotPassportSession,
+} from "./auth.ts";
 import { createNinebotPassportWebSigner } from "./passport-signer.ts";
 
 export interface PassportResponse {
@@ -26,6 +32,8 @@ export interface PassportLoginClientOptions {
   transport: PassportTransport;
   /** Optional override for protocol tests or a future Passport version. */
   signer?: BuildPasswordLoginRequestOptions["signer"];
+  smsSigner?: PassportSmsRequestSigner;
+  smsRegion?: () => Promise<string>;
   refreshSigner?: BuildRefreshRequestOptions["signer"];
   whoamiSigner?: BuildPassportWhoamiRequestOptions["signer"];
   authorizationFactory?: (session: NinebotPassportSession) => string;
@@ -84,7 +92,14 @@ export class PassportLoginBusinessError extends Error {
     const rejection = classifyRejection(resultDesc);
     super(`Ninebot passport request rejected: ${rejection}`);
     this.name = "PassportLoginBusinessError";
-    this.resultCode = resultCode;
+    this.resultCode =
+      typeof resultCode === "number"
+        ? Number.isSafeInteger(resultCode) && Math.abs(resultCode) <= 999_999_999
+          ? resultCode
+          : null
+        : typeof resultCode === "string" && /^-?\d{1,9}$/.test(resultCode)
+          ? resultCode
+          : null;
     this.rejection = rejection;
   }
 }
@@ -133,6 +148,8 @@ export const createNinebotPassportLoginClient = ({
   transport,
   signer,
   refreshSigner,
+  smsSigner,
+  smsRegion,
   whoamiSigner,
   authorizationFactory,
   responseBodyDecoder = (response) => response.body,
@@ -145,7 +162,49 @@ export const createNinebotPassportLoginClient = ({
   // It is deliberately not prefixed with `Bearer`; ninecli sends the token verbatim.
   const authorization =
     authorizationFactory ?? ((session: NinebotPassportSession) => session.accessToken);
+  const sendSmsRequest = async (
+    input: NinebotSmsCodeRequest & { code?: string; region?: string },
+  ) => {
+    const request = await buildPassportSmsRequest({
+      ...input,
+      signer: smsSigner ?? defaultSigners.sms,
+    });
+    const response = await transport.send(request);
+    if (response.status < 200 || response.status >= 300)
+      throw new PassportLoginHttpError(response.status);
+    const raw = await responseBodyDecoder(response);
+    const envelope = parseResponseEnvelope(raw);
+    const record = JSON.parse(new TextDecoder().decode(raw)) as Record<string, unknown>;
+    if (
+      (record.code !== undefined && record.code !== 0 && record.code !== "0") ||
+      (envelope.resultCode !== 90000 && envelope.resultCode !== "90000")
+    ) {
+      throw new PassportLoginBusinessError(
+        envelope.resultCode,
+        input.code === undefined &&
+          (envelope.resultCode === 90202 || envelope.resultCode === "90202")
+          ? "send code need verify"
+          : envelope.resultDesc,
+      );
+    }
+    return envelope.data;
+  };
   return {
+    async requestSmsCode(input: NinebotSmsCodeRequest): Promise<void> {
+      await sendSmsRequest({ areaCode: input.areaCode, phone: input.phone });
+    },
+    async loginWithSmsCode(
+      input: NinebotSmsLoginInput & { region?: string },
+    ): Promise<NinebotPassportSession> {
+      if (typeof input.code !== "string" || !/^\d{4,8}$/.test(input.code))
+        throw new Error("Invalid Passport SMS input");
+      return parsePassportLoginSession(
+        await sendSmsRequest({
+          ...input,
+          region: input.region ?? (smsRegion ? await smsRegion() : "bj"),
+        }),
+      );
+    },
     async loginWithPassword(
       input: Omit<BuildPasswordLoginRequestOptions, "signer">,
     ): Promise<NinebotPassportSession> {

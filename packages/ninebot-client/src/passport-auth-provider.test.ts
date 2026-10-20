@@ -1,8 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import {
-  createNinebotPassportAuthProvider,
-  NinebotHumanVerificationRequiredError,
-} from "./passport-auth-provider.ts";
+import { createNinebotPassportAuthProvider } from "./passport-auth-provider.ts";
 import type { NinebotAuthSession } from "./auth.ts";
 import type { NinebotPassportAuthClient } from "./passport-auth-provider.ts";
 
@@ -39,7 +36,7 @@ describe("Passport auth provider", () => {
     expect(client.whoami).toHaveBeenCalledWith(session);
   });
 
-  it("exposes SMS human verification as a stable fail-closed error", async () => {
+  it("reports an absent SMS capability without inventing a server challenge", async () => {
     const provider = createNinebotPassportAuthProvider(
       {
         loginWithPassword: async () => session,
@@ -49,12 +46,12 @@ describe("Passport auth provider", () => {
       { initializeBusinessSession: async () => "uid" },
     );
 
-    await expect(
-      provider.requestSmsCode({ areaCode: "86", phone: "13800138000" }),
-    ).rejects.toBeInstanceOf(NinebotHumanVerificationRequiredError);
+    await expect(provider.requestSmsCode({ areaCode: "86", phone: "13800138000" })).rejects.toThrow(
+      "SMS capability is unavailable",
+    );
     await expect(
       provider.loginWithSmsCode({ areaCode: "86", phone: "13800138000", code: "123456" }),
-    ).rejects.toMatchObject({ code: "HUMAN_VERIFICATION_REQUIRED" });
+    ).rejects.toThrow("SMS capability is unavailable");
   });
 
   it("requires business bootstrap even when the account client returns a uid", async () => {

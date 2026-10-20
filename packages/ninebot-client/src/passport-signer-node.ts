@@ -4,6 +4,7 @@ import {
   type PassportRefreshRequestSigner,
   type PassportRequestSigner,
   type PassportWhoamiRequestSigner,
+  type PassportSmsRequestSigner,
 } from "./passport-auth.ts";
 
 const signCanonical = (canonical: string) => createHash("sha256").update(canonical).digest("hex");
@@ -13,10 +14,12 @@ export const createNinebotPassportSigner = (): {
   login: PassportRequestSigner;
   refresh: PassportRefreshRequestSigner;
   whoami: PassportWhoamiRequestSigner;
+  sms: PassportSmsRequestSigner;
 } => ({
   login: (input) => signCanonical(buildPassportCanonicalString(input)),
   refresh: (input) => signCanonical(buildPassportCanonicalString(input)),
   whoami: (input) => signCanonical(buildPassportCanonicalString(input)),
+  sms: (input) => signCanonical(buildPassportCanonicalString(input)),
 });
 
 export const signNinebotPassportRequest = (input: Parameters<PassportRequestSigner>[0]) =>

@@ -4,7 +4,12 @@ import type { NinebotPassportSession } from "./auth.ts";
 export interface PassportRequest {
   service: "passport";
   method: "POST";
-  path: "/v5/user" | "/v6/user/login" | "/v3/user/refresh";
+  path:
+    | "/v5/user"
+    | "/v6/user/login"
+    | "/v3/user/refresh"
+    | "/v4/code/phone"
+    | "/v6/user/phoneCodeLogin";
   headers: Readonly<Record<string, string>>;
   body: Uint8Array;
 }
@@ -127,7 +132,8 @@ export const buildPassportCanonicalString = ({
   path:
     | PassportSigningInput["path"]
     | PassportRefreshSigningInput["path"]
-    | PassportWhoamiSigningInput["path"];
+    | PassportWhoamiSigningInput["path"]
+    | PassportSmsSigningInput["path"];
   timestamp: string;
   clientKey: string;
   appVersion: string;
@@ -369,5 +375,73 @@ export const parsePassportRefreshSession = (
     refreshToken: requireText(record.refresh_token, "refresh_token"),
     ...(uuid === undefined ? {} : { uuid: requireText(uuid, "uuid") }),
     ...(expiresAtMs === undefined ? {} : { expiresAtMs }),
+  };
+};
+
+/** Request/signature contract observed in saved ninecli SMS fixtures. */
+export interface PassportSmsSigningInput extends Omit<PassportSigningInput, "path"> {
+  path: "/v4/code/phone" | "/v6/user/phoneCodeLogin";
+}
+export type PassportSmsRequestSigner = (input: PassportSmsSigningInput) => string | Promise<string>;
+export interface BuildPassportSmsRequestOptions {
+  areaCode: string;
+  phone: string;
+  code?: string;
+  region?: string;
+  timestampMs?: number;
+  signer: PassportSmsRequestSigner;
+}
+
+/** Omission of code sends SMS; consumption explicitly requires a nonempty code. */
+export const buildPassportSmsRequest = async ({
+  areaCode,
+  phone,
+  code,
+  region = "bj",
+  timestampMs = Date.now(),
+  signer,
+}: BuildPassportSmsRequestOptions): Promise<PassportRequest> => {
+  if (
+    !/^\d{1,4}$/.test(areaCode) ||
+    !/^\d{5,20}$/.test(phone) ||
+    (code !== undefined && !/^\d{4,8}$/.test(code))
+  ) {
+    throw new Error("Invalid Passport SMS input");
+  }
+  const path = code === undefined ? "/v4/code/phone" : "/v6/user/phoneCodeLogin";
+  const body = textEncoder.encode(
+    JSON.stringify(
+      code === undefined
+        ? { account: phone, areaCode, rawTemplate: "login" }
+        : { areaCode, code, device: "ANDROID", phone, region },
+    ),
+  );
+  const timestamp = String(timestampMs);
+  const metadata = {
+    clientId: "vehicle_app_prod",
+    clientKey: defaultPassportClientKey,
+    appVersion: "610063322",
+    os: "Android",
+    osLanguage: "zh-hans-cn",
+    osVersion: "13",
+  };
+  const sign = await signer({ method: "POST", path, timestamp, body: body.slice(), ...metadata });
+  return {
+    service: "passport",
+    method: "POST",
+    path,
+    body,
+    headers: {
+      "accept-encoding": "gzip",
+      app_version: metadata.appVersion,
+      clientid: metadata.clientId,
+      "content-type": "application/json; charset=UTF-8",
+      os: metadata.os,
+      os_language: metadata.osLanguage,
+      os_version: metadata.osVersion,
+      sign,
+      timestamp,
+      "user-agent": "ninebot-client",
+    },
   };
 };

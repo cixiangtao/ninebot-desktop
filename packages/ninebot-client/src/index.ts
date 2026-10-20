@@ -159,6 +159,7 @@ export type {
 } from "./vehicle-cache-node.ts";
 export {
   buildPasswordLoginRequest,
+  buildPassportSmsRequest,
   buildPassportCanonicalString,
   buildRefreshRequest,
   buildWhoamiPassportRequest,
@@ -167,6 +168,9 @@ export {
 } from "./passport-auth.ts";
 export type {
   BuildPasswordLoginRequestOptions,
+  BuildPassportSmsRequestOptions,
+  PassportSmsSigningInput,
+  PassportSmsRequestSigner,
   BuildRefreshRequestOptions,
   BuildPassportWhoamiRequestOptions,
   PassportRequest,
