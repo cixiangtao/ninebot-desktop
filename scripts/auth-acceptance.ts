@@ -5,6 +5,7 @@ import { createInterface } from "node:readline/promises";
 import { Writable } from "node:stream";
 import { pathToFileURL } from "node:url";
 import type { NinebotPasswordCredentials, NinebotCandidateService } from "@jiuhao/ninebot-client";
+import { KeychainCredentialError, readKeychainCredentials } from "./auth-keychain.ts";
 import { runNinebotAuthAcceptance } from "./auth-acceptance-core.ts";
 
 const usage = `Usage: pnpm protocol:auth -- [options]
@@ -14,6 +15,7 @@ const usage = `Usage: pnpm protocol:auth -- [options]
   --month=YYYYMM         Month containing a ride (default: previous calendar month).
   --auth-only           Validate login/Business/profile/restore/refresh/logout without vehicle reads.
   --credentials-stdin    Read {"user","password","areaCode"} JSON from stdin instead of TTY prompts.
+  --credentials-keychain Read an exact ninebot.com login-Keychain selector JSON from stdin; requires --auth-only and TTY confirmation.
   --help                 Show this help without reading credentials or contacting Ninebot.
 
 Creates a fresh private temporary directory; never reads an existing account configuration.
@@ -32,6 +34,7 @@ export const parseAuthAcceptanceArguments = (args: string[], now = new Date()) =
   previous.setMonth(previous.getMonth() - 1);
   let month = `${previous.getFullYear()}${String(previous.getMonth() + 1).padStart(2, "0")}`;
   let credentialsStdin = false;
+  let credentialsKeychain = false;
   let authOnly = false;
   const seen = new Set<string>();
   for (const arg of args.filter((value) => value !== "--")) {
@@ -39,6 +42,7 @@ export const parseAuthAcceptanceArguments = (args: string[], now = new Date()) =
     if (seen.has(name)) throw new Error("Duplicate acceptance option");
     seen.add(name);
     if (arg === "--auth-only") authOnly = true;
+    else if (arg === "--credentials-keychain") credentialsKeychain = true;
     else if (arg === "--credentials-stdin") credentialsStdin = true;
     else if (arg === "--service=ebike") service = "ebike";
     else if (arg === "--service=motor") service = "motor";
@@ -53,7 +57,9 @@ export const parseAuthAcceptanceArguments = (args: string[], now = new Date()) =
     vehicleIndex > 999
   )
     throw new Error("Invalid acceptance option");
-  return { service, month, vehicleIndex, credentialsStdin, authOnly };
+  if (credentialsKeychain && (credentialsStdin || !authOnly))
+    throw new Error("Invalid credential source");
+  return { service, month, vehicleIndex, credentialsStdin, credentialsKeychain, authOnly };
 };
 
 /** Validates input without ever including the rejected value in an error. */
@@ -120,14 +126,33 @@ const main = async () => {
   }
   let directory: string | undefined;
   const controller = new AbortController();
-  const interrupt = () => controller.abort();
   let phase: "options" | "credentials" | "setup" | "run" = "options";
+  const interrupt = () => {
+    controller.abort();
+    if (phase === "credentials") process.stdin.destroy();
+  };
   try {
     const options = parseAuthAcceptanceArguments(args);
     phase = "credentials";
-    const credentials = await readCredentials(options.credentialsStdin);
     process.on("SIGINT", interrupt);
     process.on("SIGTERM", interrupt);
+    let credentials: NinebotPasswordCredentials;
+    if (options.credentialsKeychain) {
+      let body = "";
+      process.stdin.setEncoding("utf8");
+      for await (const chunk of process.stdin) {
+        body += String(chunk);
+        if (Buffer.byteLength(body) > 16_384)
+          throw new KeychainCredentialError("keychain-invalid-input");
+      }
+      let selector: unknown;
+      try {
+        selector = JSON.parse(body);
+      } catch {
+        throw new KeychainCredentialError("keychain-invalid-input");
+      }
+      credentials = await readKeychainCredentials(selector, { signal: controller.signal });
+    } else credentials = await readCredentials(options.credentialsStdin);
     phase = "setup";
     directory = await mkdtemp(join(tmpdir(), "ninebot-auth-acceptance-"));
     phase = "run";
@@ -142,9 +167,15 @@ const main = async () => {
     directory = undefined;
     console.log(JSON.stringify(report, null, 2));
     process.exitCode = report.outcome === "passed" ? 0 : report.outcome === "incomplete" ? 2 : 1;
-  } catch {
+  } catch (error) {
     // Upstream error messages, names and stack traces may contain private data.
-    console.log(JSON.stringify({ outcome: "failed", phase, reason: "acceptance-failed" }));
+    console.log(
+      JSON.stringify({
+        outcome: "failed",
+        phase,
+        reason: error instanceof KeychainCredentialError ? error.reason : "acceptance-failed",
+      }),
+    );
     process.exitCode = 1;
   } finally {
     if (directory !== undefined) {

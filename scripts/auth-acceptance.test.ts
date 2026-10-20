@@ -637,6 +637,20 @@ describe("acceptance input", () => {
     expect(() => parseAuthAcceptanceArguments(["--auth-only", "--auth-only"])).toThrow();
   });
 
+  it("limits Keychain credentials to auth-only and one source", () => {
+    expect(
+      parseAuthAcceptanceArguments(["--auth-only", "--credentials-keychain"]).credentialsKeychain,
+    ).toBe(true);
+    expect(() => parseAuthAcceptanceArguments(["--credentials-keychain"])).toThrow();
+    expect(() =>
+      parseAuthAcceptanceArguments([
+        "--auth-only",
+        "--credentials-keychain",
+        "--credentials-stdin",
+      ]),
+    ).toThrow();
+  });
+
   it("computes the previous calendar month correctly at month end", () => {
     expect(parseAuthAcceptanceArguments([], new Date(2026, 2, 31)).month).toBe("202602");
     expect(parseAuthAcceptanceArguments([], new Date(2026, 0, 31)).month).toBe("202512");
@@ -681,6 +695,7 @@ describe("acceptance input", () => {
       service: "motor",
       vehicleIndex: 1,
       credentialsStdin: true,
+      credentialsKeychain: false,
       month: "202608",
       authOnly: false,
     });
