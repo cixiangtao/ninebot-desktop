@@ -5,6 +5,7 @@ import {
   NinebotHumanVerificationRequiredError,
   PassportLoginHttpError,
   PassportRefreshMaterialError,
+  NinebotPassportRedirectError,
   type NinebotAuthSessionManager,
 } from "@jiuhao/ninebot-client";
 import type { RuntimeSecurityStatus } from "../shared/contracts.js";
@@ -17,6 +18,11 @@ const passportAuthCodes = new Set(["90016", "90017", "90018", "90019", "00002", 
 
 /** Converts Passport transport failures to the renderer's stable client error contract. */
 export const normalizeSdkAuthError = (error: unknown): unknown => {
+  if (error instanceof NinebotPassportRedirectError)
+    return new NinebotClientError(
+      "九号认证接口发生重定向，已停止请求，请检查接口配置。",
+      "upstream",
+    );
   if (error instanceof PassportRefreshMaterialError)
     return new NinebotClientError("当前会话缺少刷新资料，请重新连接九号账号。", "auth");
   if (error instanceof NinebotAuthSessionUnavailableError)

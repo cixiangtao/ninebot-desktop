@@ -32,6 +32,19 @@ export interface FetchNinebotTransportOptions {
   timeoutMs?: number;
 }
 
+const redirectStatuses = new Set([301, 302, 303, 307, 308]);
+
+/** No destination, response body, or request material is retained. Zero means opaque/unknown. */
+export class NinebotPassportRedirectError extends Error {
+  readonly status: number;
+
+  constructor(status: number) {
+    super("Ninebot Passport redirect rejected");
+    this.name = "NinebotPassportRedirectError";
+    this.status = redirectStatuses.has(status) ? status : 0;
+  }
+}
+
 const responseHeaders = (headers: Headers) =>
   Object.fromEntries(headers.entries()) as Record<string, string>;
 
@@ -74,9 +87,21 @@ export const createFetchNinebotTransport = ({
         const response = await fetchImpl(new URL(request.path, origin), {
           method: request.method,
           headers: request.headers,
+          // Signed authentication requests must never be rewritten or forwarded by Fetch.
+          ...(request.service === "passport" ? { redirect: "manual" as const } : {}),
           ...(request.body ? { body: new Uint8Array(request.body) } : {}),
           ...(requestSignal ? { signal: requestSignal } : {}),
         });
+        if (
+          request.service === "passport" &&
+          (redirectStatuses.has(response.status) ||
+            response.type === "opaqueredirect" ||
+            response.redirected)
+        ) {
+          // Do not read Location or upstream text, including on opaque browser responses.
+          await response.body?.cancel().catch(() => undefined);
+          throw new NinebotPassportRedirectError(response.status);
+        }
         return {
           status: response.status,
           headers: responseHeaders(response.headers),

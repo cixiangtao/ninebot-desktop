@@ -2,6 +2,7 @@ import {
   createMemoryNinebotAuthSessionStore,
   NinebotAuthSessionManager,
   PassportLoginBusinessError,
+  NinebotPassportRedirectError,
 } from "@jiuhao/ninebot-client";
 import type { NinebotAuthProvider, NinebotAuthSession } from "@jiuhao/ninebot-client";
 import type { RuntimeSecurityStatus } from "../shared/contracts.js";
@@ -16,6 +17,15 @@ describe("createNinebotSdkAppClient", () => {
     const error = normalizeSdkAuthError(new PassportLoginBusinessError("90016", "expired"));
     expect(error).toBeInstanceOf(NinebotClientError);
     expect(error).toMatchObject({ kind: "auth" });
+  });
+
+  it("keeps redirects distinct from expired credentials and suppresses destinations", () => {
+    const error = normalizeSdkAuthError(new NinebotPassportRedirectError(307));
+    expect(error).toBeInstanceOf(NinebotClientError);
+    expect(error).toMatchObject({
+      kind: "upstream",
+      message: "九号认证接口发生重定向，已停止请求，请检查接口配置。",
+    });
   });
 
   it("maps application calls to injected SDK boundaries", async () => {

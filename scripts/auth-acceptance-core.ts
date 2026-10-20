@@ -9,8 +9,10 @@ import {
   PassportLoginBusinessError,
   PassportLoginHttpError,
   PassportRefreshMaterialError,
+  NinebotPassportRedirectError,
   type PassportDescriptionSource,
   type NinebotRequest,
+  type NinebotResponse,
   type NinebotAuthSession,
   type NinebotAuthSessionManager,
   type NinebotCandidateService,
@@ -43,7 +45,9 @@ export interface RefreshRequestObservation {
 }
 
 export interface AuthAcceptanceDiagnostics {
-  version: 1;
+  version: 2;
+  /** Omitted when an injected auth factory bypasses the default Fetch transport. */
+  passportRedirectPolicy?: "reject";
   loginMode: "password";
   restoredMaterialsMatchSaved?: true;
   refreshAttempt?: {
@@ -56,6 +60,8 @@ export interface AuthAcceptanceDiagnostics {
     /** Omitted when a test/client factory bypasses the observed transport. */
     observedRefreshRequestsBeforeExplicit?: number;
     request?: RefreshRequestObservation;
+    /** Only resolved direct responses are observed; never includes body, headers, or destination. */
+    response?: { httpStatus: number };
   };
 }
 
@@ -128,7 +134,8 @@ export interface AuthAcceptanceCheck {
     | "cancelled"
     | "passport"
     | "business-login"
-    | "missing-refresh-material";
+    | "missing-refresh-material"
+    | "passport-redirect";
   httpStatus?: number;
   businessCode?: number;
   businessCodeField?: "code";
@@ -180,6 +187,7 @@ const requireProfile = (value: unknown) => {
 const createAcceptanceTransport = (
   signal?: AbortSignal,
   onRequest?: (request: NinebotRequest) => void,
+  onResponse?: (request: NinebotRequest, response: NinebotResponse) => void,
 ): NinebotTransport => {
   const transport = createFetchNinebotTransport({
     origins: Object.fromEntries(
@@ -188,14 +196,16 @@ const createAcceptanceTransport = (
     timeoutMs: 15_000,
   });
   return {
-    send: (request) => {
+    send: async (request) => {
       onRequest?.(request);
-      return transport.send({
+      const response = await transport.send({
         ...request,
         ...(signal === undefined
           ? {}
           : { signal: request.signal ? AbortSignal.any([signal, request.signal]) : signal }),
       });
+      onResponse?.(request, response);
+      return response;
     },
   };
 };
@@ -215,6 +225,13 @@ const failureCheck = (stage: AuthAcceptanceStage, error: unknown): AuthAcceptanc
   ) {
     return { stage, outcome: "failed", reason: "http", httpStatus: error.status };
   }
+  if (error instanceof NinebotPassportRedirectError)
+    return {
+      stage,
+      outcome: "failed",
+      reason: "passport-redirect",
+      ...([301, 302, 303, 307, 308].includes(error.status) ? { httpStatus: error.status } : {}),
+    };
   if (error instanceof PassportRefreshMaterialError)
     return { stage, outcome: "failed", reason: "missing-refresh-material" };
   if (error instanceof NinebotBusinessSessionError)
@@ -276,7 +293,11 @@ export const runNinebotAuthAcceptance = async ({
   const checks: AuthAcceptanceCheck[] = [];
   let stage: AuthAcceptanceStage = "login";
   let auth: AuthClient | undefined;
-  const diagnostics: AuthAcceptanceDiagnostics = { version: 1, loginMode: "password" };
+  const diagnostics: AuthAcceptanceDiagnostics = {
+    version: 2,
+    loginMode: "password",
+    ...(suppliedCreateAuth ? {} : { passportRedirectPolicy: "reject" as const }),
+  };
   let refreshContext: NinebotAuthSession | undefined;
   let refreshRequestsBeforeExplicit = 0;
   const createAuth =
@@ -284,15 +305,30 @@ export const runNinebotAuthAcceptance = async ({
     (() =>
       createNinebotNodeAuthSessionManager({
         directory,
-        transport: createAcceptanceTransport(signal, (request) => {
-          if (request.service !== "passport" || request.path !== "/v3/user/refresh") return;
-          if (stage === "refresh" && refreshContext && diagnostics.refreshAttempt)
-            diagnostics.refreshAttempt.request = observeAcceptanceRefreshRequest(
-              request,
-              refreshContext,
-            );
-          else refreshRequestsBeforeExplicit += 1;
-        }),
+        transport: createAcceptanceTransport(
+          signal,
+          (request) => {
+            if (request.service !== "passport" || request.path !== "/v3/user/refresh") return;
+            if (stage === "refresh" && refreshContext && diagnostics.refreshAttempt)
+              diagnostics.refreshAttempt.request = observeAcceptanceRefreshRequest(
+                request,
+                refreshContext,
+              );
+            else refreshRequestsBeforeExplicit += 1;
+          },
+          (request, response) => {
+            if (
+              stage === "refresh" &&
+              diagnostics.refreshAttempt &&
+              request.service === "passport" &&
+              request.path === "/v3/user/refresh" &&
+              Number.isInteger(response.status) &&
+              response.status >= 100 &&
+              response.status <= 599
+            )
+              diagnostics.refreshAttempt.response = { httpStatus: response.status };
+          },
+        ),
       }));
   const pass = (count?: number) => {
     signal?.throwIfAborted();

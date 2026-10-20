@@ -1,3 +1,4 @@
+import * as sdk from "@jiuhao/ninebot-client";
 import { describe, expect, it, vi } from "vitest";
 import {
   createMemoryNinebotAuthSessionStore,
@@ -5,6 +6,7 @@ import {
   NinebotHttpError,
   PassportLoginBusinessError,
   PassportRefreshMaterialError,
+  NinebotPassportRedirectError,
   buildRefreshRequest,
   createNinebotPassportWebSigner,
   type NinebotAuthProvider,
@@ -105,7 +107,7 @@ describe("fresh SDK authentication acceptance", () => {
       { stage: "logout", outcome: "passed" },
     ]);
     expect(report.diagnostics).toMatchObject({
-      version: 1,
+      version: 2,
       loginMode: "password",
       restoredMaterialsMatchSaved: true,
       refreshAttempt: {
@@ -117,6 +119,8 @@ describe("fresh SDK authentication acceptance", () => {
         sinceLogin: "under-10s",
       },
     });
+    expect(report.diagnostics).not.toHaveProperty("passportRedirectPolicy");
+    expect(report.diagnostics.refreshAttempt).not.toHaveProperty("response");
     // An injected factory bypasses transport capture; do not pretend zero requests were observed.
     expect(report.diagnostics.refreshAttempt).not.toHaveProperty(
       "observedRefreshRequestsBeforeExplicit",
@@ -125,6 +129,117 @@ describe("fresh SDK authentication acceptance", () => {
     expect(JSON.stringify(report)).not.toContain(secret);
     expect(rig.provider.loginWithPassword).toHaveBeenCalledOnce();
   });
+
+  it.each([302, 307, 0])(
+    "reports a rejected redirect without upstream content (%s)",
+    async (status) => {
+      const rig = createRig();
+      vi.mocked(rig.provider.refresh!).mockRejectedValue(new NinebotPassportRedirectError(status));
+      const report = await rig.run({ authOnly: true });
+      expect(report.checks).toContainEqual({
+        stage: "refresh",
+        outcome: "failed",
+        reason: "passport-redirect",
+        ...(status === 0 ? {} : { httpStatus: status }),
+      });
+      expect(report.checks.at(-1)).toEqual({ stage: "logout", outcome: "passed" });
+      expect(rig.provider.refresh).toHaveBeenCalledOnce();
+      expect(JSON.stringify(report)).not.toContain(secret);
+      expect(rig.client.listVehicles).not.toHaveBeenCalled();
+    },
+  );
+
+  it.each(["redirect", "direct-rejection"])(
+    "distinguishes %s through the default observed transport",
+    async (kind) => {
+      // Keep the production observed Fetch and Passport parser. Only filesystem/Business
+      // initialization are replaced; this verifies diagnostic plumbing, not cloud parity.
+      const store = createMemoryNinebotAuthSessionStore();
+      const factory = vi
+        .spyOn(sdk, "createNinebotNodeAuthSessionManager")
+        .mockImplementation(({ transport }) => {
+          if (!transport) throw new Error("Expected acceptance transport");
+          return new NinebotAuthSessionManager({
+            store,
+            provider: sdk.createNinebotPassportAuthProvider(
+              sdk.createNinebotPassportLoginClient({ transport }),
+              {
+                initializeBusinessSession: async () => secret,
+              },
+            ),
+          });
+        });
+      const fetchImpl = vi.fn<typeof fetch>(async (input, init) => {
+        expect(init?.redirect).toBe("manual");
+        const path = new URL(String(input)).pathname;
+        if (path === "/v6/user/login")
+          return Response.json({
+            resultCode: 90000,
+            data: {
+              access_token: secret,
+              refresh_token: secret,
+              uuid: secret,
+            },
+          });
+        if (path === "/v5/user")
+          return Response.json({ resultCode: 90000, data: { connected: true } });
+        if (path === "/v3/user/refresh")
+          return kind === "redirect"
+            ? new Response(secret, {
+                status: 302,
+                headers: { location: `https://example.test/${secret}` },
+              })
+            : Response.json({ resultCode: 90002, resultDesc: `args missing ${secret}` });
+        throw new Error("Unexpected synthetic request");
+      });
+      vi.stubGlobal("fetch", fetchImpl);
+      try {
+        const report = await runNinebotAuthAcceptance({
+          directory: "/unused-injected-test-directory",
+          credentials,
+          service: "ebike",
+          month: "202609",
+          authOnly: true,
+        });
+        expect(report.diagnostics).toMatchObject({
+          version: 2,
+          passportRedirectPolicy: "reject",
+          restoredMaterialsMatchSaved: true,
+        });
+        const attempt = report.diagnostics.refreshAttempt;
+        expect(attempt?.request).toMatchObject({
+          methodAndPathMatch: true,
+          expectedFieldsOnly: true,
+        });
+        if (kind === "redirect") {
+          expect(report.checks).toContainEqual({
+            stage: "refresh",
+            outcome: "failed",
+            reason: "passport-redirect",
+            httpStatus: 302,
+          });
+          expect(attempt).not.toHaveProperty("response");
+        } else {
+          expect(report.checks).toContainEqual({
+            stage: "refresh",
+            outcome: "failed",
+            reason: "passport",
+            passportRejection: "invalid-request",
+            passportDescriptionSource: "resultDesc",
+            businessCode: 90002,
+          });
+          expect(attempt?.response).toEqual({ httpStatus: 200 });
+        }
+        expect(fetchImpl).toHaveBeenCalledTimes(3);
+        expect(report.checks.at(-1)).toEqual({ stage: "logout", outcome: "passed" });
+        expect(JSON.stringify(report)).not.toContain(secret);
+        expect(JSON.stringify(report)).not.toContain("example.test");
+      } finally {
+        factory.mockRestore();
+        vi.unstubAllGlobals();
+      }
+    },
+  );
 
   it("stops at restore when refresh material changes instead of blaming the server", async () => {
     const rig = createRig();
