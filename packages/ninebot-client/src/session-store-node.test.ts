@@ -52,6 +52,18 @@ describe("file-backed Ninebot auth session store", () => {
     await expect(readFile(join(directory, "tokens.json"), "utf8")).resolves.toBe(legacy);
   });
 
+  it("isolates SDK load and logout from preserved legacy credentials", async () => {
+    const { directory, store } = await createStore({ legacyFileName: false });
+    const legacy = "synthetic legacy bytes must not be parsed or removed";
+    await writeFile(join(directory, "tokens.json"), legacy);
+    await expect(store.load()).resolves.toBeNull();
+    await store.save({ accessToken: "sdk-access", businessUid: "sdk-business" });
+    await expect(store.load()).resolves.toMatchObject({ accessToken: "sdk-access" });
+    await store.clear();
+    await expect(store.load()).resolves.toBeNull();
+    expect(await readFile(join(directory, "tokens.json"), "utf8")).toBe(legacy);
+  });
+
   it("normalizes legacy access-token validity for refresh-aware restore", async () => {
     const { directory, store } = await createStore();
     await writeFile(

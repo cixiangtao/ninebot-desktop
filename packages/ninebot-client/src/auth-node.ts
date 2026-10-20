@@ -13,6 +13,8 @@ import { createFetchNinebotTransport, type NinebotTransport } from "./transport.
 
 export interface CreateNinebotNodeAuthSessionManagerOptions {
   directory: string;
+  /** Opt out of reading/clearing legacy tokens when running alongside the old desktop. */
+  legacySession?: "compatible" | "ignore";
   /** Injected transport takes precedence over fetch/origin/timeout options. */
   transport?: NinebotTransport;
   origins?: Readonly<Partial<Record<NinebotServiceName, string>>>;
@@ -32,6 +34,7 @@ export interface CreateNinebotNodeAuthSessionManagerOptions {
  */
 export const createNinebotNodeAuthSessionManager = ({
   directory,
+  legacySession = "compatible",
   transport: suppliedTransport,
   origins,
   fetch,
@@ -74,7 +77,10 @@ export const createNinebotNodeAuthSessionManager = ({
   });
   return new NinebotAuthSessionManager({
     provider: createNinebotPassportAuthProvider(passport, { initializeBusinessSession }),
-    store: createFileNinebotAuthSessionStore({ directory }),
+    store: createFileNinebotAuthSessionStore({
+      directory,
+      ...(legacySession === "ignore" ? { legacyFileName: false } : {}),
+    }),
     ...(now === undefined ? {} : { now }),
   });
 };

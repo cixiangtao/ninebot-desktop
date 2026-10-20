@@ -6,8 +6,8 @@ export interface FileNinebotAuthSessionStoreOptions {
   directory: string;
   /** New-format file written by this store. */
   fileName?: string;
-  /** Optional legacy ninecli token file read only when the new file is absent. */
-  legacyFileName?: string;
+  /** Optional legacy token file; false isolates load/logout from legacy credentials. */
+  legacyFileName?: string | false;
 }
 
 const defaultFileName = "auth-session.json";
@@ -84,7 +84,8 @@ const readSessionFile = async (path: string): Promise<NinebotAuthSession | null>
  * When the new file is absent, an optional legacy ninecli token file can be read without
  * modifying it. Saving always uses the new camelCase file, allowing a later migration
  * step to remove the legacy runtime without losing an existing account session.
- * Explicit logout removes both formats so restore cannot resurrect legacy credentials.
+ * By default logout removes both formats so restore cannot resurrect legacy credentials.
+ * With legacyFileName: false, load and logout only touch the SDK session file.
  */
 export const createFileNinebotAuthSessionStore = ({
   directory,
@@ -92,12 +93,15 @@ export const createFileNinebotAuthSessionStore = ({
   legacyFileName = defaultLegacyFileName,
 }: FileNinebotAuthSessionStoreOptions): NinebotAuthSessionStore => {
   const sessionPath = join(directory, fileName);
-  const legacyPath = join(directory, legacyFileName);
+  const legacyPath = legacyFileName === false ? null : join(directory, legacyFileName);
 
   return {
     async load() {
       const current = await readSessionFile(sessionPath);
-      return current ?? (sessionPath === legacyPath ? null : readSessionFile(legacyPath));
+      return (
+        current ??
+        (legacyPath === null || sessionPath === legacyPath ? null : readSessionFile(legacyPath))
+      );
     },
     async save(session) {
       await mkdir(directory, { recursive: true, mode: 0o700 });
@@ -115,7 +119,7 @@ export const createFileNinebotAuthSessionStore = ({
     },
     async clear() {
       // Clear the fallback first; a failed deletion must not look like a successful logout.
-      if (legacyPath !== sessionPath) await rm(legacyPath, { force: true });
+      if (legacyPath !== null && legacyPath !== sessionPath) await rm(legacyPath, { force: true });
       await rm(sessionPath, { force: true });
     },
   };
