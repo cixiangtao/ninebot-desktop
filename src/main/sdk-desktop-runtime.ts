@@ -2,7 +2,7 @@ import {
   createNinebotNodeAuthSessionManager,
   type NinebotAuthSessionManager,
 } from "@jiuhao/ninebot-client";
-import { createNinebotSdkAppClient } from "./sdk-app-client.js";
+import { createNinebotSdkAppClient, normalizeSdkAuthError } from "./sdk-app-client.js";
 import { createSdkRuntimeDiagnostics } from "./sdk-runtime.js";
 import { createCandidateVehicleReader } from "./vehicle-source.js";
 import { createCandidateTelemetryReader } from "./telemetry-source.js";
@@ -28,7 +28,13 @@ export const createSdkDesktopRuntime = async ({
     // and leave the login UI available; only an explicit successful login replaces it.
     console.warn("SDK local session could not be restored", { reason: "local-session" });
   }
-  const sessionProvider = () => auth.ensureSession();
+  const sessionProvider = async () => {
+    try {
+      return await auth.ensureSession();
+    } catch (error) {
+      throw normalizeSdkAuthError(error);
+    }
+  };
   const vehicleReader = createCandidateVehicleReader({ configDirectory, sessionProvider });
   const telemetryReader = createCandidateTelemetryReader({ configDirectory, sessionProvider });
   const travelReader = createCandidateTravelReader({ configDirectory, sessionProvider });

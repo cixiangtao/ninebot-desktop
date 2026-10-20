@@ -46,6 +46,35 @@ vi.mock("./travel-source.js", () => ({
 const invoke = (name: string, input?: unknown) => mocks.handlers.get(name)!(null, input);
 
 describe("SDK desktop authentication through real IPC handlers (synthetic providers)", () => {
+  it("propagates expired-session refresh rejection from domain reads as AUTH_REQUIRED", async () => {
+    mocks.sessions.length = 0;
+    const session = {
+      accessToken: "synthetic",
+      refreshToken: "synthetic",
+      businessUid: "synthetic",
+      expiresAtMs: 1,
+    };
+    const store = createMemoryNinebotAuthSessionStore(session);
+    const auth = new NinebotAuthSessionManager({
+      store,
+      provider: {
+        loginWithPassword: async () => session,
+        requestSmsCode: async () => undefined,
+        loginWithSmsCode: async () => session,
+        refresh: async () => {
+          throw new PassportLoginBusinessError(90016, "synthetic-private");
+        },
+        whoami: async <T>() => null as T,
+      },
+    });
+    const client = await createSdkDesktopRuntime({ configDirectory: "/unused-synthetic", auth });
+    registerIpcHandlers(client);
+    const result = await invoke(ipcChannels.listVehicles);
+    expect(result).toMatchObject({ ok: false, error: { code: "AUTH_REQUIRED" } });
+    expect(JSON.stringify(result)).not.toContain("synthetic-private");
+    expect(mocks.sessions).toHaveLength(0);
+    await expect(store.load()).resolves.toEqual(session);
+  });
   it("requires explicit SDK selection", () => {
     expect(resolveDesktopAuthSource({})).toBe("legacy");
     expect(resolveDesktopAuthSource({ NINEBOT_AUTH_SOURCE: "sdk" })).toBe("sdk");
