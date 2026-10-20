@@ -8,6 +8,9 @@ import {
   NinebotBusinessSessionError,
   PassportLoginBusinessError,
   PassportLoginHttpError,
+  PassportRefreshMaterialError,
+  type PassportDescriptionSource,
+  type NinebotRequest,
   type NinebotAuthSession,
   type NinebotAuthSessionManager,
   type NinebotCandidateService,
@@ -24,6 +27,78 @@ type AuthClient = Pick<
   NinebotAuthSessionManager,
   "loginWithPassword" | "ensureSession" | "restore" | "refresh" | "whoami" | "logout"
 >;
+
+/** Fixed booleans/enums only: no values, hashes, lengths, headers or response text. */
+export interface RefreshRequestObservation {
+  methodAndPathMatch: boolean;
+  expectedFieldsOnly: boolean;
+  accessMatchesRestoredSession: boolean;
+  refreshMatchesRestoredSession: boolean;
+  deviceAndroid: boolean;
+  authorizationPresent: boolean;
+  contentTypeJson: boolean;
+  timestampShapeValid: boolean;
+  signatureShapeValid: boolean;
+  userAgent: "sdk-default" | "native-default" | "other";
+}
+
+export interface AuthAcceptanceDiagnostics {
+  version: 1;
+  loginMode: "password";
+  restoredMaterialsMatchSaved?: true;
+  refreshAttempt?: {
+    accessTokenPresent: boolean;
+    refreshTokenPresent: boolean;
+    accessMatchesLogin: boolean;
+    refreshMatchesLogin: boolean;
+    expiryState: "unknown" | "expired" | "near-expiry" | "fresh";
+    sinceLogin: "clock-changed" | "under-10s" | "10-to-60s" | "at-least-60s";
+    /** Omitted when a test/client factory bypasses the observed transport. */
+    observedRefreshRequestsBeforeExplicit?: number;
+    request?: RefreshRequestObservation;
+  };
+}
+
+export const observeAcceptanceRefreshRequest = (
+  request: NinebotRequest,
+  session: NinebotAuthSession,
+): RefreshRequestObservation => {
+  let fields: Record<string, unknown> = {};
+  try {
+    const body: unknown = JSON.parse(new TextDecoder().decode(request.body));
+    if (body !== null && typeof body === "object" && !Array.isArray(body))
+      fields = body as Record<string, unknown>;
+  } catch {
+    /* Shape failure is diagnostic; never copy parser errors or body text. */
+  }
+  const header = (name: string) =>
+    Object.entries(request.headers).find(([key]) => key.toLowerCase() === name)?.[1] ?? "";
+  const userAgent = header("user-agent");
+  return {
+    methodAndPathMatch:
+      request.service === "passport" &&
+      request.method === "POST" &&
+      request.path === "/v3/user/refresh",
+    expectedFieldsOnly:
+      Object.keys(fields).length === 3 &&
+      ["accessToken", "device", "refreshToken"].every((key) => Object.hasOwn(fields, key)),
+    accessMatchesRestoredSession:
+      typeof fields.accessToken === "string" && fields.accessToken === session.accessToken,
+    refreshMatchesRestoredSession:
+      typeof fields.refreshToken === "string" && fields.refreshToken === session.refreshToken,
+    deviceAndroid: fields.device === "ANDROID",
+    authorizationPresent: !!header("authorization"),
+    contentTypeJson: header("content-type").toLowerCase().startsWith("application/json"),
+    timestampShapeValid: /^\d{13}$/.test(header("timestamp")),
+    signatureShapeValid: /^[a-f0-9]{64}$/i.test(header("sign")),
+    userAgent:
+      userAgent === "ninebot-client"
+        ? "sdk-default"
+        : userAgent === "Go-http-client/1.1"
+          ? "native-default"
+          : "other",
+  };
+};
 
 /** Fixed stage names keep arbitrary upstream data out of diagnostic output. */
 export type AuthAcceptanceStage =
@@ -52,12 +127,14 @@ export interface AuthAcceptanceCheck {
     | "request-failed"
     | "cancelled"
     | "passport"
-    | "business-login";
+    | "business-login"
+    | "missing-refresh-material";
   httpStatus?: number;
   businessCode?: number;
   businessCodeField?: "code";
   /** Text-derived diagnostic category; an undocumented numeric code alone remains unknown. */
   passportRejection?: PassportRejectionKind;
+  passportDescriptionSource?: Exclude<PassportDescriptionSource, "unknown">;
   count?: number;
 }
 
@@ -68,6 +145,7 @@ export interface AuthAcceptanceReport {
   service: NinebotCandidateService;
   month: string;
   checks: AuthAcceptanceCheck[];
+  diagnostics: AuthAcceptanceDiagnostics;
 }
 
 /** Runtime seams allow offline verification without touching an existing account directory. */
@@ -81,6 +159,8 @@ export interface AuthAcceptanceOptions {
   /** Authentication lifecycle only; no vehicle, telemetry, location or trip reads. */
   authOnly?: boolean;
   signal?: AbortSignal;
+  /** Clock for diagnostic buckets only, never logged as an absolute timestamp. */
+  now?: () => number;
   createAuth?: () => AuthClient;
   loadDevice?: () => Promise<NinebotDeviceContext>;
   createClient?: (session: NinebotCandidateSessionFields) => NinebotCandidateSessionClient;
@@ -97,7 +177,10 @@ const requireProfile = (value: unknown) => {
   if (!isRecord(value) || Object.keys(value).length === 0) invalidResponse();
 };
 
-const createAcceptanceTransport = (signal?: AbortSignal): NinebotTransport => {
+const createAcceptanceTransport = (
+  signal?: AbortSignal,
+  onRequest?: (request: NinebotRequest) => void,
+): NinebotTransport => {
   const transport = createFetchNinebotTransport({
     origins: Object.fromEntries(
       defaultNinebotServiceEndpoints.map((endpoint) => [endpoint.service, endpoint.upstreamOrigin]),
@@ -105,13 +188,15 @@ const createAcceptanceTransport = (signal?: AbortSignal): NinebotTransport => {
     timeoutMs: 15_000,
   });
   return {
-    send: (request) =>
-      transport.send({
+    send: (request) => {
+      onRequest?.(request);
+      return transport.send({
         ...request,
         ...(signal === undefined
           ? {}
           : { signal: request.signal ? AbortSignal.any([signal, request.signal]) : signal }),
-      }),
+      });
+    },
   };
 };
 
@@ -130,6 +215,8 @@ const failureCheck = (stage: AuthAcceptanceStage, error: unknown): AuthAcceptanc
   ) {
     return { stage, outcome: "failed", reason: "http", httpStatus: error.status };
   }
+  if (error instanceof PassportRefreshMaterialError)
+    return { stage, outcome: "failed", reason: "missing-refresh-material" };
   if (error instanceof NinebotBusinessSessionError)
     return { stage, outcome: "failed", reason: "business-login" };
   if (error instanceof PassportLoginBusinessError) {
@@ -142,6 +229,9 @@ const failureCheck = (stage: AuthAcceptanceStage, error: unknown): AuthAcceptanc
       outcome: "failed",
       reason: "passport",
       passportRejection: error.rejection,
+      ...(error.descriptionSource === "unknown"
+        ? {}
+        : { passportDescriptionSource: error.descriptionSource }),
       ...(error.responseField === "code" ? { businessCodeField: "code" as const } : {}),
       ...(/^\d{1,6}$/.test(code) ? { businessCode: Number(code) } : {}),
     };
@@ -171,11 +261,8 @@ export const runNinebotAuthAcceptance = async ({
   vehicleIndex = 0,
   authOnly = false,
   signal,
-  createAuth = () =>
-    createNinebotNodeAuthSessionManager({
-      directory,
-      transport: createAcceptanceTransport(signal),
-    }),
+  now = Date.now,
+  createAuth: suppliedCreateAuth,
   loadDevice = () => createFileNinebotDeviceContextStore({ directory }).load(),
   createClient = (session) =>
     createNinebotCandidateSessionClient({
@@ -189,6 +276,24 @@ export const runNinebotAuthAcceptance = async ({
   const checks: AuthAcceptanceCheck[] = [];
   let stage: AuthAcceptanceStage = "login";
   let auth: AuthClient | undefined;
+  const diagnostics: AuthAcceptanceDiagnostics = { version: 1, loginMode: "password" };
+  let refreshContext: NinebotAuthSession | undefined;
+  let refreshRequestsBeforeExplicit = 0;
+  const createAuth =
+    suppliedCreateAuth ??
+    (() =>
+      createNinebotNodeAuthSessionManager({
+        directory,
+        transport: createAcceptanceTransport(signal, (request) => {
+          if (request.service !== "passport" || request.path !== "/v3/user/refresh") return;
+          if (stage === "refresh" && refreshContext && diagnostics.refreshAttempt)
+            diagnostics.refreshAttempt.request = observeAcceptanceRefreshRequest(
+              request,
+              refreshContext,
+            );
+          else refreshRequestsBeforeExplicit += 1;
+        }),
+      }));
   const pass = (count?: number) => {
     signal?.throwIfAborted();
     checks.push({ stage, outcome: "passed", ...(count === undefined ? {} : { count }) });
@@ -228,6 +333,7 @@ export const runNinebotAuthAcceptance = async ({
     }
     auth = createAuth();
     const loggedIn = await auth.loginWithPassword(credentials);
+    const loginCompletedAt = now();
     pass();
     stage = "profile";
     requireProfile(await auth.whoami());
@@ -235,9 +341,40 @@ export const runNinebotAuthAcceptance = async ({
     const beforeRestart = await auth.ensureSession();
     stage = "restore";
     auth = createAuth();
-    if (!sameSession(await auth.restore(), beforeRestart)) invalidResponse();
+    const restored = await auth.restore();
+    if (restored === null || !sameSession(restored, beforeRestart)) invalidResponse();
+    diagnostics.restoredMaterialsMatchSaved = true;
     pass();
     stage = "refresh";
+    const currentTime = now();
+    const elapsed = currentTime - loginCompletedAt;
+    refreshContext = restored;
+    diagnostics.refreshAttempt = {
+      accessTokenPresent: typeof restored.accessToken === "string" && !!restored.accessToken.trim(),
+      refreshTokenPresent:
+        typeof restored.refreshToken === "string" && !!restored.refreshToken.trim(),
+      accessMatchesLogin: restored.accessToken === loggedIn.accessToken,
+      refreshMatchesLogin: restored.refreshToken === loggedIn.refreshToken,
+      expiryState:
+        restored.expiresAtMs === undefined
+          ? "unknown"
+          : restored.expiresAtMs <= currentTime
+            ? "expired"
+            : restored.expiresAtMs <= currentTime + 60_000
+              ? "near-expiry"
+              : "fresh",
+      sinceLogin:
+        elapsed < 0
+          ? "clock-changed"
+          : elapsed < 10_000
+            ? "under-10s"
+            : elapsed < 60_000
+              ? "10-to-60s"
+              : "at-least-60s",
+      ...(suppliedCreateAuth === undefined
+        ? { observedRefreshRequestsBeforeExplicit: refreshRequestsBeforeExplicit }
+        : {}),
+    };
     const refreshed = await auth.refresh();
     if (refreshed.businessUid !== loggedIn.businessUid) invalidResponse();
     pass();
@@ -336,6 +473,7 @@ export const runNinebotAuthAcceptance = async ({
     service,
     month,
     checks,
+    diagnostics,
     outcome: checks.some((check) => check.outcome === "failed")
       ? "failed"
       : checks.some((check) => check.outcome === "skipped")

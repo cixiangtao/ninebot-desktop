@@ -4,11 +4,18 @@ import {
   NinebotAuthSessionManager,
   NinebotHttpError,
   PassportLoginBusinessError,
+  PassportRefreshMaterialError,
+  buildRefreshRequest,
+  createNinebotPassportWebSigner,
   type NinebotAuthProvider,
   type NinebotCandidateSessionClient,
   type NinebotCandidateSessionFields,
 } from "@jiuhao/ninebot-client";
-import { runNinebotAuthAcceptance, type AuthAcceptanceOptions } from "./auth-acceptance-core.ts";
+import {
+  runNinebotAuthAcceptance,
+  observeAcceptanceRefreshRequest,
+  type AuthAcceptanceOptions,
+} from "./auth-acceptance-core.ts";
 import { parseAuthAcceptanceArguments, parseAuthAcceptanceCredentials } from "./auth-acceptance.ts";
 
 const secret = "synthetic-private-marker";
@@ -86,6 +93,112 @@ const createRig = () => {
 };
 
 describe("fresh SDK authentication acceptance", () => {
+  it("reports the supplied real-result sequence with safe refresh diagnostics", async () => {
+    const rig = createRig();
+    vi.mocked(rig.provider.refresh!).mockRejectedValue(new PassportLoginBusinessError(90002, null));
+    const report = await rig.run({ authOnly: true, now: () => 1_000 });
+    expect(report.checks.map(({ stage, outcome }) => ({ stage, outcome }))).toEqual([
+      { stage: "login", outcome: "passed" },
+      { stage: "profile", outcome: "passed" },
+      { stage: "restore", outcome: "passed" },
+      { stage: "refresh", outcome: "failed" },
+      { stage: "logout", outcome: "passed" },
+    ]);
+    expect(report.diagnostics).toMatchObject({
+      version: 1,
+      loginMode: "password",
+      restoredMaterialsMatchSaved: true,
+      refreshAttempt: {
+        accessTokenPresent: true,
+        refreshTokenPresent: true,
+        accessMatchesLogin: true,
+        refreshMatchesLogin: true,
+        expiryState: "unknown",
+        sinceLogin: "under-10s",
+      },
+    });
+    // An injected factory bypasses transport capture; do not pretend zero requests were observed.
+    expect(report.diagnostics.refreshAttempt).not.toHaveProperty(
+      "observedRefreshRequestsBeforeExplicit",
+    );
+    expect(report.checks[3]).toMatchObject({ businessCode: 90002, passportRejection: "unknown" });
+    expect(JSON.stringify(report)).not.toContain(secret);
+    expect(rig.provider.loginWithPassword).toHaveBeenCalledOnce();
+  });
+
+  it("stops at restore when refresh material changes instead of blaming the server", async () => {
+    const rig = createRig();
+    const load = rig.store.load;
+    rig.store.load = vi
+      .fn()
+      .mockImplementation(load)
+      .mockResolvedValueOnce({ ...session, refreshToken: "changed-synthetic" });
+    const report = await rig.run({ authOnly: true });
+    expect(report.checks).toContainEqual({
+      stage: "restore",
+      outcome: "failed",
+      reason: "invalid-response",
+    });
+    expect(rig.provider.refresh).not.toHaveBeenCalled();
+    expect(report.diagnostics.refreshAttempt).toBeUndefined();
+  });
+
+  it("distinguishes local missing refresh material from server rejection", async () => {
+    const rig = createRig();
+    vi.mocked(rig.provider.refresh!).mockRejectedValue(new PassportRefreshMaterialError());
+    const report = await rig.run({ authOnly: true });
+    expect(report.checks).toContainEqual({
+      stage: "refresh",
+      outcome: "failed",
+      reason: "missing-refresh-material",
+    });
+    expect(rig.client.listVehicles).not.toHaveBeenCalled();
+  });
+
+  it("observes refresh shape/equality without copying tokens, signatures, headers or response text", async () => {
+    const request = await buildRefreshRequest({
+      accessToken: secret,
+      refreshToken: secret,
+      timestampMs: 1_792_146_206_810,
+      signer: createNinebotPassportWebSigner().refresh,
+    });
+    const observation = observeAcceptanceRefreshRequest(request, session);
+    expect(observation).toEqual({
+      methodAndPathMatch: true,
+      expectedFieldsOnly: true,
+      accessMatchesRestoredSession: true,
+      refreshMatchesRestoredSession: true,
+      deviceAndroid: true,
+      authorizationPresent: false,
+      contentTypeJson: true,
+      timestampShapeValid: true,
+      signatureShapeValid: true,
+      userAgent: "sdk-default",
+    });
+    expect(JSON.stringify(observation)).not.toContain(secret);
+    expect(JSON.stringify(observation)).not.toContain(request.headers.sign);
+    const wrong = {
+      ...request,
+      body: new TextEncoder().encode(
+        JSON.stringify({
+          accessToken: "wrong-synthetic",
+          refresh_token: secret,
+          device: "ANDROID",
+        }),
+      ),
+    };
+    expect(observeAcceptanceRefreshRequest(wrong, session)).toMatchObject({
+      expectedFieldsOnly: false,
+      accessMatchesRestoredSession: false,
+      refreshMatchesRestoredSession: false,
+    });
+    expect(() =>
+      observeAcceptanceRefreshRequest(
+        { ...request, body: new TextEncoder().encode(secret) },
+        session,
+      ),
+    ).not.toThrow();
+  });
   it("identifies top-level code rejections without confusing them with resultCode", async () => {
     const rig = createRig();
     vi.mocked(rig.provider.loginWithPassword).mockRejectedValue(
