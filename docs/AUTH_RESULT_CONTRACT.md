@@ -25,13 +25,13 @@ observer分别保存`code`与`resultCode`的缺失、null及JSON类型；数值�
 
 原版Passport gate静态锚点：密码`0x10031db5c`，发码`0x10031e340`，消费`0x10031e710`，刷新`0x10027e5e0`。它检查顶层code，却漏检数值resultCode；这项缺陷只在reference中保留。`continue`不意味着data/token、业务阶段或完整登录成功。
 
-`auth-result-reference.test.ts`内10个合成输入及各自REA Evidence ID来自已保存的原版发码回放；这些记录**没有在本轮重跑**。本轮运行的是新参考模型测试。测试另用注入transport和假凭据调用当前TS密码client，验证相同输入下的当前gate行为；这不是短信实现或真实请求。原版profile controller未在该批材料中还原，原版profile reference返回unavailable；当前短信provider尚未实现请求，当前TS短信reference也返回unavailable。
+`auth-result-reference.test.ts`内10个合成输入及各自REA Evidence ID来自已保存的原版发码回放；这些记录**没有在本轮重跑**。本轮运行的是新参考模型测试。测试另用注入transport和假凭据调用当前TS密码client，验证相同输入下的当前gate行为；这不是短信实现或真实请求。原版profile controller未在该批材料中还原，原版profile reference返回unavailable；后续实现已补齐SDK短信请求，但本参考函数尚未覆盖短信操作，仍返回unavailable；这只表示参考范围，不再表示实现缺失。
 
 | 判据输入                          | 固定原版gate | 当前TS密码gate |
 | --------------------------------- | ------------ | -------------- |
 | resultCode数值90202或2            | continue     | reject         |
 | resultCode字符串90202或2          | reject       | reject         |
-| code数值1 + resultCode字符串90000 | reject       | continue       |
+| code数值1 + resultCode字符串90000 | reject       | reject         |
 | resultCode字符串0                 | reject       | continue       |
 
 Business参考锚点`0x10027c4ec..0x10027c594`：原版只接受数字0/1和非空string UID，不trim；当前TS接受数字1或字符串"1"且要求trim非空UID。相关表驱动测试是**静态预测的执行模型测试**，未执行原版Business成功全路径，也不建立真实成功码的权威含义。参考函数只检查业务响应，不证明输入凭据、加解密或持久化已完成。
@@ -41,3 +41,5 @@ Business参考锚点`0x10027c4ec..0x10027c594`：原版只接受数字0/1和非�
 离线测试覆盖十个已存回放输入、当前TS注入对照、双字段冲突、类型/缺失差异、诊断脱敏、数据完整度、显式挑战和未决Business策略。浏览器类型检查也覆盖两个新模块。仓库check、SDK/桌面build结果以本次实际执行日志为准，历史343个测试通过不当成本轮结果。
 
 下一切片是五个Passport操作的请求/签名字节合同，再接两阶段和生命周期组件。仍待补Business成功全路径受控回放、低层序列化/加解密证据及真实首登/刷新验收；这些不阻塞本纯函数切片，也不因本切片通过而被视为完成。接入旧配置前才需要明确Passport-only恢复策略；完整替代短信路径还需正常人机挑战交互范围。
+
+2026-10-20 后续修复：生产 Passport password/refresh/profile 在 resultCode 之前检查可选顶层 code，拒绝明确失败码和畸形类型，防止 code=2/resultCode=90000 的冲突被接纳。缺失/null 的兼容行为保留；两个字段的数字0/90000与字符串0/90000为当前TS显式成功集合，不宣称与原版所有边界相同。`referenceCurrentTsPassportGate`及注入差分测试同步更新；固定原版参考和历史 Evidence ID 未改写。Business 成功集合仍未扩大，assessAuthResult 仍未作为生产默认策略接入。

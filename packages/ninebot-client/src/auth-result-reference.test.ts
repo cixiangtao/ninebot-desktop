@@ -83,7 +83,7 @@ const savedSendCases = [
     originalGate: "reject",
     evidenceId: "ev_c91a7d141949cd8b5dabf89cedd97e4a1cbebd7ee5b45eb94f13a2c9190191b5",
     originalExit: 1,
-    currentTsGate: "continue",
+    currentTsGate: "reject",
   },
   {
     payload: {

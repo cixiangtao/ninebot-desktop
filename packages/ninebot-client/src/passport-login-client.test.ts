@@ -7,6 +7,73 @@ import {
 const json = (value: unknown) => new TextEncoder().encode(JSON.stringify(value));
 
 describe("Passport login client", () => {
+  it.each(["password", "refresh", "profile"] as const)(
+    "rejects a conflicting top-level code in %s",
+    async (operation) => {
+      const client = createNinebotPassportLoginClient({
+        transport: {
+          send: async () => ({
+            status: 200,
+            headers: {},
+            body: json({
+              code: 2,
+              resultCode: 90000,
+              data: {
+                access_token: "synthetic-access",
+                refresh_token: "synthetic-refresh",
+                username: "synthetic-user",
+              },
+            }),
+          }),
+        },
+      });
+      const request =
+        operation === "password"
+          ? client.loginWithPassword({
+              areaCode: "86",
+              username: "synthetic",
+              password: "synthetic",
+            })
+          : operation === "refresh"
+            ? client.refresh({ accessToken: "synthetic", refreshToken: "synthetic" })
+            : client.whoami({ accessToken: "synthetic" });
+      await expect(request).rejects.toMatchObject({
+        responseField: "code",
+        resultCode: 2,
+        rejection: "unknown",
+      });
+    },
+  );
+
+  it.each([true, [], {}])("rejects an invalid top-level code shape %j", async (code) => {
+    const client = createNinebotPassportLoginClient({
+      transport: {
+        send: async () => ({
+          status: 200,
+          headers: {},
+          body: json({
+            code,
+            resultCode: 90000,
+            data: { access_token: "synthetic", refresh_token: "synthetic" },
+          }),
+        }),
+      },
+    });
+    await expect(
+      client.loginWithPassword({ areaCode: "86", username: "synthetic", password: "synthetic" }),
+    ).rejects.toThrow("invalid code");
+  });
+
+  it("bounds arbitrary upstream code strings in error objects", () => {
+    const error = new PassportLoginBusinessError(
+      "synthetic-private-code",
+      "synthetic-private-description",
+      "code",
+    );
+    expect(error.resultCode).toBeNull();
+    expect(error.responseField).toBe("code");
+    expect(JSON.stringify(error)).not.toContain("synthetic-private");
+  });
   it.each([
     [2, null, "unknown"],
     [2, "login rejected", "unknown"],

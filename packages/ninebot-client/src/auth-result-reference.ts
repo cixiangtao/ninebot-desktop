@@ -36,7 +36,7 @@ export const referenceNinecli017PassportGate = (
   return "continue";
 };
 
-/** Current TS envelope/gate only, not token/schema parsing or an implemented SMS client. */
+/** Current TS password/refresh/profile gate only; this reference does not model SMS. */
 export const referenceCurrentTsPassportGate = (input: AuthResultObservation): AuthGateReference => {
   if (
     input.operation === "send-code" ||
@@ -46,6 +46,12 @@ export const referenceCurrentTsPassportGate = (input: AuthResultObservation): Au
     return "unavailable";
   }
   if (input.envelope !== "object" || input.resultDescription === "invalid") return "invalid-input";
+  const top = input.code;
+  if (top.kind !== "missing" && top.kind !== "null") {
+    if (top.kind !== "number" && top.kind !== "string") return "invalid-input";
+    if (top.value !== 0 && top.value !== "0" && top.value !== 90000 && top.value !== "90000")
+      return "reject";
+  }
   const code = input.resultCode;
   if (code.kind === "missing" || code.kind === "null") return "continue";
   if (code.kind !== "number" && code.kind !== "string") return "invalid-input";

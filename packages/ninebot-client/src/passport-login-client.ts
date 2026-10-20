@@ -87,8 +87,13 @@ const classifyRejection = (description: string | null): PassportRejectionKind =>
 export class PassportLoginBusinessError extends Error {
   readonly resultCode: number | string | null;
   readonly rejection: PassportRejectionKind;
+  readonly responseField: "code" | "resultCode";
 
-  constructor(resultCode: number | string | null, resultDesc: string | null) {
+  constructor(
+    resultCode: number | string | null,
+    resultDesc: string | null,
+    responseField: "code" | "resultCode" = "resultCode",
+  ) {
     const rejection = classifyRejection(resultDesc);
     super(`Ninebot passport request rejected: ${rejection}`);
     this.name = "PassportLoginBusinessError";
@@ -101,10 +106,12 @@ export class PassportLoginBusinessError extends Error {
           ? resultCode
           : null;
     this.rejection = rejection;
+    this.responseField = responseField;
   }
 }
 
 interface PassportResponseEnvelope {
+  code: number | string | null;
   data: unknown;
   resultCode: number | string | null;
   resultDesc: string | null;
@@ -116,6 +123,9 @@ const parseResponseEnvelope = (body: Uint8Array): PassportResponseEnvelope => {
     throw new Error("Ninebot passport response is not a JSON object");
   }
   const record = parsed as Record<string, unknown>;
+  const code = record.code;
+  if (code !== undefined && code !== null && typeof code !== "number" && typeof code !== "string")
+    throw new Error("Ninebot passport response has an invalid code");
   const resultCode = record.resultCode;
   const resultDesc = record.resultDesc;
   if (
@@ -130,6 +140,7 @@ const parseResponseEnvelope = (body: Uint8Array): PassportResponseEnvelope => {
     throw new Error("Ninebot passport response has an invalid resultDesc");
   }
   return {
+    code: code === undefined ? null : code,
     data: record.data,
     resultCode: resultCode === undefined ? null : resultCode,
     resultDesc: resultDesc === undefined ? null : resultDesc,
@@ -214,6 +225,8 @@ export const createNinebotPassportLoginClient = ({
         throw new PassportLoginHttpError(response.status);
       }
       const envelope = parseResponseEnvelope(await responseBodyDecoder(response));
+      if (!isSuccessCode(envelope.code))
+        throw new PassportLoginBusinessError(envelope.code, envelope.resultDesc, "code");
       if (!isSuccessCode(envelope.resultCode)) {
         throw new PassportLoginBusinessError(envelope.resultCode, envelope.resultDesc);
       }
@@ -230,6 +243,8 @@ export const createNinebotPassportLoginClient = ({
         throw new PassportLoginHttpError(response.status);
       }
       const envelope = parseResponseEnvelope(await responseBodyDecoder(response));
+      if (!isSuccessCode(envelope.code))
+        throw new PassportLoginBusinessError(envelope.code, envelope.resultDesc, "code");
       if (!isSuccessCode(envelope.resultCode)) {
         throw new PassportLoginBusinessError(envelope.resultCode, envelope.resultDesc);
       }
@@ -245,6 +260,8 @@ export const createNinebotPassportLoginClient = ({
         throw new PassportLoginHttpError(response.status);
       }
       const envelope = parseResponseEnvelope(await responseBodyDecoder(response));
+      if (!isSuccessCode(envelope.code))
+        throw new PassportLoginBusinessError(envelope.code, envelope.resultDesc, "code");
       if (!isSuccessCode(envelope.resultCode)) {
         throw new PassportLoginBusinessError(envelope.resultCode, envelope.resultDesc);
       }
