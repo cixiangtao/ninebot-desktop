@@ -1,5 +1,7 @@
 # 刷新 90002：v2 结论与最小取证方案
 
+后续已按用户请求使用本机REA技能继续静态逆向，从官方APK实际方法恢复snake-case刷新字段，已据此修复。当前依据和下一步以 [官方APK刷新差异](AUTH_REFRESH_APK_EVIDENCE.md) 为准。下文保留当时有限网页/原版调查范围，不能继续据此要求用户提供官方示例。
+
 ## 当前真实反馈已经排除的假设
 
 2026-10-20 用户提供 v2 报告（message_id `Sentinel_b79e4be7f7708191a26569ce0fba6e44`）：login/profile/restore passed，refresh 为 passport / invalid-request / resultDesc / 90002，logout passed。默认 transport 的 `passportRedirectPolicy=reject`，刷新直接 `response.httpStatus=200`。因此本次 HTTP 自动重定向假设已经排除；不要要求用户再次运行同一验收。
@@ -37,7 +39,7 @@ SHA256 `1b71f343838ede9d13f5b8fbc21c45e2c7ba4cc5ffcf0d76df316968c10b9a87`。其�
 
 SDK 当前 `parsePassportRefreshSession` 会使用明确返回的新 UUID/有效期，仅在服务端省略时保留旧值。无需照搬原版遗漏，也没有依据改端点、设备、字段或签名。当前证据不足以认定原版请求一定完整，或一定错误。
 
-## 实际可执行的最小用户配合
+## 当时的用户配合备选（已由后续APK恢复替代）
 
 普通 App 界面通常无法给出可靠请求字段及签名规则；当前限制下不安排代理拦截或从账号数据提取。因此不让用户凭界面猜字段，也不要求等待后反复重试。以下两条任选其一取得新来源即可：
 
