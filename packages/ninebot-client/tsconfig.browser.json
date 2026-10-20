@@ -22,6 +22,8 @@
     "src/passport-auth-provider.ts",
     "src/crypto-web.ts",
     "src/crypto-web-codec.ts",
-    "src/transport-web.ts"
+    "src/transport-web.ts",
+    "src/auth-result.ts",
+    "src/auth-result-reference.ts"
   ]
 }

@@ -268,3 +268,15 @@ for compatibility research. It should not be used to bypass account checks,
 defeat anti-abuse controls, or send vehicle-control commands. Keep captured
 payloads private and redact tokens, device identifiers, serial numbers, and
 location data before sharing diagnostics.
+
+## Independent auth-result contract
+
+The platform-neutral `auth-result` subpath observes decoded authentication
+responses without retaining tokens or upstream descriptions. Assessment requires
+an explicit operation-specific policy; there is no default Business success-code
+or partial-session compatibility policy. This module is not wired into the current
+authentication client or desktop entry.
+
+The separate `auth-result-reference` subpath models fixed ninecli 0.1.7 and current
+TS response behavior for offline comparison only. These references are not
+production acceptance rules. See [the contract and evidence boundaries](../../docs/AUTH_RESULT_CONTRACT.md).

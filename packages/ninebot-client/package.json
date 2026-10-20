@@ -112,6 +112,14 @@
     "./business-login-node": {
       "types": "./dist/business-login-node.d.ts",
       "import": "./dist/business-login-node.js"
+    },
+    "./auth-result": {
+      "types": "./dist/auth-result.d.ts",
+      "import": "./dist/auth-result.js"
+    },
+    "./auth-result-reference": {
+      "types": "./dist/auth-result-reference.d.ts",
+      "import": "./dist/auth-result-reference.js"
     }
   },
   "scripts": {
