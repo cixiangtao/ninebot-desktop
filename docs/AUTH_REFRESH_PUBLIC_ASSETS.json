@@ -1,0 +1,418 @@
+{
+  "reviewedOn": "2026-10-20",
+  "scope": "Static assets explicitly referenced by the public official account page; downloaded without authentication and never executed. Not an App refresh contract.",
+  "root": {
+    "url": "https://account.ninebot.com/auth-v5/dist/assets/index-UkJIss_V.js",
+    "sha256": "17e0f5b6e3cda260788056a7c6e17b1e5ea7e93565f5db7f16e56547c819646f"
+  },
+  "assets": [
+    {
+      "name": "Arrow-cDZ3nCNj.js",
+      "url": "https://account.ninebot.com/auth-v5/dist/assets/Arrow-cDZ3nCNj.js",
+      "bytes": 16289,
+      "sha256": "255e68a83efb0d806d6dfa6c3a3a21e2d5d9783d5d23bf4cd21f0df0fed00253",
+      "terms": {
+        "refreshToken": 0,
+        "refresh_token": 0,
+        "/refresh": 0,
+        "accessToken": 0,
+        "passport": 0,
+        "/v3/user": 0,
+        "/v6/user": 0,
+        "expires": 0,
+        "90002": 0
+      }
+    },
+    {
+      "name": "BackToLogin-CpJmHtth.js",
+      "url": "https://account.ninebot.com/auth-v5/dist/assets/BackToLogin-CpJmHtth.js",
+      "bytes": 376,
+      "sha256": "974299fb3e0f38c49c4a78e6b9441a2c205238f0d6898ec17836ba2fcd18e9b1",
+      "terms": {
+        "refreshToken": 0,
+        "refresh_token": 0,
+        "/refresh": 0,
+        "accessToken": 0,
+        "passport": 0,
+        "/v3/user": 0,
+        "/v6/user": 0,
+        "expires": 0,
+        "90002": 0
+      }
+    },
+    {
+      "name": "CountDown-lqIjBLde.js",
+      "url": "https://account.ninebot.com/auth-v5/dist/assets/CountDown-lqIjBLde.js",
+      "bytes": 1049,
+      "sha256": "0a32312e29c3b8a964054b9bd55745b3cbb7b5667fa5124615167f4815b68b86",
+      "terms": {
+        "refreshToken": 0,
+        "refresh_token": 0,
+        "/refresh": 0,
+        "accessToken": 0,
+        "passport": 0,
+        "/v3/user": 0,
+        "/v6/user": 0,
+        "expires": 0,
+        "90002": 0
+      }
+    },
+    {
+      "name": "Index-CFD9-_Eu.js",
+      "url": "https://account.ninebot.com/auth-v5/dist/assets/Index-CFD9-_Eu.js",
+      "bytes": 41651,
+      "sha256": "fd3315b22b1d6e996a0b41f2ead48364dff8a40ed80b973b9b32a126d8052831",
+      "terms": {
+        "refreshToken": 0,
+        "refresh_token": 0,
+        "/refresh": 0,
+        "accessToken": 0,
+        "passport": 0,
+        "/v3/user": 0,
+        "/v6/user": 0,
+        "expires": 0,
+        "90002": 0
+      }
+    },
+    {
+      "name": "Index-CvJDWqEb.js",
+      "url": "https://account.ninebot.com/auth-v5/dist/assets/Index-CvJDWqEb.js",
+      "bytes": 2799,
+      "sha256": "378a69851ae8d4066838340d520d80a4ef6eb4c078865a8780fcea553749e3db",
+      "terms": {
+        "refreshToken": 0,
+        "refresh_token": 0,
+        "/refresh": 0,
+        "accessToken": 0,
+        "passport": 0,
+        "/v3/user": 0,
+        "/v6/user": 0,
+        "expires": 0,
+        "90002": 0
+      }
+    },
+    {
+      "name": "Input-B-yBMn8r.js",
+      "url": "https://account.ninebot.com/auth-v5/dist/assets/Input-B-yBMn8r.js",
+      "bytes": 3769,
+      "sha256": "df1e074f3e09b456a7a75ac9441240fea8cd44b770fecd5dbb199b573e3ce874",
+      "terms": {
+        "refreshToken": 0,
+        "refresh_token": 0,
+        "/refresh": 0,
+        "accessToken": 0,
+        "passport": 0,
+        "/v3/user": 0,
+        "/v6/user": 0,
+        "expires": 0,
+        "90002": 0
+      }
+    },
+    {
+      "name": "code-CJRK5Lz1.js",
+      "url": "https://account.ninebot.com/auth-v5/dist/assets/code-CJRK5Lz1.js",
+      "bytes": 9403,
+      "sha256": "1b71f343838ede9d13f5b8fbc21c45e2c7ba4cc5ffcf0d76df316968c10b9a87",
+      "terms": {
+        "refreshToken": 0,
+        "refresh_token": 0,
+        "/refresh": 0,
+        "accessToken": 0,
+        "passport": 0,
+        "/v3/user": 2,
+        "/v6/user": 0,
+        "expires": 0,
+        "90002": 0
+      }
+    },
+    {
+      "name": "createFormAndSubmit-Q6YfhfIt.js",
+      "url": "https://account.ninebot.com/auth-v5/dist/assets/createFormAndSubmit-Q6YfhfIt.js",
+      "bytes": 279,
+      "sha256": "c8e5c7a1b52e91fd1ec63942098522b43e5eecd51a09ba9a999b6bd6d4bd87c8",
+      "terms": {
+        "refreshToken": 0,
+        "refresh_token": 0,
+        "/refresh": 0,
+        "accessToken": 0,
+        "passport": 0,
+        "/v3/user": 0,
+        "/v6/user": 0,
+        "expires": 0,
+        "90002": 0
+      }
+    },
+    {
+      "name": "footer-6lc53OJp.js",
+      "url": "https://account.ninebot.com/auth-v5/dist/assets/footer-6lc53OJp.js",
+      "bytes": 1493,
+      "sha256": "7d0a7ae61e97180f912bd14691319d3969272b054c47a628b59b0ac0c45e38b5",
+      "terms": {
+        "refreshToken": 0,
+        "refresh_token": 0,
+        "/refresh": 0,
+        "accessToken": 0,
+        "passport": 0,
+        "/v3/user": 0,
+        "/v6/user": 0,
+        "expires": 0,
+        "90002": 0
+      }
+    },
+    {
+      "name": "index-0AKJkmWT.js",
+      "url": "https://account.ninebot.com/auth-v5/dist/assets/index-0AKJkmWT.js",
+      "bytes": 26168,
+      "sha256": "14fc3c29cb8ab3a26c55e37e897699152180c59fa8e81c5baf5c8ef7c5f3a8d9",
+      "terms": {
+        "refreshToken": 0,
+        "refresh_token": 0,
+        "/refresh": 0,
+        "accessToken": 0,
+        "passport": 0,
+        "/v3/user": 0,
+        "/v6/user": 0,
+        "expires": 0,
+        "90002": 0
+      }
+    },
+    {
+      "name": "index-B-qK8vIw.js",
+      "url": "https://account.ninebot.com/auth-v5/dist/assets/index-B-qK8vIw.js",
+      "bytes": 2955,
+      "sha256": "5ca3c36ac611a2558ab8cd4c4d7bfdbfeb3a851f997c83dab2e63816af920c7c",
+      "terms": {
+        "refreshToken": 0,
+        "refresh_token": 0,
+        "/refresh": 0,
+        "accessToken": 0,
+        "passport": 0,
+        "/v3/user": 0,
+        "/v6/user": 0,
+        "expires": 0,
+        "90002": 0
+      }
+    },
+    {
+      "name": "index-BqtADt7O.js",
+      "url": "https://account.ninebot.com/auth-v5/dist/assets/index-BqtADt7O.js",
+      "bytes": 2840,
+      "sha256": "046ff070c5c675b9eb99eb41695cc9ed8dec00041ec35220c90acdf9f3c4ad5d",
+      "terms": {
+        "refreshToken": 0,
+        "refresh_token": 0,
+        "/refresh": 0,
+        "accessToken": 0,
+        "passport": 0,
+        "/v3/user": 0,
+        "/v6/user": 0,
+        "expires": 0,
+        "90002": 0
+      }
+    },
+    {
+      "name": "index-Bz0yYvoW.js",
+      "url": "https://account.ninebot.com/auth-v5/dist/assets/index-Bz0yYvoW.js",
+      "bytes": 1957,
+      "sha256": "d1ed975d9a8cb3f4cb234f39fcf14efee0b49ad98e8d07bbdfd845e27b7bc154",
+      "terms": {
+        "refreshToken": 0,
+        "refresh_token": 0,
+        "/refresh": 0,
+        "accessToken": 0,
+        "passport": 0,
+        "/v3/user": 0,
+        "/v6/user": 0,
+        "expires": 0,
+        "90002": 0
+      }
+    },
+    {
+      "name": "index-CDJ_HJfc.js",
+      "url": "https://account.ninebot.com/auth-v5/dist/assets/index-CDJ_HJfc.js",
+      "bytes": 2258,
+      "sha256": "dc1e4ce50f9f7018f25f668dec06dbbb694b824cac0438cd05caede5ee4a1d03",
+      "terms": {
+        "refreshToken": 0,
+        "refresh_token": 0,
+        "/refresh": 0,
+        "accessToken": 0,
+        "passport": 0,
+        "/v3/user": 0,
+        "/v6/user": 0,
+        "expires": 0,
+        "90002": 0
+      }
+    },
+    {
+      "name": "index-CNgSOUB3.js",
+      "url": "https://account.ninebot.com/auth-v5/dist/assets/index-CNgSOUB3.js",
+      "bytes": 2217,
+      "sha256": "0656741e1aee9d8f8643c327887fc5c7038e6e1b1fd786d0e5a3d3c77708dfba",
+      "terms": {
+        "refreshToken": 0,
+        "refresh_token": 0,
+        "/refresh": 0,
+        "accessToken": 0,
+        "passport": 0,
+        "/v3/user": 0,
+        "/v6/user": 0,
+        "expires": 0,
+        "90002": 0
+      }
+    },
+    {
+      "name": "index-Cfw-0cbg.js",
+      "url": "https://account.ninebot.com/auth-v5/dist/assets/index-Cfw-0cbg.js",
+      "bytes": 5072,
+      "sha256": "a8b6d4dfb18e1b4c3dfb41680a84efc0895ffeb19859694f69001a6a1201026f",
+      "terms": {
+        "refreshToken": 0,
+        "refresh_token": 0,
+        "/refresh": 0,
+        "accessToken": 0,
+        "passport": 0,
+        "/v3/user": 0,
+        "/v6/user": 0,
+        "expires": 0,
+        "90002": 0
+      }
+    },
+    {
+      "name": "index-Cuq10o6F.js",
+      "url": "https://account.ninebot.com/auth-v5/dist/assets/index-Cuq10o6F.js",
+      "bytes": 3714,
+      "sha256": "18a7ea136a92583483e2a1487ed275128aafc2f701b2c84dbe6000c9faab290a",
+      "terms": {
+        "refreshToken": 0,
+        "refresh_token": 0,
+        "/refresh": 0,
+        "accessToken": 0,
+        "passport": 0,
+        "/v3/user": 0,
+        "/v6/user": 0,
+        "expires": 0,
+        "90002": 0
+      }
+    },
+    {
+      "name": "index-Cv9rTcHP.js",
+      "url": "https://account.ninebot.com/auth-v5/dist/assets/index-Cv9rTcHP.js",
+      "bytes": 54205,
+      "sha256": "a1a0d641f6386d78a097f4666b2c4c81fdbe1e3a77229bb22ceccc3f1a50d5dc",
+      "terms": {
+        "refreshToken": 0,
+        "refresh_token": 0,
+        "/refresh": 0,
+        "accessToken": 0,
+        "passport": 0,
+        "/v3/user": 0,
+        "/v6/user": 0,
+        "expires": 0,
+        "90002": 0
+      }
+    },
+    {
+      "name": "index-D2EfqKw0.js",
+      "url": "https://account.ninebot.com/auth-v5/dist/assets/index-D2EfqKw0.js",
+      "bytes": 3834,
+      "sha256": "4e9f05de0b4bbafffe184b697584bc1b4ca449e58d361c9e312dca18744c2212",
+      "terms": {
+        "refreshToken": 0,
+        "refresh_token": 0,
+        "/refresh": 0,
+        "accessToken": 0,
+        "passport": 0,
+        "/v3/user": 0,
+        "/v6/user": 0,
+        "expires": 0,
+        "90002": 0
+      }
+    },
+    {
+      "name": "index-DxWLh_Gj.js",
+      "url": "https://account.ninebot.com/auth-v5/dist/assets/index-DxWLh_Gj.js",
+      "bytes": 2775,
+      "sha256": "24737a050187115710511f8176b452b0d902793289f93ba44044955074a7e25a",
+      "terms": {
+        "refreshToken": 0,
+        "refresh_token": 0,
+        "/refresh": 0,
+        "accessToken": 0,
+        "passport": 0,
+        "/v3/user": 0,
+        "/v6/user": 0,
+        "expires": 0,
+        "90002": 0
+      }
+    },
+    {
+      "name": "index-oiDazZMR.js",
+      "url": "https://account.ninebot.com/auth-v5/dist/assets/index-oiDazZMR.js",
+      "bytes": 2935,
+      "sha256": "cf90a6b179e78bb490a59da7105416c3e8e0557b2c4456c8d1b8d897f6a15c1b",
+      "terms": {
+        "refreshToken": 0,
+        "refresh_token": 0,
+        "/refresh": 0,
+        "accessToken": 0,
+        "passport": 0,
+        "/v3/user": 0,
+        "/v6/user": 0,
+        "expires": 0,
+        "90002": 0
+      }
+    },
+    {
+      "name": "text-DdzvOsSw.js",
+      "url": "https://account.ninebot.com/auth-v5/dist/assets/text-DdzvOsSw.js",
+      "bytes": 359,
+      "sha256": "8b50fe7c62953eaf7fc1cb420387b7c854c06f4b9543246252eaaea839b8c359",
+      "terms": {
+        "refreshToken": 0,
+        "refresh_token": 0,
+        "/refresh": 0,
+        "accessToken": 0,
+        "passport": 0,
+        "/v3/user": 0,
+        "/v6/user": 0,
+        "expires": 0,
+        "90002": 0
+      }
+    },
+    {
+      "name": "vendor-nextui-packages-DAfwvUyc.js",
+      "url": "https://account.ninebot.com/auth-v5/dist/assets/vendor-nextui-packages-DAfwvUyc.js",
+      "bytes": 257980,
+      "sha256": "e5d1f6c545d4485fcb3c16cc55dee05440c9182e5079ef2b9864180ec3bc75fe",
+      "terms": {
+        "refreshToken": 0,
+        "refresh_token": 0,
+        "/refresh": 0,
+        "accessToken": 0,
+        "passport": 0,
+        "/v3/user": 0,
+        "/v6/user": 0,
+        "expires": 0,
+        "90002": 0
+      }
+    },
+    {
+      "name": "vendor-other-packages-DuTPM1yT.js",
+      "url": "https://account.ninebot.com/auth-v5/dist/assets/vendor-other-packages-DuTPM1yT.js",
+      "bytes": 593162,
+      "sha256": "fad8b6bd9fd670cb0106298f47421093a03f31877819d30d305e32f90ff5f044",
+      "terms": {
+        "refreshToken": 0,
+        "refresh_token": 0,
+        "/refresh": 0,
+        "accessToken": 0,
+        "passport": 0,
+        "/v3/user": 0,
+        "/v6/user": 0,
+        "expires": 9,
+        "90002": 0
+      }
+    }
+  ]
+}

@@ -12,6 +12,10 @@
 
 默认 Fetch 可在 301/302 后将 POST 改成 GET 并移除正文，303 也有方法改写规则；307/308 可能保留正文转发。依据为 [WHATWG Fetch HTTP-redirect fetch](https://fetch.spec.whatwg.org/#http-redirect-fetch)。本机合成基线实际复现了 POST → 302 → 空体 GET → 合成 90002；这只能证明旧诊断存在盲区。
 
+## v2 已完成后的状态
+
+用户现已完成下述定向验收：reject 策略、HTTP 200、90002。该次自动重定向假设已排除，不再要求重复同一命令。后续见 [刷新协议证据与最小取证方案](AUTH_REFRESH_EVIDENCE.md)。以下保留诊断定义供解释历史报告。
+
 ## 新验收的诊断差异
 
 以后由用户自行决定运行一次现有 `pnpm protocol:auth -- --auth-only` 时，默认路径报告：
