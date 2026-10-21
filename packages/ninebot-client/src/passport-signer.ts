@@ -1,3 +1,4 @@
+import type { PassportCountryRequestSigner } from "./passport-country.ts";
 import {
   buildPassportCanonicalString,
   type PassportRefreshRequestSigner,
@@ -24,9 +25,11 @@ export const createNinebotPassportWebSigner = (): {
   refresh: PassportRefreshRequestSigner;
   whoami: PassportWhoamiRequestSigner;
   sms: PassportSmsRequestSigner;
+  country: PassportCountryRequestSigner;
 } => ({
   login: async (input) => signCanonical(buildPassportCanonicalString(input)),
   refresh: async (input) => signCanonical(buildPassportCanonicalString(input)),
   whoami: async (input) => signCanonical(buildPassportCanonicalString(input)),
   sms: async (input) => signCanonical(buildPassportCanonicalString(input)),
+  country: async (input) => signCanonical(buildPassportCanonicalString(input)),
 });

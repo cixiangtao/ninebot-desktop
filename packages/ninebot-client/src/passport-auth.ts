@@ -1,3 +1,4 @@
+import type { PassportCountryListPath } from "./passport-country.ts";
 import type { NinebotPassportSession } from "./auth.ts";
 
 /** Passport request shape shared with any transport implementation. */
@@ -133,7 +134,8 @@ export const buildPassportCanonicalString = ({
     | PassportSigningInput["path"]
     | PassportRefreshSigningInput["path"]
     | PassportWhoamiSigningInput["path"]
-    | PassportSmsSigningInput["path"];
+    | PassportSmsSigningInput["path"]
+    | PassportCountryListPath;
   timestamp: string;
   clientKey: string;
   appVersion: string;

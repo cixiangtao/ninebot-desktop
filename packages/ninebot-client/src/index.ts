@@ -263,3 +263,23 @@ export type {
   CreateNinebotCandidateSessionClientFromClientsOptions,
   NinebotCandidateSessionClients,
 } from "./candidate-session-core.ts";
+
+export {
+  buildPassportCountryListRequest,
+  parsePassportCountryResult,
+  createNinebotPassportCountryClient,
+  PassportCountryHttpError,
+} from "./passport-country.ts";
+export type {
+  PassportCountryRequest,
+  PassportCountryTransport,
+  PassportCountryListPath,
+  PassportCountrySigningInput,
+  PassportCountryRequestSigner,
+  PassportCountryListInput,
+  PassportCountryRequestOptions,
+  PassportCountryInfo,
+  PassportCountryDirectory,
+  PassportCountryResult,
+  PassportCountryClientOptions,
+} from "./passport-country.ts";

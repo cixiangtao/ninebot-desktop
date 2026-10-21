@@ -24,6 +24,7 @@
     "src/crypto-web-codec.ts",
     "src/transport-web.ts",
     "src/auth-result.ts",
-    "src/auth-result-reference.ts"
+    "src/auth-result-reference.ts",
+    "src/passport-country.ts"
   ]
 }

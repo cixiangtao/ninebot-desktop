@@ -1,3 +1,4 @@
+import type { PassportCountryRequestSigner } from "./passport-country.ts";
 import { createHash } from "node:crypto";
 import {
   buildPassportCanonicalString,
@@ -15,11 +16,13 @@ export const createNinebotPassportSigner = (): {
   refresh: PassportRefreshRequestSigner;
   whoami: PassportWhoamiRequestSigner;
   sms: PassportSmsRequestSigner;
+  country: PassportCountryRequestSigner;
 } => ({
   login: (input) => signCanonical(buildPassportCanonicalString(input)),
   refresh: (input) => signCanonical(buildPassportCanonicalString(input)),
   whoami: (input) => signCanonical(buildPassportCanonicalString(input)),
   sms: (input) => signCanonical(buildPassportCanonicalString(input)),
+  country: (input) => signCanonical(buildPassportCanonicalString(input)),
 });
 
 export const signNinebotPassportRequest = (input: Parameters<PassportRequestSigner>[0]) =>

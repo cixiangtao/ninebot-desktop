@@ -120,6 +120,10 @@
     "./auth-result-reference": {
       "types": "./dist/auth-result-reference.d.ts",
       "import": "./dist/auth-result-reference.js"
+    },
+    "./passport-country": {
+      "types": "./dist/passport-country.d.ts",
+      "import": "./dist/passport-country.js"
     }
   },
   "scripts": {
