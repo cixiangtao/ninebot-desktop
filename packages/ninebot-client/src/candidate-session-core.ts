@@ -199,6 +199,58 @@ const assertRequestActive = (signal: AbortSignal) => {
   }
 };
 
+const invalidTravelMonth = (reason: string): never => {
+  throw new Error(`Ninebot travel month ${reason}`);
+};
+
+const monthScalar = (value: unknown): number | null => {
+  if (value === null) return null;
+  if (
+    (typeof value !== "number" && typeof value !== "string") ||
+    (typeof value === "string" && value.trim() === "")
+  )
+    return invalidTravelMonth("summary is invalid");
+  const number = Number(value);
+  if (!Number.isFinite(number) || number < 0) return invalidTravelMonth("summary is invalid");
+  return number;
+};
+
+const travelMonthSummary = (page: NinebotTravelMonthResponseCandidate, month: string) => {
+  // The codec also accepts an unwrapped successful payload (code=null).
+  if (page.code !== null && page.code !== 1 && page.code !== "1")
+    return invalidTravelMonth("business request was rejected");
+  if (page.month !== month) return invalidTravelMonth("response month is inconsistent");
+  const total = monthScalar(page.times);
+  if (total === null || !Number.isSafeInteger(total)) return invalidTravelMonth("total is invalid");
+  return {
+    total,
+    duration: monthScalar(page.duration),
+    mileage: monthScalar(page.total_mileages),
+    energy: monthScalar(page.ec),
+  };
+};
+
+const appendTravelMonthPage = (
+  page: NinebotTravelMonthResponseCandidate,
+  rows: Record<string, unknown>[],
+  ids: Set<string>,
+  total: number,
+) => {
+  if (!Array.isArray(page.list) || rows.length + page.list.length > total)
+    return invalidTravelMonth("row count exceeds the declared total");
+  for (const row of page.list) {
+    if (row === null || typeof row !== "object" || Array.isArray(row))
+      return invalidTravelMonth("ride id is invalid");
+    const value = row.travel_id ?? row.travelId ?? row.id;
+    if (typeof value !== "string" || value.trim() === "")
+      return invalidTravelMonth("ride id is invalid");
+    const id = value.trim();
+    if (ids.has(id)) return invalidTravelMonth("contains duplicate ride ids");
+    ids.add(id);
+    rows.push(row);
+  }
+};
+
 const travelPageSize = 20;
 const maxTravelPages = 100;
 
@@ -354,22 +406,21 @@ export const createNinebotCandidateSessionClientFromClients = ({
         headers: withRequestId(headers),
         signal: request.signal,
       });
-      if (!paginateTravelMonths || firstPage.list.length < travelPageSize) return firstPage;
+      assertRequestActive(request.signal);
+      if (!paginateTravelMonths) return firstPage;
 
-      const pages = [...firstPage.list];
-      const declaredTotal = Number(firstPage.times);
+      const summary = travelMonthSummary(firstPage, monthKey);
+      const rows: Record<string, unknown>[] = [];
+      const ids = new Set<string>();
+      appendTravelMonthPage(firstPage, rows, ids, summary.total);
+      let page = 1;
       let lastPageCount = firstPage.list.length;
-      for (let page = 2; page <= maxTravelPages; page += 1) {
-        if (lastPageCount < travelPageSize) break;
-        if (
-          Number.isSafeInteger(declaredTotal) &&
-          declaredTotal >= 0 &&
-          pages.length >= declaredTotal
-        ) {
-          break;
-        }
+      while (rows.length < summary.total) {
+        if (lastPageCount < travelPageSize) return invalidTravelMonth("pagination is incomplete");
+        if (page >= maxTravelPages) return invalidTravelMonth("exceeded the safe page limit");
         assertRequestActive(request.signal);
-        // Page N depends on whether page N-1 was full; keep requests sequential and cancellable.
+        page += 1;
+        // Every next page depends on the previous response; never issue speculative reads.
         // eslint-disable-next-line no-await-in-loop
         const nextPage = await clients.travel.month({
           fields: {
@@ -381,18 +432,19 @@ export const createNinebotCandidateSessionClientFromClients = ({
           headers: withRequestId(headers),
           signal: request.signal,
         });
-        pages.push(...nextPage.list);
+        assertRequestActive(request.signal);
+        const nextSummary = travelMonthSummary(nextPage, monthKey);
+        if (
+          nextSummary.total !== summary.total ||
+          nextSummary.duration !== summary.duration ||
+          nextSummary.mileage !== summary.mileage ||
+          nextSummary.energy !== summary.energy
+        )
+          return invalidTravelMonth("summary changed between pages");
+        appendTravelMonthPage(nextPage, rows, ids, summary.total);
         lastPageCount = nextPage.list.length;
       }
-      if (
-        Number.isSafeInteger(declaredTotal) &&
-        declaredTotal >= 0 &&
-        lastPageCount >= travelPageSize &&
-        pages.length < declaredTotal
-      ) {
-        throw new Error(`Ninebot travel month exceeded the safe page limit (${maxTravelPages})`);
-      }
-      return { ...firstPage, list: pages };
+      return { ...firstPage, list: rows };
     } finally {
       request.cleanup();
     }
