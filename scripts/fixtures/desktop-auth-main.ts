@@ -32,6 +32,11 @@ let rejectRefresh = false;
 let vehiclePresent = true;
 let refreshes = 0;
 let networkAttempts = 0;
+let smsEnabled = false;
+let smsRequests = 0;
+let smsLogins = 0;
+let holdSms = false;
+let releaseSms: (() => void) | undefined;
 globalThis.fetch = async () => {
   networkAttempts += 1;
   throw new Error("QA network blocked");
@@ -56,10 +61,17 @@ const auth = new NinebotAuthSessionManager({
       return fresh();
     },
     requestSmsCode: async () => {
-      throw new Error("SMS disabled in QA");
+      if (!smsEnabled) throw new Error("SMS disabled in QA");
+      smsRequests += 1;
+      if (holdSms)
+        await new Promise<void>((done) => {
+          releaseSms = done;
+        });
     },
     loginWithSmsCode: async () => {
-      throw new Error("SMS disabled in QA");
+      if (!smsEnabled) throw new Error("SMS disabled in QA");
+      smsLogins += 1;
+      return fresh();
     },
     refresh: async () => {
       refreshes += 1;
@@ -137,6 +149,13 @@ app.whenReady().then(async () => {
         await readFile(join(root, "session/runtime-diagnostics.json"), "utf8"),
       ) as unknown;
     }
+    if (command === "sms-allow") smsEnabled = true;
+    if (command === "sms-hold") holdSms = true;
+    if (command === "sms-release") {
+      holdSms = false;
+      releaseSms?.();
+      releaseSms = undefined;
+    }
     if (command === "expire") now += 3_600_001;
     if (command === "reject-refresh") {
       now += 3_600_001;
@@ -144,7 +163,7 @@ app.whenReady().then(async () => {
     }
     if (command === "allow-login") rejectRefresh = false;
     if (command === "empty-vehicles") vehiclePresent = false;
-    return { refreshes, networkAttempts };
+    return { refreshes, networkAttempts, smsRequests, smsLogins };
   });
   const window = new BrowserWindow({
     show: false,

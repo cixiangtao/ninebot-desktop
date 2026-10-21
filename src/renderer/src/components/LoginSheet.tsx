@@ -1,5 +1,5 @@
 import { LoaderCircle, LockKeyhole, MessageSquareText, X } from "lucide-react";
-import { useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import type {
   PasswordLoginInput,
   SmsCodeLoginInput,
@@ -38,6 +38,19 @@ export const LoginSheet = ({
   const [code, setCode] = useState("");
   const [codeSent, setCodeSent] = useState(false);
   const [cooldownSeconds, setCooldownSeconds] = useState(0);
+  const smsRequestGeneration = useRef(0);
+  const invalidateSms = useCallback(() => {
+    smsRequestGeneration.current += 1;
+    setCodeSent(false);
+    setCode("");
+  }, []);
+
+  useEffect(
+    () => () => {
+      smsRequestGeneration.current += 1;
+    },
+    [],
+  );
 
   useEffect(() => {
     if (!open || cooldownSeconds <= 0) return;
@@ -48,6 +61,9 @@ export const LoginSheet = ({
   if (!open) return null;
 
   const changeMode = (nextMode: LoginMode) => {
+    if (nextMode === mode) return;
+    invalidateSms();
+    setPassword("");
     setMode(nextMode);
     onClearError();
   };
@@ -59,8 +75,10 @@ export const LoginSheet = ({
   };
 
   const requestCode = async () => {
+    const generation = ++smsRequestGeneration.current;
     const sent = await onRequestSmsCode({ areaCode, phone });
-    if (!sent) return;
+    // A result belongs only to the same still-active form and SMS destination.
+    if (!sent || generation !== smsRequestGeneration.current) return;
     setCodeSent(true);
     setCooldownSeconds(60);
   };
@@ -105,7 +123,16 @@ export const LoginSheet = ({
               客户端不包含车辆控制能力。
             </p>
           </div>
-          <button className="icon-button" type="button" onClick={onClose} aria-label="关闭登录">
+          <button
+            className="icon-button"
+            type="button"
+            onClick={() => {
+              invalidateSms();
+              setPassword("");
+              onClose();
+            }}
+            aria-label="关闭登录"
+          >
             <X size={18} />
           </button>
         </div>
@@ -156,7 +183,13 @@ export const LoginSheet = ({
                 required
               />
             </label>
-            <CountryCodeField areaCode={areaCode} onChange={setAreaCode} />
+            <CountryCodeField
+              areaCode={areaCode}
+              onChange={(value) => {
+                setAreaCode(value);
+                invalidateSms();
+              }}
+            />
             <LoginError message={error} />
             <button className="primary-button mt-2 w-full" type="submit" disabled={busy}>
               {busy ? <LoaderCircle size={18} className="animate-spin" /> : null}
@@ -174,7 +207,7 @@ export const LoginSheet = ({
                   value={phone}
                   onChange={(event) => {
                     setPhone(event.target.value.replace(/\D/g, ""));
-                    setCodeSent(false);
+                    invalidateSms();
                   }}
                   autoComplete="tel"
                   inputMode="tel"
@@ -215,8 +248,7 @@ export const LoginSheet = ({
               areaCode={areaCode}
               onChange={(nextAreaCode) => {
                 setAreaCode(nextAreaCode);
-                setCodeSent(false);
-                setCode("");
+                invalidateSms();
               }}
             />
             {codeSent && !error ? (
