@@ -3,11 +3,18 @@ import {
   NinebotAuthSessionManager,
   PassportLoginBusinessError,
   NinebotPassportRedirectError,
+  NinebotHttpError,
+  NinebotTelemetryBusinessError,
+  NinebotAuthSessionUnavailableError,
 } from "@jiuhao/ninebot-client";
 import type { NinebotAuthProvider, NinebotAuthSession } from "@jiuhao/ninebot-client";
 import type { RuntimeSecurityStatus } from "../shared/contracts.js";
 import { describe, expect, it, vi } from "vitest";
-import { createNinebotSdkAppClient, normalizeSdkAuthError } from "./sdk-app-client.js";
+import {
+  createNinebotSdkAppClient,
+  normalizeSdkAuthError,
+  normalizeSdkReadError,
+} from "./sdk-app-client.js";
 import { NinebotClientError } from "./app-client.js";
 
 const session = { accessToken: "access", businessUid: "uid" };
@@ -88,4 +95,89 @@ describe("createNinebotSdkAppClient", () => {
     expect(telemetryReader.clear).toHaveBeenCalledOnce();
     expect(travelReader.clear).toHaveBeenCalledOnce();
   });
+});
+
+describe("SDK business read error contract", () => {
+  it.each([400, 403, 404, 408, 429, 500, 503])(
+    "keeps business HTTP %s recoverable without invalidating credentials",
+    (status) => {
+      expect(normalizeSdkReadError(new NinebotHttpError(status))).toMatchObject({
+        kind: "upstream",
+      });
+    },
+  );
+  it("recognizes only explicit HTTP401 and existing typed authentication failures", () => {
+    expect(normalizeSdkReadError(new NinebotHttpError(401))).toMatchObject({ kind: "auth" });
+    expect(normalizeSdkReadError(new NinebotAuthSessionUnavailableError())).toMatchObject({
+      kind: "auth",
+    });
+    expect(
+      normalizeSdkReadError(new PassportLoginBusinessError("90016", "synthetic-private")),
+    ).toMatchObject({ kind: "auth" });
+  });
+  it("does not infer expired credentials from a business code or raw text", () => {
+    const errors: unknown[] = [
+      new NinebotTelemetryBusinessError("synthetic-private", {
+        code: 401,
+        data: null,
+        desc: "synthetic-private expired token",
+        time_cost: null,
+        extra: null,
+      }),
+      new Error("synthetic-private authentication expired HTTP401"),
+      new TypeError("synthetic-private fetch failed"),
+      "synthetic-private",
+    ];
+    for (const error of errors) {
+      const normalized = normalizeSdkReadError(error);
+      expect(normalized).toMatchObject({ kind: "upstream" });
+      expect(normalized.message).not.toContain("synthetic-private");
+      expect(normalized).not.toHaveProperty("cause");
+    }
+  });
+  it("preserves deliberate app error categories and challenge boundaries", () => {
+    for (const kind of ["auth", "verification", "integrity", "unsupported", "upstream"] as const) {
+      const error = new NinebotClientError("controlled app message", kind);
+      expect(normalizeSdkReadError(error)).toBe(error);
+    }
+    expect(
+      normalizeSdkReadError(new PassportLoginBusinessError(90202, "send code need verify")),
+    ).toMatchObject({ kind: "verification" });
+  });
+  it.each(["vehicles", "vehicleStatus", "battery", "rides", "rideDetail"] as const)(
+    "wraps %s at the app boundary without retrying or changing arguments",
+    async (operation) => {
+      const fail = vi.fn(async () => {
+        throw new Error("synthetic-private");
+      });
+      const auth = new NinebotAuthSessionManager({
+        store: createMemoryNinebotAuthSessionStore(),
+        provider: {} as NinebotAuthProvider,
+      });
+      const client = createNinebotSdkAppClient({
+        auth,
+        vehicleReader: { vehicles: fail },
+        telemetryReader: { vehicleStatus: fail, battery: fail },
+        travelReader: { rides: fail, rideDetail: fail },
+        diagnostics: async () => ({}) as RuntimeSecurityStatus,
+      });
+      const calls = {
+        vehicles: () => client.vehicles(),
+        vehicleStatus: () => client.vehicleStatus("synthetic-sn"),
+        battery: () => client.battery("synthetic-sn"),
+        rides: () => client.rides("synthetic-sn", "202610"),
+        rideDetail: () => client.rideDetail("synthetic-sn", "synthetic-ride"),
+      };
+      await expect(calls[operation]()).rejects.toMatchObject({ kind: "upstream" });
+      expect(fail).toHaveBeenCalledOnce();
+      const argumentsByOperation = {
+        vehicles: [],
+        vehicleStatus: ["synthetic-sn"],
+        battery: ["synthetic-sn"],
+        rides: ["synthetic-sn", "202610"],
+        rideDetail: ["synthetic-sn", "synthetic-ride"],
+      };
+      expect(fail).toHaveBeenCalledWith(...argumentsByOperation[operation]);
+    },
+  );
 });
