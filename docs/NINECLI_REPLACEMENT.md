@@ -81,11 +81,25 @@ SDK-only入口增加明确 `NINEBOT_SDK_OFFLINE_SMOKE_ROOT` 的后台验收模�
 
 新增5项隔离目录与报告字段回归；首次测试在模块尚未实现时未收集，不宣称5项业务断言失败。最终全量87文件/758测试、格式/lint/Node和renderer类型及SDK browser类型通过；SDK-only Mac成品构建和原生验包通过。PID21819、真实账号/旧会话和Keychain没有作为测试输入；未安装到Applications、替换用户现用版本、切默认或发布。Windows不在本轮范围。
 
+## 本轮交付：profile受控复验与脱敏失败分类
+
+沿用隔离数据切换到成品后，PID20450曾出现restore完成、fresh但首个whoami失败，业务尚未启动。旧日志没有保存失败类别，不能回溯推定为网络、HTTP、凭据或协议问题；无认证服务根路径HEAD可达也不等于profile请求成功。
+
+本轮只增加诊断，不修改认证协议、签名、会话资料或重试策略。profile失败现在仅记录运行时/传输/HTTP/业务/协议/配置/会话/unknown枚举，以及受限HTTP状态或短业务码；不保存原异常文本、cause、请求、账号、令牌或响应。分类与落盘均白名单重建，诊断回调抛错也不改变产品错误结果，不追加重试。
+
+在独立旁路输出 `release/sdk-only-profile-probe` 构建分类版，未覆盖当时正在运行的旧包。全新空配置的原生探针PID42608证明fetch、Web Crypto实际存在，相同portable Passport signer的合成profile签名/解析通过，网络尝试为0，随后退出。因此排除了“缺少这两项运行时能力”的猜测，没有采用未证实的crypto补丁。探针把合成profile也纳入完成条件，避免仅凭未登录启动误报认证路径可用。
+
+确认现有脱敏资格仍fresh且当前时间早于允许刷新时间后，仅安全停止已核实的PID20450，使用同一user-data/sdk-session启动分类成品PID44959。正常启动只触发一次profile即成功，随后车辆、月度和详情各完成一次；月度/详情均有upstream-completed，非缓存命中，无profile-failure或refresh事件。未强制刷新、登录、退出或请求新凭据。首次失败未复现，结论是受控复验已恢复，原始原因仍未知，不把诊断改动声称为根因修复。
+
+当前保留PID44959供用户查看，运行的是本轮初始分类成品（基线bb9c8b3，ASAR摘要记在独立验收状态中）；后续分类枚举细化只做源码回归，不为其再次重启成功实例。`acceptance-state.json`与`profile-recovery-result.json`（任务隔离目录）记录本次新PID的脱敏计数；`profile-native-probe.json`与`profile-probe-build.log`（任务ninecli-replacement-20261021目录）记录独立无账号探针。普通与SDK-only最终源码构建、SDK browser类型及全量88文件/768测试、格式/lint/Node/renderer类型通过。
+
+本次真实证据覆盖profile→车辆发现→同账号元数据读取→月度/详情；没有记录真实页数，不推广为跨页所有边界或跨账号实测。新实例地图请求无独立统计且没有视觉访问，本轮未验证地图健康；自然刷新仍未验收。旧PID21819的历史通过结果不充作本轮证据。
+
 ## 阻碍移除运行依赖的下一步顺序
 
 已完成项目所需SDK业务读取、分页、空车辆/账号隔离及SDK-only本地成品链路；默认legacy产品仍保留。剩余范围：
 
-1. **SDK-only真实业务与视觉验收**：真实Electron空会话的后台启动、renderer/preload/IPC现已通过；仍需在允许的账号/目录验证视觉界面、恢复及地图；补空车辆/切账号、跨页月度、SMS、自然刷新/刷新后业务读取。不得篡改expiry、强制认证或把无刷新事件当失败。离线harness和本轮无账号原生启动均不替代这些结果。
+1. **SDK-only剩余真实业务与视觉验收**：真实Electron启动及PID44959的profile、车辆、月度和详情已通过；仍需视觉/地图、空车辆/切账号、跨页边界、SMS、自然刷新/刷新后业务读取。不得篡改expiry、强制认证或把无刷新事件当失败。离线harness和本轮无账号原生启动均不替代这些结果。
 2. **Windows与正式分发环境**：在Windows x64完成原生构建、安装/启动与SDK桥接验收；Mac正式签名、公证和安装/更新属于后续分发流程，当前仅本地ad-hoc目录成品。
 3. **默认迁移决定**：验收后另行批准默认入口/打包切换、旧依赖删除与发布；当前普通scripts、extraResources和旧验包/GUI QA仍服务legacy，不会被SDK-only opt-in修改或替代。
 
