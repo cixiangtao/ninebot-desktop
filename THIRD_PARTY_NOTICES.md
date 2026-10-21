@@ -8,7 +8,7 @@ Package metadata author: ninecli contributors
 
 License declared by the package metadata: MIT
 
-该工具仅用于仓库内的协议 parity 与迁移排查，不会被韭号出行 Electron 安装包再分发或在生产运行时加载。PyPI 的 0.1.7 wheel 没有附带独立的许可证正文、版权声明、源码仓库或项目主页；以上许可标识与作者名因此仅依据 PyPI/Core Metadata 原样记录，不补写上游没有提供的版权归属。
+默认 legacy 构建仍会再分发并调用该固定版本工具；仓库也保留其协议 parity 与迁移排查用途。明确 opt-in 的 SDK-only 构建不包含或调用 ninecli。PyPI 的 0.1.7 wheel 没有附带独立的许可证正文、版权声明、源码仓库或项目主页；以上许可标识与作者名因此仅依据 PyPI/Core Metadata 原样记录，不补写上游没有提供的版权归属。
 
 The standard text of the declared MIT License is:
 

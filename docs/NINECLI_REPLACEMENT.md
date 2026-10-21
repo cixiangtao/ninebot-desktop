@@ -19,7 +19,7 @@
 | 错误与会话失效           | 自有NinebotClientError→IPC；明确HTTP401与既有auth错误通知重新登录；临时错误允许分区降级               | **已完成7a5740a** sdk-app-client及sdk-read-error-integration；覆盖403/未知业务码不误判auth | 合成回归通过；不等于本轮真实401或服务故障验收                                                                   |
 | 缓存、刷新、取消         | IPC TTL、并发合并、手动绕缓存、失效清理及迟到结果保护；无需旧进程                                     | session-read-cache、sdk-read-diagnostics、sdk-vehicle-cache-isolation及存储取消测试        | 账号/区域持久元数据隔离与迟到结果保护离线通过；缓存命中不证明新网络读取或自然刷新                               |
 | 跨平台运行、离线构建     | Node/TS SDK，无Python/Go子进程需求；同一应用合同可用于macOS/Windows                                   | SDK/Electron构建、browser类型检查、现有Windows静态/包脚本                                  | Windows原生安装/启动仍需Windows主机；browser类型检查不代表桌面已支持全部浏览器                                  |
-| 成品分发、启动与安全说明 | **仍有legacy依赖**，不能因SDK reader存在就称已移除                                                    | 当前成品QA主要覆盖legacy；本轮未打新包                                                     | 需统一生产入口、无ninecli包断言、SDK冷启动/恢复冒烟及运行诊断；切换/删除留给后续批准范围                        |
+| 成品分发、启动与安全说明 | 默认仍保留legacy；新增独立SDK-only入口和无旧运行时的opt-in成品                                        | SDK-only实际ASAR/资源/签名/fuse验包及成品main/preload离线harness                           | Mac arm64隔离成品通过离线验证；真实GUI/账号恢复、Windows实机与正式分发仍待验收；未默认切换                      |
 
 主要依据：`src/main/index.ts`、`sdk-desktop-runtime.ts`、`sdk-app-client.ts`、`ipc.ts`、`vehicle-source.ts`、`telemetry-source.ts`、`travel-source.ts`、`packages/ninebot-client/src/auth-node.ts`、`candidate-session-core.ts`，以及 `AUTH_PHASE1.md`、`DESKTOP_ACCEPTANCE.md`。旧文档“最多20条”与旧“默认SDK”描述不作为当前实现依据。
 
@@ -43,7 +43,7 @@
 
 验证：分页与现有candidate-session定向3文件/56测试通过；`pnpm run check` 81文件/705测试、格式/lint/Node和renderer类型全部通过；SDK `typecheck:browser` 和 `pnpm run build`（SDK及main/preload/renderer）通过。本轮没有启动窗口，PID21819、真实会话、legacy默认和分发依赖均未改动。
 
-## 本轮交付：无车辆冷启动与账号元数据隔离（906dcb8、030c827）
+## 已交付：无车辆冷启动与账号元数据隔离（906dcb8、030c827）
 
 先新增合成数据失败复现：桌面读取链路16项中15项失败、1项通过，存储层新增4项全部失败；记录在任务目录 `ninecli-replacement-20261021/metadata-red.log` 与 `cache-store-red.log`。补充边界时又复现了畸形发现响应冒充空列表、缓存保存非必需上游字段的问题，记录为 `metadata-boundaries-red.log`。
 
@@ -55,14 +55,29 @@ SDK每次车辆刷新均按既有通配模型依次发现ebike与motor，避免�
 
 本轮新增28项测试：存储层5项、SDK隔离链路22项、SDK→IPC空车辆1项。覆盖空账号及新reader恢复、A→B→A、区域变化、同账号换token、全体reader拒绝旧归属缓存、新服务族、发现失败、元数据白名单、迟到发现/业务响应和提交前取消清理。全量 `pnpm run check` 82文件/733测试、格式/lint/Node和renderer类型通过；SDK browser类型与SDK/main/preload/renderer构建通过。所有数据和目录均为合成隔离测试，未读取真实账号/会话、未启动或重启PID21819；真实空车辆、切账号及当前窗口加载新代码仍未验收。
 
+## 本轮交付：opt-in SDK-only 成品链路（568eadf、1d59357）
+
+先复现构建命令缺失及SDK诊断/界面错误描述：4项中3项失败、1项通过，记录为任务目录 `ninecli-replacement-20261021/sdk-package-red.log`。验包拒绝用例先于实现定义；初次运行因验包模块尚不存在而无法收集测试，不将其算作业务断言失败。新增测试覆盖模式拒绝、默认入口、SDK固定入口、资源隔离、污染包拒绝、无legacy准备步骤和Windows无shell命令构造。
+
+`pnpm run package:sdk:mac:dir` 明确选择独立SDK入口；同类Windows命令为 `package:sdk:win:dir`，要求目标系统。SDK入口没有legacy导入或运行时切回分支；普通入口及现有dev/preview/package/release脚本仍保留原legacy默认和显式SDK运行时选择。Vite产物隔离于 `build/generated/sdk-only/out`，成品隔离于 `release/sdk-only`。独立builder配置不继承资源数组，`extraResources`/`extraFiles`为空，仅映射该SDK产物、生产依赖、package与第三方说明；不调用ninecli准备脚本。使用本机已安装的固定Electron分发，禁止发布并采用与现有本地Mac流程一致的ad-hoc签名/不公证配置，没有使用发布凭据。
+
+本轮实际生成 `release/sdk-only/mac-arm64/韭号出行.app`（0.2.0，arm64）。验包检查实际ASAR的SDK标识、固定入口、所需依赖和恢复资源，拒绝ninecli二进制、会话/本地配置文件及主入口或SDK依赖中的legacy/子进程执行路径；同时检查外置资源、原有8项fuse策略、bundle ID/版本/架构与深度严格签名。ASAR为6656项，`bundledNinecli=false`，签名和fuse校验通过。构建日志明确使用本地Electron，没有legacy准备/下载步骤。
+
+`qa-sdk-only-package.mjs` 在Node VM中运行实际成品main和preload，仅替换Electron原生边界；它不启动Electron、读取屏幕或连接调试器。解包依赖限定在规范化后的成品临时目录内，避免仓库依赖回落；测试中曾发现ESM解析条件及Mac `/var`/`/private/var`别名问题，均已修复并重验。强制legacy环境仍返回SDK诊断，未登录冷启动/受限桥接/权限拒绝通过，网络调用、子进程调用、禁止文件读取均为0；合成旧会话与缓存canary未读取。它证明离线启动与打包依赖边界，不等同于真实Electron渲染、地图、登录或恢复实测。
+
+SDK诊断不再将外部二进制标为平台不支持，三个业务域固定反映实际SDK读取；安全页说明进程内凭据、无外部进程和无自动legacy回退。第三方清单纠正为默认legacy包仍分发ninecli、SDK-only不分发。全量 `pnpm run check` 86文件/753测试、格式/lint/Node与renderer类型通过；普通legacy构建、SDK-only构建/打包与SDK browser类型通过。Windows仅通过配置/命令静态检查，没有构建或运行Windows成品。
+
+证据保留于任务目录：`default-build-green.log`、`sdk-package-green.log`（构建、原生验包与harness）、`sdk-harness-green.log`（加强依赖路径保护后的重验）、`sdk-windows-plan.json`。首次构建日志 `sdk-package-build.log` 保留最初harness失败，不能当最终通过记录。没有将成品安装到Applications、启动真实窗口、使用真实账号或改动PID21819；没有默认切换、删除旧依赖、推送或发布。
+
 ## 阻碍移除运行依赖的下一步顺序
 
-已完成SDK分页完整性、空车辆与账号元数据隔离离线增量，下一步顺序：
+已完成项目所需SDK业务读取、分页、空车辆/账号隔离及SDK-only本地成品链路；默认legacy产品仍保留。剩余范围：
 
-1. **SDK成品链路**：使唯一生产入口和打包/验包/冷启动QA共同不依赖旧二进制；同步诊断界面和第三方清单。当前还未实施，不能只删除extraResources。
-2. **必要真实验收与切换决定**：在允许的独立流程补空车辆/切账号、跨页月度、SMS、自然刷新及Windows/SDK成品；不篡改expiry或把无刷新事件当失败。普通默认切换、删除旧依赖和发布不在本轮执行范围。
+1. **SDK-only真实成品验收**：在用户允许的隔离账号/目录验证实际Electron界面、恢复及地图；补空车辆/切账号、跨页月度、SMS、自然刷新/刷新后业务读取。不得篡改expiry、强制认证或把无刷新事件当失败。本轮harness不替代这些结果。
+2. **Windows与正式分发环境**：在Windows x64完成原生构建、安装/启动与SDK桥接验收；Mac正式签名、公证和安装/更新属于后续分发流程，当前仅本地ad-hoc目录成品。
+3. **默认迁移决定**：验收后另行批准默认入口/打包切换、旧依赖删除与发布；当前普通scripts、extraResources和旧验包/GUI QA仍服务legacy，不会被SDK-only opt-in修改或替代。
 
-分发依赖准确位置：package.json的dev/preview、package/release脚本仍prepare-ninecli-runtime，extraResources仍含二进制；index.ts有默认legacy/hybrid分支；verify-package.mjs、verify-package-windows.mjs要求文件/哈希；qa-packaged.mjs只接受0.1.7/verified；SDK诊断binary=unsupported与SecuritySheet的旧二进制说明也需调整。THIRD_PARTY_NOTICES的“不再分发”描述与当前配置不一致，最终成品清理时必须纠正。
+SDK-only命令已经绕开旧prepare/verify/qa链并提供独立验证。只有普通默认链仍依赖ninecli，不能把本轮opt-in成功表述成全产品已经默认移除旧依赖。
 
 ## 来源校验更正
 

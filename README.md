@@ -99,10 +99,23 @@ pnpm package:win:local
 ```
 
 `pnpm check` runs the Electron TypeScript typecheck, lint, formatting and test
-gates. The protocol research package remains a development-only workspace
-dependency and is not loaded by the production main process.
+gates. The workspace SDK is a production dependency; protocol recording and
+research scripts remain outside the packaged application.
 
 `package:mac:local` 会生成 DMG 和 ZIP，`package:win:local` 会生成 NSIS 安装程序和 ZIP；两者都会从成品启动自动化冒烟，但都不是正式签名包。Windows 打包与验收必须在 Windows x64 上运行。
+
+### SDK-only 本地测试成品（明确 opt-in）
+
+```bash
+pnpm run build:desktop:sdk-only
+pnpm run package:sdk:mac:dir
+# Windows x64 主机：pnpm run package:sdk:win:dir
+# 只检查 Windows 计划：node scripts/package-sdk-only.ts --platform=win32 --plan
+```
+
+该模式固定使用内置SDK入口，不准备、下载、打入或调用ninecli；产物在 `build/generated/sdk-only/out`，成品在 `release/sdk-only`。现有普通构建仍保留legacy默认。打包使用已安装的Electron，缺少目标平台分发时停止；不会安装或发布成品。
+
+Mac命令会检查实际ASAR/外置资源、依赖、bundle、签名和fuse，并使用成品main/preload执行合成离线harness。harness替换Electron原生边界，不启动真实窗口，不代表GUI、地图、真实登录或Windows实机通过。Windows命令仅在Windows执行；当前本机只完成静态计划检查。详细证据与待验项目见 [替代清单](docs/NINECLI_REPLACEMENT.md)。
 
 ## 源码许可
 
@@ -111,7 +124,7 @@ dependency and is not loaded by the production main process.
 ## 安全边界
 
 - 渲染层只能调用版本化、面向领域的桥接：登录、退出、运行时诊断、车辆列表、脱敏后的车辆/电池状态、行程列表、行程详情和用户主动触发的文件导出；不能传入任意命令或文件保存路径。
-- Electron 安装包通过 `extraResources` 包含对应平台的 ninecli 原生二进制；业务请求只经过主进程的固定命令适配器，运行时不要求用户安装 Python、uv 或 ninecli。
+- 默认 legacy 安装包通过 `extraResources` 包含对应平台的 ninecli 原生二进制；业务请求只经过主进程的固定命令适配器，运行时不要求用户安装 Python、uv 或 ninecli。
 - `status` / `battery` 仅对普通上游临时错误做分区降级；认证、人机验证、二进制缺失、平台不支持或完整性失败继续按安全错误中止，不会用部分结果掩盖。
 - SDK 配置目录权限固定为 `0700`，已知配置和令牌文件固定为 `0600`；设置页可退出账号并按文件名清除令牌和车辆缓存。
 - 车辆 SN、实时状态中的经纬度和上游 `travel_id` 仅保留在 Electron 主进程，页面只接收会话内的临时编号与脱敏后的状态数据。
