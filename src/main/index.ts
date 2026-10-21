@@ -1,3 +1,4 @@
+import { createFileRuntimeDiagnostics } from "./runtime-diagnostics.js";
 import { join } from "node:path";
 import { app, BrowserWindow, dialog, Menu, protocol, session, shell } from "electron";
 import {
@@ -117,9 +118,20 @@ app.whenReady().then(async () => {
     resourcesPath: process.resourcesPath,
   });
   if (resolveDesktopAuthSource(process.env) === "sdk") {
-    const client = await createSdkDesktopRuntime({ configDirectory });
-    registerIpcHandlers(client);
-    app.on("before-quit", () => client.clear?.());
+    const diagnostics = createFileRuntimeDiagnostics({
+      directory: configDirectory,
+      enabled: process.env.NINEBOT_RUNTIME_DIAGNOSTICS === "1",
+    });
+    const client = await createSdkDesktopRuntime({
+      configDirectory,
+      onDiagnostic: diagnostics.record,
+    });
+    registerIpcHandlers(client, client, client, client, { onDiagnostic: diagnostics.record });
+    app.on("before-quit", () => {
+      client.stopDiagnostics();
+      client.clear?.();
+      void diagnostics.flush();
+    });
   } else {
     const ninecli = new NineCliClient(configDirectory, binaryPath);
     await ninecli.start();

@@ -30,6 +30,11 @@ import { createMonthSummaryExportDocument } from "./month-summary-export.js";
 import { createRideExportDocument } from "./ride-export.js";
 import { loadRideSpeedVerifications } from "./ride-speed-verification.js";
 import { createYearSummaryExportDocument } from "./year-summary-export.js";
+import {
+  emitRuntimeDiagnostic,
+  type ReadOperation,
+  type RuntimeDiagnosticObserver,
+} from "./runtime-diagnostics.js";
 import { SessionReadCache } from "./session-read-cache.js";
 import { loadVehicleSnapshot, type VehicleTelemetryReader } from "./vehicle-snapshot.js";
 import { type TravelReader } from "./travel-source.js";
@@ -272,7 +277,27 @@ export const registerIpcHandlers = (
   telemetryReader: VehicleTelemetryReader = client,
   travelReader: TravelReader = client,
   vehicleReader: VehicleReader = client,
+  diagnostics: { onDiagnostic?: RuntimeDiagnosticObserver; now?: () => number } = {},
 ) => {
+  const emit = (event: Parameters<RuntimeDiagnosticObserver>[0]) =>
+    emitRuntimeDiagnostic(diagnostics.onDiagnostic, event);
+  const handleRead = <T>(
+    channel: string,
+    operation: ReadOperation,
+    handler: (...args: unknown[]) => Promise<BridgeResult<T>>,
+  ) => {
+    ipcMain.handle(channel, async (...args) => {
+      emit({ category: "read", operation, outcome: "started" });
+      try {
+        const result = await handler(...args);
+        emit({ category: "read", operation, outcome: result.ok ? "completed" : "failed" });
+        return result;
+      } catch (error) {
+        emit({ category: "read", operation, outcome: "failed" });
+        throw error;
+      }
+    });
+  };
   const serialNumbers = new Map<string, string>();
   const travelIds = new Map<
     string,
@@ -280,9 +305,15 @@ export const registerIpcHandlers = (
   >();
   const rideIdsByUpstream = new Map<string, string>();
   let rideSequence = 0;
-  const snapshotCache = new SessionReadCache<VehicleSnapshot>();
-  const rideMonthCache = new SessionReadCache<RideMonth>();
-  const rideDetailCache = new SessionReadCache<RideDetail>();
+  const snapshotCache = new SessionReadCache<VehicleSnapshot>(diagnostics.now, (outcome) =>
+    emit({ category: "cache", operation: "snapshot", outcome }),
+  );
+  const rideMonthCache = new SessionReadCache<RideMonth>(diagnostics.now, (outcome) =>
+    emit({ category: "cache", operation: "ride-month", outcome }),
+  );
+  const rideDetailCache = new SessionReadCache<RideDetail>(diagnostics.now, (outcome) =>
+    emit({ category: "cache", operation: "ride-detail", outcome }),
+  );
   const readRideDetail = (
     vehicleId: string,
     rideId: string,
@@ -407,23 +438,28 @@ export const registerIpcHandlers = (
     },
   );
 
-  ipcMain.handle(ipcChannels.listVehicles, async (): Promise<BridgeResult<VehicleSummary[]>> => {
-    try {
-      const vehicles = parseVehicles(await vehicleReader.vehicles());
-      clearSessionState();
-      const summaries = vehicles.map(({ serialNumber, ...vehicle }, index) => {
-        const id = `vehicle-${index + 1}`;
-        serialNumbers.set(id, serialNumber);
-        return { id, ...vehicle };
-      });
-      return ok(summaries);
-    } catch (error) {
-      return handleSessionReadError(error);
-    }
-  });
+  handleRead(
+    ipcChannels.listVehicles,
+    "vehicles",
+    async (): Promise<BridgeResult<VehicleSummary[]>> => {
+      try {
+        const vehicles = parseVehicles(await vehicleReader.vehicles());
+        clearSessionState();
+        const summaries = vehicles.map(({ serialNumber, ...vehicle }, index) => {
+          const id = `vehicle-${index + 1}`;
+          serialNumbers.set(id, serialNumber);
+          return { id, ...vehicle };
+        });
+        return ok(summaries);
+      } catch (error) {
+        return handleSessionReadError(error);
+      }
+    },
+  );
 
-  ipcMain.handle(
+  handleRead(
     ipcChannels.getVehicleSnapshot,
+    "snapshot",
     async (_event, input: unknown): Promise<BridgeResult<VehicleSnapshot>> => {
       try {
         const { vehicleId, refresh } = vehicleSnapshotSchema.parse(input);
@@ -461,8 +497,9 @@ export const registerIpcHandlers = (
     },
   );
 
-  ipcMain.handle(
+  handleRead(
     ipcChannels.listRides,
+    "ride-month",
     async (_event, input: unknown): Promise<BridgeResult<RideMonth>> => {
       try {
         const { vehicleId, month, refresh } = rideListSchema.parse(input);
@@ -499,8 +536,9 @@ export const registerIpcHandlers = (
     },
   );
 
-  ipcMain.handle(
+  handleRead(
     ipcChannels.getRideDetail,
+    "ride-detail",
     async (_event, input: unknown): Promise<BridgeResult<RideDetail>> => {
       try {
         const { vehicleId, rideId, refresh } = rideDetailInputSchema.parse(input);

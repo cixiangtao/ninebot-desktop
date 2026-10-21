@@ -10,6 +10,7 @@ import {
 import { createSdkRuntimeDiagnostics } from "./sdk-runtime.js";
 import { createCandidateVehicleReader } from "./vehicle-source.js";
 import { createCandidateTelemetryReader } from "./telemetry-source.js";
+import { emitRuntimeDiagnostic, type RuntimeDiagnosticObserver } from "./runtime-diagnostics.js";
 import { createCandidateTravelReader } from "./travel-source.js";
 
 /** Explicit opt-in until desktop acceptance and the default-runtime switch are approved. */
@@ -25,13 +26,20 @@ export const createSdkDesktopRuntime = async ({
     legacySession: "ignore",
   }),
   readers = {},
+  onDiagnostic,
 }: {
   configDirectory: string;
   auth?: NinebotAuthSessionManager;
+  onDiagnostic?: RuntimeDiagnosticObserver;
   readers?: Partial<
     Pick<NinebotSdkAppClientOptions, "vehicleReader" | "telemetryReader" | "travelReader">
   >;
 }) => {
+  const stopDiagnostics = onDiagnostic
+    ? auth.observeDiagnostics((event) =>
+        emitRuntimeDiagnostic(onDiagnostic, { category: "auth", event }),
+      )
+    : () => {};
   try {
     await auth.restore();
   } catch {
@@ -52,11 +60,12 @@ export const createSdkDesktopRuntime = async ({
     readers.telemetryReader ?? createCandidateTelemetryReader({ configDirectory, sessionProvider });
   const travelReader =
     readers.travelReader ?? createCandidateTravelReader({ configDirectory, sessionProvider });
-  return createNinebotSdkAppClient({
+  const client = createNinebotSdkAppClient({
     auth,
     vehicleReader,
     telemetryReader,
     travelReader,
     diagnostics: createSdkRuntimeDiagnostics({ configDirectory, auth }),
   });
+  return Object.assign(client, { stopDiagnostics });
 };

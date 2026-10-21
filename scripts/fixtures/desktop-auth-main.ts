@@ -1,3 +1,5 @@
+import { readFile } from "node:fs/promises";
+import { createFileRuntimeDiagnostics } from "../../src/main/runtime-diagnostics.js";
 /** Isolated QA entry, never imported by the product. Every provider and domain is synthetic. */
 import { app, BrowserWindow, protocol, session } from "electron";
 import { join } from "node:path";
@@ -86,9 +88,14 @@ app.whenReady().then(async () => {
     callback(false),
   );
   registerAppProtocol(join(project, "out/renderer"));
+  const diagnostics = createFileRuntimeDiagnostics({
+    directory: join(root, "session"),
+    enabled: true,
+  });
   const client = await createSdkDesktopRuntime({
     configDirectory: join(root, "session"),
     auth,
+    onDiagnostic: diagnostics.record,
     readers: {
       vehicleReader: {
         vehicles: async () => {
@@ -119,8 +126,17 @@ app.whenReady().then(async () => {
       },
     },
   });
-  registerIpcHandlers(client);
-  Reflect.set(globalThis, "ninebotAuthQa", (command: string) => {
+  registerIpcHandlers(client, client, client, client, {
+    onDiagnostic: diagnostics.record,
+    now: () => now,
+  });
+  Reflect.set(globalThis, "ninebotAuthQa", async (command: string) => {
+    if (command === "diagnostics") {
+      await diagnostics.flush();
+      return JSON.parse(
+        await readFile(join(root, "session/runtime-diagnostics.json"), "utf8"),
+      ) as unknown;
+    }
     if (command === "expire") now += 3_600_001;
     if (command === "reject-refresh") {
       now += 3_600_001;
@@ -131,6 +147,7 @@ app.whenReady().then(async () => {
     return { refreshes, networkAttempts };
   });
   const window = new BrowserWindow({
+    show: false,
     width: 1280,
     height: 850,
     webPreferences: {

@@ -67,6 +67,26 @@ try {
   const refreshed = await window.evaluate(() => window.ninebot.auth.profile());
   assert.equal(refreshed.ok, true);
   assert.equal((await qa("inspect")).refreshes, 1);
+  const monthResult = await window.evaluate(() =>
+    window.ninebot.rides.list({ vehicleId: "vehicle-1", month: "202610", refresh: true }),
+  );
+  assert.equal(monthResult.ok, true);
+  const diagnostics = await qa("diagnostics");
+  assert.equal(diagnostics.signals["auth.refresh.completed.expiry"].count, 1);
+  assert.equal(diagnostics.latestEligibility.decision.status, "fresh");
+  assert.ok(
+    diagnostics.signals["cache.ride-month.upstream-completed"].lastSequence >
+      diagnostics.signals["auth.refresh.completed.expiry"].lastSequence,
+  );
+  assert.ok(diagnostics.signals["read.ride-month.completed"].count > 0);
+  assert.doesNotMatch(
+    JSON.stringify(diagnostics),
+    /qa-user|qa-access|qa-refresh|qa-password|qa-business|qa-serial|qa-uuid/,
+  );
+  await writeFile(
+    join(evidence, "desktop-auth-diagnostics.json"),
+    JSON.stringify(diagnostics, null, 2) + "\n",
+  );
   await qa("reject-refresh");
   const expired = await window.evaluate(() => window.ninebot.vehicles.list());
   assert.equal(expired.ok, false);
@@ -96,6 +116,8 @@ try {
     failedLoginStaysOpen: true,
     restartRestore: true,
     autoRefresh: true,
+    passiveEligibilityDiagnostics: true,
+    postRefreshBusinessDiagnostics: true,
     expiredReturnsToLogin: true,
     expiredClearsView: true,
     noVehicleStillConnected: true,
