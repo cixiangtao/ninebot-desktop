@@ -8,7 +8,8 @@ import { verifySdkOnlyPackage } from "./sdk-only-audit.ts";
 
 if (process.platform !== "darwin") throw new Error("This acceptance run is Mac-only");
 const project = resolve(import.meta.dirname, "..");
-const app = resolve(project, "release/sdk-only/mac-arm64/韭号出行.app");
+const appOverride = process.argv.find((argument) => argument.startsWith("--app="))?.slice(6);
+const app = resolve(appOverride ?? resolve(project, "release/sdk-only/mac-arm64/韭号出行.app"));
 const output = process.argv.find((argument) => argument.startsWith("--evidence="))?.slice(11);
 if (!output) throw new Error("Choose an explicit --evidence JSON output path");
 await verifySdkOnlyPackage(project, app, "darwin");

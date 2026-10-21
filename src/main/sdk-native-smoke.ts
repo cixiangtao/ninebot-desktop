@@ -1,3 +1,5 @@
+import { createNinebotPassportLoginClient } from "@jiuhao/ninebot-client";
+import { classifyProfileFailure, type ProfileFailure } from "./sdk-profile-failure.js";
 import { existsSync, readFileSync, readdirSync, renameSync, writeFileSync } from "node:fs";
 import { basename, join, resolve } from "node:path";
 import { app, ipcMain, session } from "electron";
@@ -40,6 +42,10 @@ export const configureSdkNativeSmoke = () => {
   const path = join(root, "native-smoke-report.json");
   const state = {
     version: 1,
+    originalFetchAvailable: typeof globalThis.fetch === "function",
+    originalWebCryptoAvailable: Boolean(globalThis.crypto?.subtle),
+    syntheticProfileCompleted: false,
+    syntheticProfileFailure: null as ProfileFailure | null,
     pid: process.pid,
     nativeWindowCreated: false,
     localPageLoaded: false,
@@ -59,6 +65,8 @@ export const configureSdkNativeSmoke = () => {
   };
   const record = () => {
     state.completed =
+      state.originalFetchAvailable &&
+      state.syntheticProfileCompleted &&
       state.nativeWindowCreated &&
       state.localPageLoaded &&
       state.rendererMounted &&
@@ -78,7 +86,24 @@ export const configureSdkNativeSmoke = () => {
     record();
     throw new Error("Offline native smoke blocks network");
   };
-  app.whenReady().then(() => {
+  app.whenReady().then(async () => {
+    // Exercise the real portable Passport signer with synthetic material and no network.
+    try {
+      const client = createNinebotPassportLoginClient({
+        transport: {
+          send: async () => ({
+            status: 200,
+            headers: {},
+            body: new TextEncoder().encode(JSON.stringify({ resultCode: 90000, data: {} })),
+          }),
+        },
+      });
+      await client.whoami({ accessToken: "synthetic-offline-only" });
+      state.syntheticProfileCompleted = true;
+    } catch (error) {
+      state.syntheticProfileFailure = classifyProfileFailure(error);
+    }
+    record();
     session.defaultSession.webRequest.onBeforeRequest(
       { urls: ["http://*/*", "https://*/*", "ws://*/*", "wss://*/*"] },
       (_details, callback) => {
