@@ -8,18 +8,18 @@
 
 “已有”指代码实现存在；自动合成通过、历史真实证据与待真实验收分别列出，不相互替代。历史真实结果来自既有验收记录/用户反馈，本轮未重新请求或观察实例。
 
-| 必需流程                 | SDK / 桌面实现与自身合同                                                                              | 自动证据                                                                                   | 真实证据与剩余缺口                                                                                              |
-| ------------------------ | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------- |
-| 密码登录与连接状态       | auth-node 的 Passport→Business 两阶段，只接受完整会话；失败不替换旧会话；SDK app client→IPC           | auth-node、auth-result、sdk-desktop-runtime 测试                                           | 用户报告密码验收七阶段通过；独立 SDK 桌面登录曾通过，不推广所有账号/车型                                        |
-| 恢复、刷新、退出         | SDK store、并发刷新/替换竞态、显式退出；桌面 legacySession=ignore，不依赖运行 ninecli 或读取旧 tokens | auth、store、auth-node、桌面合成生命周期及恢复→业务→刷新回归                               | SDK恢复/profile已有实测；真实自然刷新和当前窗口的完整退出/重登仍待验收。切换时需明确保留旧文件、SDK重新登录策略 |
-| 短信与挑战               | SDK发码/消费及Business初始化；挑战受控报错，不虚报成功；旧表单晚到响应忽略                            | passport-sms、sms-login-flow、离线 Electron QA                                             | 真实 SMS 未验收；内嵌挑战未实现，保留受控边界，不绕过验证                                                       |
-| 车辆（自有/共享）        | vehicle-source及SDK车辆客户端；发现ebike/motor；输出自有VehicleSummary/opaque ID                      | vehicle-source、vehicle-node、SDK缓存隔离及IPC空车辆回归                                   | 历史单账号车辆通过；空车辆、跨账号/区域与新增服务族现已离线通过，尚待真实账号验收                               |
-| 状态、电池、位置         | telemetry SDK、BMS/锁/点火/续航/充电解析，按需授权位置；不包含控制操作                                | telemetry-node、分区快照、位置桥接与本轮真实reader→IPC合成测试                             | 历史五类读取及位置桥接记录不等于所有车型通过；错误契约与本轮缓存隔离尚未加载进当前实例                          |
-| 月度行程、详情、分页     | travel SDK及candidate-session全月分页，桌面RideMonth/RideDetail；本地统计/回放/导出复用结果           | travel-node、travel-pagination新增44项完整性回归、parsers/统计/IPC                         | 月度/详情历史实测通过；分页完整性与本轮账号缓存隔离离线通过，尚无真实跨页服务验收                               |
-| 错误与会话失效           | 自有NinebotClientError→IPC；明确HTTP401与既有auth错误通知重新登录；临时错误允许分区降级               | **已完成7a5740a** sdk-app-client及sdk-read-error-integration；覆盖403/未知业务码不误判auth | 合成回归通过；不等于本轮真实401或服务故障验收                                                                   |
-| 缓存、刷新、取消         | IPC TTL、并发合并、手动绕缓存、失效清理及迟到结果保护；无需旧进程                                     | session-read-cache、sdk-read-diagnostics、sdk-vehicle-cache-isolation及存储取消测试        | 账号/区域持久元数据隔离与迟到结果保护离线通过；缓存命中不证明新网络读取或自然刷新                               |
-| 跨平台运行、离线构建     | Node/TS SDK，无Python/Go子进程需求；同一应用合同可用于macOS/Windows                                   | SDK/Electron构建、browser类型检查、现有Windows静态/包脚本                                  | Windows原生安装/启动仍需Windows主机；browser类型检查不代表桌面已支持全部浏览器                                  |
-| 成品分发、启动与安全说明 | 默认仍保留legacy；新增独立SDK-only入口和无旧运行时的opt-in成品                                        | SDK-only实际ASAR/资源/签名/fuse验包及成品main/preload离线harness                           | Mac arm64隔离成品通过离线验证；真实GUI/账号恢复、Windows实机与正式分发仍待验收；未默认切换                      |
+| 必需流程                 | SDK / 桌面实现与自身合同                                                                              | 自动证据                                                                                   | 真实证据与剩余缺口                                                                                                 |
+| ------------------------ | ----------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------ |
+| 密码登录与连接状态       | auth-node 的 Passport→Business 两阶段，只接受完整会话；失败不替换旧会话；SDK app client→IPC           | auth-node、auth-result、sdk-desktop-runtime 测试                                           | 用户报告密码验收七阶段通过；独立 SDK 桌面登录曾通过，不推广所有账号/车型                                           |
+| 恢复、刷新、退出         | SDK store、并发刷新/替换竞态、显式退出；桌面 legacySession=ignore，不依赖运行 ninecli 或读取旧 tokens | auth、store、auth-node、桌面合成生命周期及恢复→业务→刷新回归                               | SDK恢复/profile已有实测；真实自然刷新和当前窗口的完整退出/重登仍待验收。切换时需明确保留旧文件、SDK重新登录策略    |
+| 短信与挑战               | SDK发码/消费及Business初始化；挑战受控报错，不虚报成功；旧表单晚到响应忽略                            | passport-sms、sms-login-flow、离线 Electron QA                                             | 真实 SMS 未验收；内嵌挑战未实现，保留受控边界，不绕过验证                                                          |
+| 车辆（自有/共享）        | vehicle-source及SDK车辆客户端；发现ebike/motor；输出自有VehicleSummary/opaque ID                      | vehicle-source、vehicle-node、SDK缓存隔离及IPC空车辆回归                                   | 历史单账号车辆通过；空车辆、跨账号/区域与新增服务族现已离线通过，尚待真实账号验收                                  |
+| 状态、电池、位置         | telemetry SDK、BMS/锁/点火/续航/充电解析，按需授权位置；不包含控制操作                                | telemetry-node、分区快照、位置桥接与本轮真实reader→IPC合成测试                             | 历史五类读取及位置桥接记录不等于所有车型通过；错误契约与本轮缓存隔离尚未加载进当前实例                             |
+| 月度行程、详情、分页     | travel SDK及candidate-session全月分页，桌面RideMonth/RideDetail；本地统计/回放/导出复用结果           | travel-node、travel-pagination新增44项完整性回归、parsers/统计/IPC                         | 月度/详情历史实测通过；分页完整性与本轮账号缓存隔离离线通过，尚无真实跨页服务验收                                  |
+| 错误与会话失效           | 自有NinebotClientError→IPC；明确HTTP401与既有auth错误通知重新登录；临时错误允许分区降级               | **已完成7a5740a** sdk-app-client及sdk-read-error-integration；覆盖403/未知业务码不误判auth | 合成回归通过；不等于本轮真实401或服务故障验收                                                                      |
+| 缓存、刷新、取消         | IPC TTL、并发合并、手动绕缓存、失效清理及迟到结果保护；无需旧进程                                     | session-read-cache、sdk-read-diagnostics、sdk-vehicle-cache-isolation及存储取消测试        | 账号/区域持久元数据隔离与迟到结果保护离线通过；缓存命中不证明新网络读取或自然刷新                                  |
+| 跨平台运行、离线构建     | Node/TS SDK，无Python/Go子进程需求；同一应用合同可用于macOS/Windows                                   | SDK/Electron构建、browser类型检查、现有Windows静态/包脚本                                  | Windows原生安装/启动仍需Windows主机；browser类型检查不代表桌面已支持全部浏览器                                     |
+| 成品分发、启动与安全说明 | 默认仍保留legacy；新增独立SDK-only入口和无旧运行时的opt-in成品                                        | SDK-only实际ASAR/资源/签名/fuse验包及成品main/preload离线harness                           | Mac arm64成品真实Electron后台启动/renderer/preload/IPC已通过；视觉/真实账号、Windows与正式分发仍待验收；未默认切换 |
 
 主要依据：`src/main/index.ts`、`sdk-desktop-runtime.ts`、`sdk-app-client.ts`、`ipc.ts`、`vehicle-source.ts`、`telemetry-source.ts`、`travel-source.ts`、`packages/ninebot-client/src/auth-node.ts`、`candidate-session-core.ts`，以及 `AUTH_PHASE1.md`、`DESKTOP_ACCEPTANCE.md`。旧文档“最多20条”与旧“默认SDK”描述不作为当前实现依据。
 
@@ -55,7 +55,7 @@ SDK每次车辆刷新均按既有通配模型依次发现ebike与motor，避免�
 
 本轮新增28项测试：存储层5项、SDK隔离链路22项、SDK→IPC空车辆1项。覆盖空账号及新reader恢复、A→B→A、区域变化、同账号换token、全体reader拒绝旧归属缓存、新服务族、发现失败、元数据白名单、迟到发现/业务响应和提交前取消清理。全量 `pnpm run check` 82文件/733测试、格式/lint/Node和renderer类型通过；SDK browser类型与SDK/main/preload/renderer构建通过。所有数据和目录均为合成隔离测试，未读取真实账号/会话、未启动或重启PID21819；真实空车辆、切账号及当前窗口加载新代码仍未验收。
 
-## 本轮交付：opt-in SDK-only 成品链路（568eadf、1d59357）
+## 已交付：opt-in SDK-only 成品链路（568eadf、1d59357）
 
 先复现构建命令缺失及SDK诊断/界面错误描述：4项中3项失败、1项通过，记录为任务目录 `ninecli-replacement-20261021/sdk-package-red.log`。验包拒绝用例先于实现定义；初次运行因验包模块尚不存在而无法收集测试，不将其算作业务断言失败。新增测试覆盖模式拒绝、默认入口、SDK固定入口、资源隔离、污染包拒绝、无legacy准备步骤和Windows无shell命令构造。
 
@@ -69,11 +69,23 @@ SDK诊断不再将外部二进制标为平台不支持，三个业务域固定�
 
 证据保留于任务目录：`default-build-green.log`、`sdk-package-green.log`（构建、原生验包与harness）、`sdk-harness-green.log`（加强依赖路径保护后的重验）、`sdk-windows-plan.json`。首次构建日志 `sdk-package-build.log` 保留最初harness失败，不能当最终通过记录。没有将成品安装到Applications、启动真实窗口、使用真实账号或改动PID21819；没有默认切换、删除旧依赖、推送或发布。
 
+## 本轮交付：真实Electron隔离离线启动
+
+系统会话接口 `CGSessionCopyCurrentDictionary` 未返回可用状态，不能据此证明已解锁；本轮没有重试此前受保护的AX操作，也没有通过截图、DOM提取或CDP绕过界面保护。改用本次新建临时进程内部的固定事件/布尔报告，不读取屏幕内容。它补齐真实Electron/Chromium执行证据，仍不替代视觉验收。
+
+SDK-only入口增加明确 `NINEBOT_SDK_OFFLINE_SMOKE_ROOT` 的后台验收模式：要求指定前缀的新根目录、精确位于其下的user-data/config、固定marker、空配置和mock-keychain开关。缺省只返回禁用标记，不执行验收读取或修改普通启动。启用时在创建SDK和窗口前拒绝Node fetch及Chromium HTTP/WebSocket请求；preload收到renderer挂载事件后，仅通过现有runtime/auth只读IPC回传SDK身份、桥接往返、未登录和挂载四个布尔值。主进程只接收本地顶层页面的报告，记录窗口创建、加载错误和自身Electron进程类型，不记录文本、URL、账号或凭据。
+
+`node scripts/qa-sdk-native-smoke.ts --evidence=/绝对路径/报告.json` 先验包，再生成全新临时目录，以真实Mac成品启动；使用mock-keychain和本地拒绝代理，不开放调试端口。当前一次实机运行PID63285：窗口创建、本地页面加载、React挂载、preload/IPC往返、SDK身份和未登录状态全部为true；Node网络尝试、Chromium请求、加载/preload失败均为0，没有renderer崩溃。Electron报告Browser/GPU/Tab/Utility；仅查询该PID的3个直接子进程，未见ninecli。随后只退出本次进程，退出码0，并清理本次临时目录。
+
+证据：任务目录 `ninecli-replacement-20261021/sdk-native-smoke-result.json` 为真实Electron的非秘密布尔结果；`sdk-native-build.log` 是这版隔离成品的构建、ASAR/资源/签名/fuse校验及Node VM harness通过记录。两类结果分开：真实Electron运行不使用mock Electron；先前harness则替换Electron边界。此次原生进程使用空配置、没有认证或业务请求；不能据此把真实登录/恢复/自然刷新/地图网络验收标为通过。
+
+新增5项隔离目录与报告字段回归；首次测试在模块尚未实现时未收集，不宣称5项业务断言失败。最终全量87文件/758测试、格式/lint/Node和renderer类型及SDK browser类型通过；SDK-only Mac成品构建和原生验包通过。PID21819、真实账号/旧会话和Keychain没有作为测试输入；未安装到Applications、替换用户现用版本、切默认或发布。Windows不在本轮范围。
+
 ## 阻碍移除运行依赖的下一步顺序
 
 已完成项目所需SDK业务读取、分页、空车辆/账号隔离及SDK-only本地成品链路；默认legacy产品仍保留。剩余范围：
 
-1. **SDK-only真实成品验收**：在用户允许的隔离账号/目录验证实际Electron界面、恢复及地图；补空车辆/切账号、跨页月度、SMS、自然刷新/刷新后业务读取。不得篡改expiry、强制认证或把无刷新事件当失败。本轮harness不替代这些结果。
+1. **SDK-only真实业务与视觉验收**：真实Electron空会话的后台启动、renderer/preload/IPC现已通过；仍需在允许的账号/目录验证视觉界面、恢复及地图；补空车辆/切账号、跨页月度、SMS、自然刷新/刷新后业务读取。不得篡改expiry、强制认证或把无刷新事件当失败。离线harness和本轮无账号原生启动均不替代这些结果。
 2. **Windows与正式分发环境**：在Windows x64完成原生构建、安装/启动与SDK桥接验收；Mac正式签名、公证和安装/更新属于后续分发流程，当前仅本地ad-hoc目录成品。
 3. **默认迁移决定**：验收后另行批准默认入口/打包切换、旧依赖删除与发布；当前普通scripts、extraResources和旧验包/GUI QA仍服务legacy，不会被SDK-only opt-in修改或替代。
 

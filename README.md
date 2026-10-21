@@ -115,7 +115,7 @@ pnpm run package:sdk:mac:dir
 
 该模式固定使用内置SDK入口，不准备、下载、打入或调用ninecli；产物在 `build/generated/sdk-only/out`，成品在 `release/sdk-only`。现有普通构建仍保留legacy默认。打包使用已安装的Electron，缺少目标平台分发时停止；不会安装或发布成品。
 
-Mac命令会检查实际ASAR/外置资源、依赖、bundle、签名和fuse，并使用成品main/preload执行合成离线harness。harness替换Electron原生边界，不启动真实窗口，不代表GUI、地图、真实登录或Windows实机通过。Windows命令仅在Windows执行；当前本机只完成静态计划检查。详细证据与待验项目见 [替代清单](docs/NINECLI_REPLACEMENT.md)。
+Mac命令会检查实际ASAR/外置资源、依赖、bundle、签名和fuse，并使用成品main/preload执行合成离线harness。harness替换Electron原生边界，不启动真实窗口。另可显式运行 `node scripts/qa-sdk-native-smoke.ts --evidence=/绝对路径/报告.json`：用真实Mac成品、全新临时目录、mock keychain和网络阻断验证后台窗口/renderer/preload/IPC事件，然后退出本次进程。此模式不读取画面、DOM文本或真实会话，不代表视觉、地图、真实登录或Windows实机通过。Windows命令仅在Windows执行；当前本机只完成静态计划检查。详细证据与待验项目见 [替代清单](docs/NINECLI_REPLACEMENT.md)。
 
 ## 源码许可
 
