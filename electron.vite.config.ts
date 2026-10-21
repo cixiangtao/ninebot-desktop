@@ -1,14 +1,26 @@
+import { resolve } from "node:path";
+import { resolveBuildMode } from "./src/shared/build-mode.ts";
 import tailwindcss from "@tailwindcss/vite";
 import react from "@vitejs/plugin-react";
 import { defineConfig, externalizeDepsPlugin } from "electron-vite";
 
+const sdkOnly = resolveBuildMode(process.env.NINEBOT_BUILD_MODE) === "sdk-only";
+const outputRoot = sdkOnly ? "build/generated/sdk-only/out" : "out";
+
 export default defineConfig({
   main: {
     plugins: [externalizeDepsPlugin()],
+    build: {
+      outDir: `${outputRoot}/main`,
+      rollupOptions: {
+        input: { index: resolve(sdkOnly ? "src/main/index.sdk.ts" : "src/main/index.ts") },
+      },
+    },
   },
   preload: {
     plugins: [externalizeDepsPlugin()],
     build: {
+      outDir: `${outputRoot}/preload`,
       rollupOptions: {
         output: {
           entryFileNames: "index.cjs",
@@ -18,6 +30,7 @@ export default defineConfig({
     },
   },
   renderer: {
+    build: { outDir: `${outputRoot}/renderer` },
     plugins: [react(), tailwindcss()],
   },
 });

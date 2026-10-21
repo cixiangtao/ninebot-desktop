@@ -43,7 +43,10 @@
     "package:win:local": "pnpm run build && pnpm run prepare:ninecli-runtime -- --platform=win32 --arch=x64 && electron-builder --win nsis zip --x64 --publish never && node scripts/verify-package-windows.mjs --artifacts && node scripts/qa-packaged.mjs && node scripts/qa-windows-installer.mjs",
     "release:mac": "pnpm run check && pnpm run build && pnpm run prepare:ninecli-runtime -- --platform=darwin --arch=arm64 && node scripts/qa-recovery.mjs && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder --mac dmg zip --arm64 --publish never -c.forceCodeSigning=true && node scripts/verify-package.mjs --release && node scripts/qa-packaged.mjs",
     "dist": "pnpm run package:mac:local",
-    "build:auth-keychain": "node scripts/build-auth-keychain.mjs"
+    "build:auth-keychain": "node scripts/build-auth-keychain.mjs",
+    "build:desktop:sdk-only": "node scripts/build-sdk-only.ts",
+    "package:sdk:mac:dir": "node scripts/package-sdk-only.ts --platform=darwin",
+    "package:sdk:win:dir": "node scripts/package-sdk-only.ts --platform=win32"
   },
   "dependencies": {
     "@jiuhao/ninebot-client": "workspace:*",
