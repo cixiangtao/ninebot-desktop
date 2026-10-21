@@ -48,6 +48,23 @@ describe("bounded non-secret runtime diagnostics", () => {
     expect(collector.snapshot().signals["read.ride-month.completed"]?.count).toBe(100);
   });
 
+  it("persists only bounded profile failure fields", () => {
+    const collector = createRuntimeDiagnosticCollector(() => 123);
+    collector.record({
+      category: "profile-failure",
+      failure: {
+        kind: "http",
+        reason: "http-rejected",
+        httpStatus: 503,
+        businessCode: null,
+        response: "NEVER-LOG",
+        accessToken: "NEVER-LOG",
+      },
+    } as RuntimeDiagnosticEvent);
+    expect(collector.snapshot().signals["profile-failure.http.http-rejected"]?.count).toBe(1);
+    expect(JSON.stringify(collector.snapshot())).not.toContain("NEVER-LOG");
+  });
+
   it("does not create files when disabled, writes atomic private snapshots when enabled", async () => {
     const root = await mkdtemp(join(tmpdir(), "runtime-diagnostic-test-"));
     try {

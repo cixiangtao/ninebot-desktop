@@ -1,3 +1,4 @@
+import { classifyProfileFailure, type ProfileFailure } from "./sdk-profile-failure.js";
 import {
   PassportLoginBusinessError,
   NinebotAuthSessionUnavailableError,
@@ -103,6 +104,7 @@ export interface NinebotSdkAppClientOptions {
   telemetryReader: VehicleTelemetryReader;
   travelReader: TravelReader;
   diagnostics: () => Promise<RuntimeSecurityStatus>;
+  onProfileFailure?: (failure: ProfileFailure) => void;
 }
 
 /**
@@ -116,6 +118,7 @@ export const createNinebotSdkAppClient = ({
   telemetryReader,
   travelReader,
   diagnostics,
+  onProfileFailure,
 }: NinebotSdkAppClientOptions): NinebotAppClient => ({
   async login(user, areaCode, password) {
     try {
@@ -149,6 +152,11 @@ export const createNinebotSdkAppClient = ({
     try {
       return await auth.whoami();
     } catch (error) {
+      try {
+        onProfileFailure?.(classifyProfileFailure(error));
+      } catch {
+        /* Diagnostics never change the read result. */
+      }
       throw normalizeSdkAuthError(error);
     }
   },

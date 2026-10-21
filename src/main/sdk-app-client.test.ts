@@ -2,6 +2,7 @@ import {
   createMemoryNinebotAuthSessionStore,
   NinebotAuthSessionManager,
   PassportLoginBusinessError,
+  PassportLoginHttpError,
   NinebotPassportRedirectError,
   NinebotHttpError,
   NinebotTelemetryBusinessError,
@@ -32,6 +33,41 @@ describe("createNinebotSdkAppClient", () => {
     expect(error).toMatchObject({
       kind: "upstream",
       message: "九号认证接口发生重定向，已停止请求，请检查接口配置。",
+    });
+  });
+
+  it("classifies one profile failure without retry, even when the diagnostic sink throws", async () => {
+    const whoami = vi.fn(async () => {
+      throw new PassportLoginHttpError(503);
+    });
+    const auth = new NinebotAuthSessionManager({
+      store: createMemoryNinebotAuthSessionStore(session),
+      provider: {
+        loginWithPassword: async () => session,
+        requestSmsCode: async () => undefined,
+        loginWithSmsCode: async () => session,
+        whoami,
+      },
+    });
+    await auth.restore();
+    const observer = vi.fn((_failure: unknown) => {
+      throw new Error("synthetic-private");
+    });
+    const client = createNinebotSdkAppClient({
+      auth,
+      vehicleReader: { vehicles: async () => [] },
+      telemetryReader: { vehicleStatus: async () => ({}), battery: async () => ({}) },
+      travelReader: { rides: async () => ({}), rideDetail: async () => ({}) },
+      diagnostics: async () => ({}) as RuntimeSecurityStatus,
+      onProfileFailure: observer,
+    });
+    await expect(client.whoami()).rejects.toMatchObject({ kind: "upstream" });
+    expect(whoami).toHaveBeenCalledOnce();
+    expect(observer).toHaveBeenCalledOnce();
+    expect(observer.mock.calls[0]?.[0]).toMatchObject({
+      kind: "http",
+      reason: "http-rejected",
+      httpStatus: 503,
     });
   });
 

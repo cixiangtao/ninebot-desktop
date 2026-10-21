@@ -66,6 +66,8 @@ export const createSdkDesktopRuntime = async ({
     telemetryReader,
     travelReader,
     diagnostics: createSdkRuntimeDiagnostics({ configDirectory, auth }),
+    onProfileFailure: (failure) =>
+      emitRuntimeDiagnostic(onDiagnostic, { category: "profile-failure", failure }),
   });
   return Object.assign(client, { stopDiagnostics });
 };

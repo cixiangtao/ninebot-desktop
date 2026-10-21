@@ -1,3 +1,4 @@
+import { sanitizeProfileFailure, type ProfileFailure } from "./sdk-profile-failure.js";
 import { chmod, mkdir, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { NinebotAuthDiagnosticEvent } from "@jiuhao/ninebot-client";
@@ -11,6 +12,7 @@ export type CacheOutcome =
   | "upstream-failed"
   | "discarded";
 export type RuntimeDiagnosticEvent =
+  | { category: "profile-failure"; failure: ProfileFailure }
   | { category: "auth"; event: Readonly<NinebotAuthDiagnosticEvent> }
   | { category: "read"; operation: ReadOperation; outcome: "started" | "completed" | "failed" }
   | { category: "cache"; operation: ReadOperation; outcome: CacheOutcome };
@@ -30,6 +32,8 @@ export const emitRuntimeDiagnostic = (
 
 // Reconstruct an explicit allow-list; accidental extra fields cannot enter persisted snapshots.
 const safeEvent = (input: RuntimeDiagnosticEvent): RuntimeDiagnosticEvent => {
+  if (input.category === "profile-failure")
+    return { category: "profile-failure", failure: sanitizeProfileFailure(input.failure) };
   if (input.category === "auth") {
     const event = input.event;
     if (event.kind === "eligibility") {
@@ -71,6 +75,8 @@ const safeEvent = (input: RuntimeDiagnosticEvent): RuntimeDiagnosticEvent => {
 };
 
 const signalKey = (event: RuntimeDiagnosticEvent) => {
+  if (event.category === "profile-failure")
+    return `profile-failure.${event.failure.kind}.${event.failure.reason}`;
   if (event.category !== "auth") return `${event.category}.${event.operation}.${event.outcome}`;
   if (event.event.kind === "eligibility") return `auth.eligibility.${event.event.status}`;
   return `auth.${event.event.operation}.${event.event.outcome}${event.event.operation === "refresh" ? `.${event.event.trigger}` : ""}`;
