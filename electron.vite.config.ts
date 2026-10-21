@@ -18,6 +18,7 @@ export default defineConfig({
     },
   },
   preload: {
+    define: { SDK_ONLY_BUILD_FLAG: JSON.stringify(sdkOnly) },
     plugins: [externalizeDepsPlugin()],
     build: {
       outDir: `${outputRoot}/preload`,
@@ -30,6 +31,7 @@ export default defineConfig({
     },
   },
   renderer: {
+    define: { SDK_ONLY_BUILD_FLAG: JSON.stringify(sdkOnly) },
     build: { outDir: `${outputRoot}/renderer` },
     plugins: [react(), tailwindcss()],
   },

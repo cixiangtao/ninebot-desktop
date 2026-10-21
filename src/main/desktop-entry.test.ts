@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({ start: vi.fn(), sdk: vi.fn(), legacy: vi.fn() }));
+vi.mock("./sdk-native-smoke.js", () => ({ configureSdkNativeSmoke: vi.fn() }));
 vi.mock("./desktop-main.js", () => ({ startDesktopApp: mocks.start }));
 vi.mock("./runtime-sdk.js", () => ({ registerSdkRuntime: mocks.sdk }));
 vi.mock("./runtime-legacy.js", () => ({ registerLegacyRuntime: mocks.legacy }));

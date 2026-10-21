@@ -227,6 +227,7 @@ try {
   assert.equal(permission, false);
   const preload = await readFile(join(unpacked, "out/preload/index.cjs"), "utf8");
   vm.runInNewContext(preload, {
+    addEventListener() {},
     require: (name) => {
       assert.equal(name, "electron");
       return {
