@@ -2,6 +2,28 @@
 
 本轮真实首次登录已确认能显示车辆、月度行程与选中行程详情。修复在线底图后，独立产品进程的后台记录确认 SDK 会话恢复、真实 profile 和地图资源请求成功；**当前真实窗口的视觉复核、重启后的月度行程/详情完成信号、自然自动刷新仍有证据缺口**。不要把公开坐标回归或后台 HTTP 成功写成这些项目全部通过。
 
+## 本轮开发增量：刷新与业务读取诊断
+
+新增第一方 SDK 观察接口 `observeDiagnostics` 和纯读取 `getRefreshEligibility`；不读取日志以外的凭据文件来查询到期。资格状态为 `unavailable`、`expiry-unknown`、`fresh`、`due`，另有刷新能力布尔值和已验证内存期限推导的 `nextEligibleAtMs`（期限未知时为 null）。恢复、正常请求、登录、刷新、退出后自然生成状态；记录中没有会话、请求、profile 或错误正文。刷新区分 `expiry` 与 `explicit`，并发等待记为 `joined`，不重复算上游刷新。
+
+SDK 桌面显式设置 `NINEBOT_RUNTIME_DIAGNOSTICS=1` 后，在当前 SDK 配置目录写 `runtime-diagnostics.json`。独立验收启动器自动启用该选项；生产默认认证入口仍为 legacy。新入口移除了原型方法补丁，改用 SDK 本身的观察接口。文件仅含固定状态、计数、顺序和非秘密期限边界，原子替换，权限 0600；最多保留 64 个事件，累计信号与最新资格单独保留。按 `processId`、`collectorStartedAtMs` 区分实例，不能跨重启直接比较序号。诊断失败不会改变业务结果；写盘延迟合并约 150ms，结束时的 flush 属于尽力写入，缺日志不能直接判为认证失败。
+
+| 信号                                                       | 可以证明什么                             | 不能扩大为什么                       |
+| ---------------------------------------------------------- | ---------------------------------------- | ------------------------------------ |
+| `read.ride-month.completed` / `read.ride-detail.completed` | IPC 读取返回成功                         | 可能来自缓存，不保证新上游请求       |
+| `cache.ride-month.hit` / `cache.ride-detail.hit`           | 已完成缓存命中                           | 不触发 SDK，因此不证明会话已刷新     |
+| `cache.*.joined`                                           | 等待同一进行中的读取                     | 不重复计为新上游请求                 |
+| `cache.*.upstream-completed`                               | 本次 loader 及解析成功，结果未被清理丢弃 | 没有保存业务内容；还需与刷新顺序对照 |
+| `cache.*.upstream-failed` / `read.*.failed`                | 上游/IPC 读取失败                        | 不保存原始错误，不自动认定要重新登录 |
+| `cache.*.discarded`                                        | 在会话清理后结束的旧加载被丢弃           | 不算当前有效上游完成                 |
+| `auth.refresh.completed.expiry`                            | 正常请求触发的自动刷新及会话保存完成     | 不单独证明后续业务继续使用成功       |
+
+刷新后继续使用的通过信号：同一实例先有 `auth.refresh.completed.expiry`，再有更大的 `cache.ride-month.upstream-completed` 或 `cache.ride-detail.upstream-completed` 序号，或后续正常 profile 成功；单独的 cache hit/IPC 完成不能代替。资格时间只是最早 eligible 边界，不是自动发请求的预约；期限未知时不提供预计时间。
+
+本轮自动回归使用合成会话及注入时钟：恢复→业务读取→到达自然资格边界但命中缓存而不刷新→月度缓存自然过期触发刷新→新令牌继续月度读取→详情缓存不误报→正常业务缓存绕过后详情上游成功。另覆盖并发、失败不替换会话、迟到结果丢弃、诊断监听器失败隔离、隐私字段不落盘、禁用模式和受限文件权限。全量 78 文件 / 611 测试通过，SDK browser 类型检查与 SDK/桌面构建通过；增强的独立 Electron 合成验收另保存 `desktop-auth-diagnostics.json`。
+
+**生效边界：本轮没有为埋点重启真实 PID11100。该进程仍使用先前加载的实现和原 `acceptance-state.json` 诊断；新增 runtime 日志留待后续正常启动生效。本轮日志和回归不补写为真实自然刷新通过。**
+
 ## 在线底图根因和修复
 
 上次独立验收启动器对 renderer 的所有 HTTP(S) 请求执行 `cancel: true`，同时取消了产品原有 OpenFreeMap 样式。十秒后地图组件进入本地轨迹/位置占位退化状态。Node SDK 的资料、车辆和行程请求不经过这条 Electron renderer 规则，不能据此认定行程接口失败。
@@ -54,4 +76,4 @@
 
 锁屏报错明确为检测到 physical input 后自动解锁暂停。connected/attached/任务授权不是已解除暂停的证据；本轮未再次读取该界面，未用调试端口、脚本或替代屏幕工具绕过。
 
-用户要求主动跟进。本轮尝试创建每小时一次、共三次的限定跟进（只核对脱敏地图/认证计数和已知实例存活状态），但工具返回 `Automations are only supported for local threads.`，**没有创建成功的定时任务**。需要在支持 Automations 的本机项目任务中安排该限定跟进；不以常驻 shell 或另一种任务类型绕过限制。出现新地图失败、profile/refresh 失败、自然刷新完成，或三次后仍缺证据时报告明确结果；不要承诺持续监控未知范围。
+此前自动跟进工具返回 `Automations are only supported for local threads.`，没有创建成功。后续由主对话继续拥有进行中的项目跟进，按正常 SDK 调用结束、资格边界后的实际请求、用户正常解除界面暂停等有意义事件复核；不采用任意三次截止，不用常驻脚本替代。当前进程没有 refresh 事件仍为未验收，不是失败；仅等待不保证触发认证刷新。

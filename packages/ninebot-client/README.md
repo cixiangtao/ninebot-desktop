@@ -34,7 +34,7 @@ requests now call the observed Passport send-code/consume-code endpoints with
 SHA-256 signing; SMS login uses the same Business bootstrap. A server challenge
 is surfaced as a bounded error without claiming that SMS was sent. Embedded
 human-challenge interaction is not implemented. See the [phase-one acceptance
-checklist](../../docs/AUTH_PHASE1.md); fresh-account online acceptance is pending.
+checklist](../../docs/AUTH_PHASE1.md) for the separate real and synthetic acceptance status.
 
 The lifecycle layer can be imported without pulling in Node-only crypto:
 
@@ -47,6 +47,21 @@ The Passport client exposes the reconstructed password-login, refresh, and
 which reconstructs the sorted raw query canonical string and SHA-256 signature
 observed in ninecli 0.1.7. `whoami` sends the raw access token in Authorization,
 without a `Bearer` prefix. Hosts may inject a signer for protocol tests.
+
+## Passive authentication diagnostics
+
+`auth.getRefreshEligibility()` returns only `status` (`unavailable`,
+`expiry-unknown`, `fresh`, `due`), `refreshSupported`, and `nextEligibleAtMs`
+(null when expiry is unknown). It reads in-memory metadata, never loads files,
+returns credentials, or contacts a service. Eligibility is not a scheduled refresh:
+a normal request must reach `ensureSession`, and business cache hits can avoid it.
+
+`auth.observeDiagnostics(listener)` returns an unsubscribe function. Its fixed
+operation/state events distinguish automatic expiry refresh, explicit refresh,
+shared in-flight refreshes, completion, and failure. Events omit tokens, accounts,
+profiles, request arguments and error text. Synchronous and asynchronous listener
+failures are contained. Desktop opt-in logging and evidence interpretation are
+covered in the [desktop acceptance guide](../../docs/DESKTOP_ACCEPTANCE.md).
 
 ## Node authentication
 
@@ -97,9 +112,10 @@ retained. Concurrent refreshes are shared; superseded login/refresh results
 cannot replace a newer account or restore credentials after logout.
 
 This implementation has passed local HTTP integration tests using synthetic
-credentials, encrypted responses, and gzip. New-account login and refresh still
-need acceptance against the real Ninebot service. The desktop production entry
-continues to use ninecli for authentication.
+credentials, encrypted responses, and gzip. The user has reported real CLI password
+lifecycle acceptance, and isolated SDK desktop login/restore/profile have passed;
+real desktop natural refresh remains unverified. The desktop production entry
+continues to default to ninecli; SDK authentication requires explicit opt-in.
 
 From this repository, `pnpm protocol:auth -- --service=ebike --month=202609`
 runs the real-service acceptance flow with terminal credential prompts and a
