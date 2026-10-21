@@ -139,6 +139,8 @@ export {
   NinebotAuthSessionUnavailableError,
 } from "./auth.ts";
 export type {
+  NinebotAuthDiagnosticEvent,
+  NinebotRefreshEligibility,
   NinebotAuthProvider,
   NinebotAuthSession,
   NinebotAuthSessionManagerOptions,

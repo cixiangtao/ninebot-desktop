@@ -50,6 +50,32 @@ export interface NinebotAuthProvider {
   logout?(session: NinebotAuthSession): Promise<void>;
 }
 
+/** Non-secret, passive view of the manager's current refresh decision. */
+export interface NinebotRefreshEligibility {
+  status: "unavailable" | "expiry-unknown" | "fresh" | "due";
+  refreshSupported: boolean;
+  /** Earliest eligible wall-clock time; null when no validated expiry is available. */
+  nextEligibleAtMs: number | null;
+}
+
+export type NinebotAuthDiagnosticEvent =
+  | {
+      kind: "operation";
+      operation: "restore" | "whoami";
+      outcome: "started" | "completed" | "failed";
+      sessionPresent?: boolean;
+    }
+  | {
+      kind: "operation";
+      operation: "refresh";
+      outcome: "started" | "completed" | "failed" | "joined";
+      trigger: "expiry" | "explicit";
+    }
+  | ({
+      kind: "eligibility";
+      source: "restore" | "ensure-session" | "refresh" | "login" | "logout";
+    } & NinebotRefreshEligibility);
+
 export interface NinebotAuthSessionManagerOptions {
   provider: NinebotAuthProvider;
   store: NinebotAuthSessionStore;
@@ -134,6 +160,48 @@ export class NinebotAuthSessionManager {
   private readonly refreshSkewMs: number;
   private generation = 0;
   private persistence: Promise<void> = Promise.resolve();
+  private readonly observers = new Set<(event: Readonly<NinebotAuthDiagnosticEvent>) => void>();
+
+  /** Observes fixed states only; listener failures cannot change authentication behavior. */
+  observeDiagnostics(observer: (event: Readonly<NinebotAuthDiagnosticEvent>) => void) {
+    this.observers.add(observer);
+    return () => {
+      this.observers.delete(observer);
+    };
+  }
+
+  private emit(event: NinebotAuthDiagnosticEvent) {
+    for (const observer of this.observers) {
+      try {
+        void Promise.resolve(observer(Object.freeze({ ...event }))).catch(() => undefined);
+      } catch {
+        /* Diagnostic sinks are non-authoritative. */
+      }
+    }
+  }
+
+  /** Does not load files, return credentials, refresh or contact any service. */
+  getRefreshEligibility(): NinebotRefreshEligibility {
+    const refreshSupported = this.options.provider.refresh !== undefined;
+    if (this.session === null)
+      return { status: "unavailable", refreshSupported, nextEligibleAtMs: null };
+    if (this.session.expiresAtMs === undefined)
+      return { status: "expiry-unknown", refreshSupported, nextEligibleAtMs: null };
+    const nextEligibleAtMs = this.session.expiresAtMs - this.refreshSkewMs;
+    return {
+      status: this.now() >= nextEligibleAtMs ? "due" : "fresh",
+      refreshSupported,
+      nextEligibleAtMs,
+    };
+  }
+
+  private reportEligibility(
+    source: Extract<NinebotAuthDiagnosticEvent, { kind: "eligibility" }>["source"],
+  ) {
+    const eligibility = this.getRefreshEligibility();
+    this.emit({ kind: "eligibility", source, ...eligibility });
+    return eligibility;
+  }
 
   constructor(private readonly options: NinebotAuthSessionManagerOptions) {
     this.now = options.now ?? Date.now;
@@ -145,12 +213,25 @@ export class NinebotAuthSessionManager {
 
   /** Loads a persisted session without contacting the upstream service. */
   async restore(): Promise<NinebotAuthSession | null> {
-    const generation = ++this.generation;
-    this.refreshPromise = null;
-    const stored = await this.persist(() => this.options.store.load());
-    this.assertCurrent(generation);
-    this.session = stored === null ? null : validateSession(stored);
-    return this.getSession();
+    this.emit({ kind: "operation", operation: "restore", outcome: "started" });
+    try {
+      const generation = ++this.generation;
+      this.refreshPromise = null;
+      const stored = await this.persist(() => this.options.store.load());
+      this.assertCurrent(generation);
+      this.session = stored === null ? null : validateSession(stored);
+      this.emit({
+        kind: "operation",
+        operation: "restore",
+        outcome: "completed",
+        sessionPresent: this.session !== null,
+      });
+      this.reportEligibility("restore");
+      return this.getSession();
+    } catch (error) {
+      this.emit({ kind: "operation", operation: "restore", outcome: "failed" });
+      throw error;
+    }
   }
 
   /** Returns a defensive copy of the current session, or null when signed out. */
@@ -172,6 +253,7 @@ export class NinebotAuthSessionManager {
     this.refreshPromise = null;
     const nextSession = validateSession(await this.options.provider.loginWithPassword(credentials));
     await this.replaceSession(nextSession, generation);
+    this.reportEligibility("login");
     return cloneSession(nextSession);
   }
 
@@ -184,6 +266,7 @@ export class NinebotAuthSessionManager {
     this.refreshPromise = null;
     const nextSession = validateSession(await this.options.provider.loginWithSmsCode(input));
     await this.replaceSession(nextSession, generation);
+    this.reportEligibility("login");
     return cloneSession(nextSession);
   }
 
@@ -192,17 +275,39 @@ export class NinebotAuthSessionManager {
    * An expired session without a refresh implementation fails closed.
    */
   async whoami<T = unknown>(): Promise<T> {
-    const session = await this.ensureSession();
-    return this.options.provider.whoami<T>(session);
+    this.emit({ kind: "operation", operation: "whoami", outcome: "started" });
+    try {
+      const session = await this.ensureSession();
+      const result = await this.options.provider.whoami<T>(session);
+      this.emit({ kind: "operation", operation: "whoami", outcome: "completed" });
+      return result;
+    } catch (error) {
+      this.emit({ kind: "operation", operation: "whoami", outcome: "failed" });
+      throw error;
+    }
   }
 
   /** Refreshes explicitly and persists the replacement session. */
   async refresh(): Promise<NinebotAuthSession> {
-    if (this.refreshPromise !== null) return cloneSession(await this.refreshPromise);
+    return this.refreshWithTrigger("explicit");
+  }
+
+  private async refreshWithTrigger(trigger: "expiry" | "explicit"): Promise<NinebotAuthSession> {
+    if (this.refreshPromise !== null) {
+      this.emit({ kind: "operation", operation: "refresh", outcome: "joined", trigger });
+      return cloneSession(await this.refreshPromise);
+    }
+    this.emit({ kind: "operation", operation: "refresh", outcome: "started", trigger });
     const operation = this.performRefresh(this.generation);
     this.refreshPromise = operation;
     try {
-      return cloneSession(await operation);
+      const result = cloneSession(await operation);
+      this.emit({ kind: "operation", operation: "refresh", outcome: "completed", trigger });
+      this.reportEligibility("refresh");
+      return result;
+    } catch (error) {
+      this.emit({ kind: "operation", operation: "refresh", outcome: "failed", trigger });
+      throw error;
     } finally {
       if (this.refreshPromise === operation) this.refreshPromise = null;
     }
@@ -214,6 +319,7 @@ export class NinebotAuthSessionManager {
     this.generation += 1;
     this.session = null;
     this.refreshPromise = null;
+    this.reportEligibility("logout");
     // Queue clearing after any save already in progress, before contacting upstream.
     await this.persist(() => this.options.store.clear());
     if (current !== null) await this.options.provider.logout?.(current);
@@ -271,13 +377,9 @@ export class NinebotAuthSessionManager {
   }
 
   private async ensureFreshSession() {
+    const eligibility = this.reportEligibility("ensure-session");
     const current = this.requireSession();
-    if (
-      current.expiresAtMs === undefined ||
-      current.expiresAtMs > this.now() + this.refreshSkewMs
-    ) {
-      return current;
-    }
-    return this.refresh();
+    if (eligibility.status !== "due") return current;
+    return this.refreshWithTrigger("expiry");
   }
 }
