@@ -150,20 +150,39 @@ export const readCandidateSession = async (
   return session;
 };
 
-/** Reads the cached vehicle metadata needed to resolve a candidate service. */
-export const readCandidateVehicles = async (configDirectory: string): Promise<unknown> =>
-  (await readCandidateVehiclesIfPresent(configDirectory)) ??
+/** SDK readers pass their fresh session; omitted identity is legacy-migration-only. */
+export const readCandidateVehicles = async (
+  configDirectory: string,
+  session?: NinebotCandidateSessionFields,
+): Promise<unknown> =>
+  (await readCandidateVehiclesIfPresent(configDirectory, session)) ??
   (() => {
     throw new Error("Ninebot candidate vehicle cache is unavailable");
   })();
 
-/** Reads the SDK vehicle cache without treating a first-run cache miss as a fatal error. */
+/** Reads metadata for the supplied account/region; missing ownership is a cache miss. */
 export const readCandidateVehiclesIfPresent = async (
   configDirectory: string,
-): Promise<unknown | null> =>
-  createFileNinebotVehicleCacheStore({ directory: configDirectory }).load();
+  session?: NinebotCandidateSessionFields,
+): Promise<unknown | null> => vehicleCacheStore(configDirectory, session).load();
 
 /** Stores only the SDK vehicle metadata needed to resolve service families and model codes. */
-export const writeCandidateVehicles = async (configDirectory: string, value: unknown) => {
-  await createFileNinebotVehicleCacheStore({ directory: configDirectory }).save(value);
+export const writeCandidateVehicles = async (
+  configDirectory: string,
+  value: unknown,
+  session?: NinebotCandidateSessionFields,
+  signal?: AbortSignal,
+) => {
+  await vehicleCacheStore(configDirectory, session).save(value, signal ? { signal } : {});
+};
+
+const vehicleCacheStore = (directory: string, session?: NinebotCandidateSessionFields) =>
+  createFileNinebotVehicleCacheStore({
+    directory,
+    ...(session ? { scope: { businessUid: session.uid, region: session.regionx } } : {}),
+  });
+
+/** Discards late results even when an injected or upstream transport ignores cancellation. */
+export const assertCandidateRequestActive = (signal: AbortSignal) => {
+  if (signal.aborted) throw new Error("Ninebot candidate request was cancelled");
 };

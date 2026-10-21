@@ -45,7 +45,7 @@ const httpFailure = (status: number) =>
     transport: { send: async () => ({ status, headers: {}, body: new Uint8Array() }) },
   });
 
-const setup = async () => {
+const setup = async (empty = false) => {
   const directory = await mkdtemp(join(tmpdir(), "sdk-read-errors-"));
   directories.push(directory);
   const session = { accessToken: "synthetic-access", businessUid: "synthetic-uid" };
@@ -76,7 +76,7 @@ const setup = async () => {
     candidateClientFactory: () => ({
       listVehicles: async ({ service }) => ({
         data:
-          service === "ebike"
+          !empty && service === "ebike"
             ? [
                 {
                   wnumber: "synthetic-sn",
@@ -135,11 +135,25 @@ const setup = async () => {
   });
   registerIpcHandlers(client);
   const vehicles = await invoke(ipcChannels.listVehicles);
-  expect(vehicles).toMatchObject({ ok: true, data: [{ id: "vehicle-1" }] });
+  expect(vehicles).toMatchObject({ ok: true, data: empty ? [] : [{ id: "vehicle-1" }] });
   return { state, store, session, calls };
 };
 
 describe("real SDK readers → desktop client → IPC (synthetic only)", () => {
+  it("reports connected with an empty vehicle list instead of a read error", async () => {
+    const { calls } = await setup(true);
+    expect(await invoke(ipcChannels.authStatus)).toMatchObject({
+      ok: true,
+      data: { connected: true },
+    });
+    expect(await invoke(ipcChannels.listVehicles)).toEqual({ ok: true, data: [] });
+    expect(await invoke(ipcChannels.getVehicleSnapshot, { vehicleId: "vehicle-1" })).toMatchObject({
+      ok: false,
+      error: { code: "INVALID_INPUT" },
+    });
+    expect(calls.status).not.toHaveBeenCalled();
+    expect(calls.battery).not.toHaveBeenCalled();
+  });
   it.each(["status", "battery"] as const)(
     "keeps the other telemetry partition after %s HTTP503",
     async (domain) => {

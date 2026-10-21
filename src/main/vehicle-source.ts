@@ -1,6 +1,7 @@
 import type { NinebotAuthSession } from "@jiuhao/ninebot-client";
 import type { NinebotCandidateSessionFields } from "@jiuhao/ninebot-client/candidate-session";
 import {
+  assertCandidateRequestActive,
   createCandidateRequestTracker,
   readCandidateSession,
   readCandidateService,
@@ -86,10 +87,12 @@ export const createCandidateVehicleReader = ({
             : sessionProvider().then((authenticatedSession) =>
                 readCandidateSession(configDirectory, authenticatedSession),
               );
-        const [session, cachedVehiclesValue] = await Promise.all([
-          sessionPromise,
-          readCandidateVehiclesIfPresent(configDirectory),
-        ]);
+        const session = await sessionPromise;
+        // SDK discovery always refreshes both service families. Ownerless metadata
+        // is only used by the explicit legacy migration path.
+        const cachedVehiclesValue = sessionProvider
+          ? null
+          : await readCandidateVehiclesIfPresent(configDirectory);
         if (cachedVehiclesValue !== null && !isRecord(cachedVehiclesValue)) {
           throw new Error("Ninebot candidate vehicle cache is invalid");
         }
@@ -144,10 +147,11 @@ export const createCandidateVehicleReader = ({
                 vehicleType,
                 signal: request.signal,
               });
-              if (!Array.isArray(result.data)) {
+              assertCandidateRequestActive(request.signal);
+              if (!Array.isArray(result.data) || !result.data.every(isRecord)) {
                 throw new Error("Ninebot candidate vehicle discovery data is invalid");
               }
-              rows.push(...result.data.filter((item): item is VehicleRow => isRecord(item)));
+              rows.push(...result.data);
             }
           }
           const grouped = new Map<
@@ -156,11 +160,15 @@ export const createCandidateVehicleReader = ({
           >();
           for (const row of rows) {
             const service = readCandidateService(row);
-            if (!service) continue;
+            if (!service) {
+              if (rowsFromDiscovery)
+                throw new Error("Ninebot candidate vehicle service is invalid");
+              continue;
+            }
             const vehicleType = requireText(row.vehicle_type, "candidate vehicle_type");
             grouped.set(`${service}\0${vehicleType}`, { service, vehicleType });
           }
-          if (grouped.size === 0)
+          if (grouped.size === 0 && !rowsFromDiscovery)
             throw new Error("Ninebot candidate vehicle services are unavailable");
 
           const candidateRows: unknown[] = [];
@@ -191,12 +199,37 @@ export const createCandidateVehicleReader = ({
               vehicleType,
               signal: request.signal,
             });
+            assertCandidateRequestActive(request.signal);
             if (!Array.isArray(result.data))
               throw new Error("Ninebot candidate vehicle data is invalid");
             appendRows(result.data);
           }
-          const cachedValue = { vehicles: candidateRows };
-          await writeCandidateVehicles(configDirectory, cachedValue);
+          // SDK persistence needs only routing fields, not display data, telemetry
+          // or arbitrary fields returned by upstream. Preserve full rows for the UI.
+          const cachedValue = {
+            vehicles: sessionProvider
+              ? candidateRows.map((row) => {
+                  if (!isRecord(row)) throw new Error("Ninebot candidate vehicle data is invalid");
+                  const serialNumber =
+                    (typeof row.wnumber === "string" ? row.wnumber.trim() : "") ||
+                    (typeof row.sn === "string" ? row.sn.trim() : "");
+                  if (!serialNumber) throw new Error("Ninebot candidate vehicle id is invalid");
+                  return {
+                    wnumber: serialNumber,
+                    business_line: readCandidateService(row),
+                    vehicle_type: row.vehicle_type,
+                  };
+                })
+              : candidateRows,
+          };
+          assertCandidateRequestActive(request.signal);
+          await writeCandidateVehicles(
+            configDirectory,
+            cachedValue,
+            sessionProvider ? session : undefined,
+            request.signal,
+          );
+          assertCandidateRequestActive(request.signal);
           return candidateRows;
         } finally {
           candidateClient?.clear?.();

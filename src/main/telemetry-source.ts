@@ -1,6 +1,7 @@
 import type { NinebotAuthSession } from "@jiuhao/ninebot-client";
 import type { NinebotCandidateSessionFields } from "@jiuhao/ninebot-client/candidate-session";
 import {
+  assertCandidateRequestActive,
   createCandidateRequestTracker,
   readCandidateSession,
   readCandidateService,
@@ -53,10 +54,11 @@ const readContext = async (
       : sessionProvider().then((authenticatedSession) =>
           readCandidateSession(configDirectory, authenticatedSession),
         );
-  const [session, vehiclesValue] = await Promise.all([
-    sessionPromise,
-    readCandidateVehicles(configDirectory),
-  ]);
+  const session = await sessionPromise;
+  const vehiclesValue = await readCandidateVehicles(
+    configDirectory,
+    sessionProvider ? session : undefined,
+  );
   if (!isRecord(vehiclesValue)) {
     throw new Error("Ninebot candidate session files are invalid");
   }
@@ -106,11 +108,13 @@ export const createCandidateTelemetryReader = ({
         }
         try {
           candidateClient = candidateClientFactory(context.session);
-          return await candidateClient.status({
+          const result = await candidateClient.status({
             service: context.service,
             serialNumber,
             signal: request.signal,
           });
+          assertCandidateRequestActive(request.signal);
+          return result;
         } finally {
           candidateClient?.clear?.();
         }
@@ -132,11 +136,13 @@ export const createCandidateTelemetryReader = ({
         }
         try {
           candidateClient = candidateClientFactory(context.session);
-          return await candidateClient.battery({
+          const result = await candidateClient.battery({
             service: context.service,
             serialNumber,
             signal: request.signal,
           });
+          assertCandidateRequestActive(request.signal);
+          return result;
         } finally {
           candidateClient?.clear?.();
         }

@@ -1,6 +1,7 @@
 import type { NinebotAuthSession } from "@jiuhao/ninebot-client";
 import type { NinebotCandidateSessionFields } from "@jiuhao/ninebot-client/candidate-session";
 import {
+  assertCandidateRequestActive,
   createCandidateRequestTracker,
   readCandidateSession,
   readCandidateService,
@@ -81,10 +82,11 @@ const readContext = async (
       : sessionProvider().then((authenticatedSession) =>
           readCandidateSession(configDirectory, authenticatedSession),
         );
-  const [session, vehiclesValue] = await Promise.all([
-    sessionPromise,
-    readCandidateVehiclesIfPresent(configDirectory),
-  ]);
+  const session = await sessionPromise;
+  const vehiclesValue = await readCandidateVehiclesIfPresent(
+    configDirectory,
+    sessionProvider ? session : undefined,
+  );
   if (vehiclesValue !== null && !isRecord(vehiclesValue)) {
     throw new Error("Ninebot candidate travel session files are invalid");
   }
@@ -170,6 +172,7 @@ export const createCandidateTravelReader = ({
             month,
             signal: request.signal,
           });
+          assertCandidateRequestActive(request.signal);
           if (isRecord(result)) {
             console.warn("ninebot candidate travel response", {
               month,
@@ -205,13 +208,15 @@ export const createCandidateTravelReader = ({
         }
         try {
           candidateClient = candidateClientFactory(context.session);
-          return await candidateClient.detail({
+          const result = await candidateClient.detail({
             service: context.service,
             serialNumber,
             vehicleType: context.vehicleType,
             travelId,
             signal: request.signal,
           });
+          assertCandidateRequestActive(request.signal);
+          return result;
         } finally {
           candidateClient?.clear?.();
         }
