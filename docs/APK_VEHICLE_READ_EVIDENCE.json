@@ -1,0 +1,592 @@
+{
+  "evidenceType": "ordinary static DEX structure and instruction analysis; not REA evidence or online validation",
+  "sourceSHA256": "db87f85c916921a5edd71d63d8c5f7c7059fde0be291b0959f41028fe0218bcc",
+  "newRegionValidation": [
+    {
+      "base": 221748,
+      "strings": 65355,
+      "matchingStringIds": 64359,
+      "reconstructedPrefixExactly0to995": true,
+      "classDataDefinitions": 6997,
+      "uniqueClassDataOffsets": 6997,
+      "mapClassDataCount": 6997,
+      "codeItems": 51601,
+      "uniqueCodeOffsets": 51601,
+      "mapCodeCount": 51604,
+      "invalidCodeBounds": 0,
+      "invalidTypeDescriptors": 0,
+      "trailingAlignmentBytes": 1,
+      "trailingAlignmentZero": true
+    },
+    {
+      "base": 31502464,
+      "strings": 62125,
+      "matchingStringIds": 61129,
+      "reconstructedPrefixExactly0to995": true,
+      "classDataDefinitions": 6082,
+      "uniqueClassDataOffsets": 6082,
+      "mapClassDataCount": 6082,
+      "codeItems": 36772,
+      "uniqueCodeOffsets": 36772,
+      "mapCodeCount": 36774,
+      "invalidCodeBounds": 0,
+      "invalidTypeDescriptors": 0,
+      "trailingAlignmentBytes": 3,
+      "trailingAlignmentZero": true
+    },
+    {
+      "base": 58815624,
+      "strings": 33805,
+      "matchingStringIds": 32809,
+      "reconstructedPrefixExactly0to995": true,
+      "classDataDefinitions": 2629,
+      "uniqueClassDataOffsets": 2629,
+      "mapClassDataCount": 2629,
+      "codeItems": 15654,
+      "uniqueCodeOffsets": 15654,
+      "mapCodeCount": 15657,
+      "invalidCodeBounds": 0,
+      "invalidTypeDescriptors": 0,
+      "trailingAlignmentBytes": 0,
+      "trailingAlignmentZero": true
+    },
+    {
+      "base": 73886464,
+      "strings": 42212,
+      "matchingStringIds": 41216,
+      "reconstructedPrefixExactly0to995": true,
+      "classDataDefinitions": 3175,
+      "uniqueClassDataOffsets": 3175,
+      "mapClassDataCount": 3175,
+      "codeItems": 19987,
+      "uniqueCodeOffsets": 19987,
+      "mapCodeCount": 19997,
+      "invalidCodeBounds": 0,
+      "invalidTypeDescriptors": 0,
+      "trailingAlignmentBytes": 0,
+      "trailingAlignmentZero": true
+    }
+  ],
+  "candidateAnnotations": [
+    {
+      "kind": "method",
+      "method": {
+        "id": 25822,
+        "class": "Lcn/ninebot/device/motor/network/MotorApiService;",
+        "name": "checkFirmwareUpdate",
+        "args": ["Ljava/lang/String;", "I", "Ljava/lang/String;", "Ljava/lang/Integer;"],
+        "return": "Lio/reactivex/Observable;",
+        "access": 1025,
+        "code": 0
+      },
+      "directoryRecordAbsolute": 51183476,
+      "annotations": [
+        {
+          "absoluteOffset": 50244930,
+          "type": "Ldalvik/annotation/Signature;",
+          "values": {
+            "value": [
+              "(",
+              "Ljava/lang/String;",
+              "I",
+              "Ljava/lang/String;",
+              "Ljava/lang/Integer;",
+              ")",
+              "Lio/reactivex/Observable<",
+              "Lcn/ninebot/lib/network/core/CommonServerResponse<",
+              "Ljava/util/List<",
+              "Lcn/ninebot/device/fwupdate/FirmwareBundle$Firmware;",
+              ">;>;>;"
+            ]
+          }
+        },
+        {
+          "absoluteOffset": 50068994,
+          "type": "Lretrofit2/http/FormUrlEncoded;",
+          "values": {}
+        },
+        {
+          "absoluteOffset": 50244972,
+          "type": "Lretrofit2/http/POST;",
+          "values": {
+            "value": "iot_ota/ota/get-new-firmware"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "method",
+      "method": {
+        "id": 25823,
+        "class": "Lcn/ninebot/device/motor/network/MotorApiService;",
+        "name": "checkPartBindState",
+        "args": ["Ljava/lang/String;", "Ljava/lang/String;", "Ljava/lang/String;"],
+        "return": "Lio/reactivex/Observable;",
+        "access": 1025,
+        "code": 0
+      },
+      "directoryRecordAbsolute": 51183484,
+      "annotations": [
+        {
+          "absoluteOffset": 50245012,
+          "type": "Ldalvik/annotation/Signature;",
+          "values": {
+            "value": [
+              "(",
+              "Ljava/lang/String;",
+              "Ljava/lang/String;",
+              "Ljava/lang/String;",
+              ")",
+              "Lio/reactivex/Observable<",
+              "Lcn/ninebot/lib/network/core/CommonServerResponse<",
+              "Ljava/lang/Boolean;",
+              ">;>;"
+            ]
+          }
+        },
+        {
+          "absoluteOffset": 50068994,
+          "type": "Lretrofit2/http/FormUrlEncoded;",
+          "values": {}
+        },
+        {
+          "absoluteOffset": 50245048,
+          "type": "Lretrofit2/http/POST;",
+          "values": {
+            "value": "/parts/index/check-bind"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "method",
+      "method": {
+        "id": 25842,
+        "class": "Lcn/ninebot/device/motor/network/MotorApiService;",
+        "name": "getPartInfoByPN",
+        "args": ["Ljava/lang/String;", "I", "Ljava/lang/String;"],
+        "return": "Lio/reactivex/Observable;",
+        "access": 1025,
+        "code": 0
+      },
+      "directoryRecordAbsolute": 51183628,
+      "annotations": [
+        {
+          "absoluteOffset": 50245945,
+          "type": "Ldalvik/annotation/Signature;",
+          "values": {
+            "value": [
+              "(",
+              "Ljava/lang/String;",
+              "I",
+              "Ljava/lang/String;",
+              ")",
+              "Lio/reactivex/Observable<",
+              "Lcn/ninebot/lib/network/core/CommonServerResponse<",
+              "Lcn/ninebot/device/motor/thirdparts/ThirdPartsBean;",
+              ">;>;"
+            ]
+          }
+        },
+        {
+          "absoluteOffset": 50068994,
+          "type": "Lretrofit2/http/FormUrlEncoded;",
+          "values": {}
+        },
+        {
+          "absoluteOffset": 50245981,
+          "type": "Lretrofit2/http/POST;",
+          "values": {
+            "value": "/parts/index/get-info-by-pn"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "parameters",
+      "method": {
+        "id": 25822,
+        "class": "Lcn/ninebot/device/motor/network/MotorApiService;",
+        "name": "checkFirmwareUpdate",
+        "args": ["Ljava/lang/String;", "I", "Ljava/lang/String;", "Ljava/lang/Integer;"],
+        "return": "Lio/reactivex/Observable;",
+        "access": 1025,
+        "code": 0
+      },
+      "directoryRecordAbsolute": 51183748,
+      "annotations": [
+        [
+          {
+            "absoluteOffset": 50244781,
+            "type": "Lretrofit2/http/Field;",
+            "values": {
+              "value": "wnumber"
+            }
+          }
+        ],
+        [
+          {
+            "absoluteOffset": 50244982,
+            "type": "Lretrofit2/http/Field;",
+            "values": {
+              "value": "env_type"
+            }
+          }
+        ],
+        [
+          {
+            "absoluteOffset": 50244992,
+            "type": "Lretrofit2/http/Field;",
+            "values": {
+              "value": "parts[]"
+            }
+          }
+        ],
+        [
+          {
+            "absoluteOffset": 50245002,
+            "type": "Lretrofit2/http/Field;",
+            "values": {
+              "value": "download"
+            }
+          }
+        ]
+      ]
+    },
+    {
+      "kind": "parameters",
+      "method": {
+        "id": 25823,
+        "class": "Lcn/ninebot/device/motor/network/MotorApiService;",
+        "name": "checkPartBindState",
+        "args": ["Ljava/lang/String;", "Ljava/lang/String;", "Ljava/lang/String;"],
+        "return": "Lio/reactivex/Observable;",
+        "access": 1025,
+        "code": 0
+      },
+      "directoryRecordAbsolute": 51183756,
+      "annotations": [
+        [
+          {
+            "absoluteOffset": 50244781,
+            "type": "Lretrofit2/http/Field;",
+            "values": {
+              "value": "wnumber"
+            }
+          }
+        ],
+        [
+          {
+            "absoluteOffset": 50245058,
+            "type": "Lretrofit2/http/Field;",
+            "values": {
+              "value": "pn"
+            }
+          }
+        ],
+        [
+          {
+            "absoluteOffset": 50245068,
+            "type": "Lretrofit2/http/Field;",
+            "values": {
+              "value": "partType"
+            }
+          }
+        ]
+      ]
+    },
+    {
+      "kind": "parameters",
+      "method": {
+        "id": 25842,
+        "class": "Lcn/ninebot/device/motor/network/MotorApiService;",
+        "name": "getPartInfoByPN",
+        "args": ["Ljava/lang/String;", "I", "Ljava/lang/String;"],
+        "return": "Lio/reactivex/Observable;",
+        "access": 1025,
+        "code": 0
+      },
+      "directoryRecordAbsolute": 51183900,
+      "annotations": [
+        [
+          {
+            "absoluteOffset": 50244781,
+            "type": "Lretrofit2/http/Field;",
+            "values": {
+              "value": "wnumber"
+            }
+          }
+        ],
+        [
+          {
+            "absoluteOffset": 50244910,
+            "type": "Lretrofit2/http/Field;",
+            "values": {
+              "value": "vehicle_type"
+            }
+          }
+        ],
+        [
+          {
+            "absoluteOffset": 50245058,
+            "type": "Lretrofit2/http/Field;",
+            "values": {
+              "value": "pn"
+            }
+          }
+        ]
+      ]
+    }
+  ],
+  "candidateMethods": [
+    {
+      "regionBase": 43170704,
+      "methodId": 25971,
+      "class": "Lcn/ninebot/device/motor/network/MotorApiSource;",
+      "name": "getPartInfoByPN",
+      "instructionAbsoluteOffset": 46212760,
+      "instructionUnits": 19
+    },
+    {
+      "regionBase": 43170704,
+      "methodId": 29315,
+      "class": "Lcn/ninebot/device/scan/ScanPartsQRCodeHWActivity$checkPartQrCode$1;",
+      "name": "invokeSuspend",
+      "instructionAbsoluteOffset": 46409064,
+      "instructionUnits": 158
+    },
+    {
+      "regionBase": 43170704,
+      "methodId": 29309,
+      "class": "Lcn/ninebot/device/scan/ScanPartsQRCodeHWActivity$checkPartQrCode$1$1;",
+      "name": "onSuccess",
+      "instructionAbsoluteOffset": 46408852,
+      "instructionUnits": 44
+    },
+    {
+      "regionBase": 43170704,
+      "methodId": 29338,
+      "class": "Lcn/ninebot/device/scan/ScanPartsQRCodeHWActivity;",
+      "name": "checkPartBindState",
+      "instructionAbsoluteOffset": 46411092,
+      "instructionUnits": 23
+    },
+    {
+      "regionBase": 43170704,
+      "methodId": 25942,
+      "class": "Lcn/ninebot/device/motor/network/MotorApiSource;",
+      "name": "checkPartBindState",
+      "instructionAbsoluteOffset": 46211104,
+      "instructionUnits": 24
+    },
+    {
+      "regionBase": 43170704,
+      "methodId": 25899,
+      "class": "Lcn/ninebot/device/motor/network/MotorApiSource$Companion$getInstance$2;",
+      "name": "invokeSuspend",
+      "instructionAbsoluteOffset": 46209204,
+      "instructionUnits": 115
+    },
+    {
+      "regionBase": 43170704,
+      "methodId": 25902,
+      "class": "Lcn/ninebot/device/motor/network/MotorApiSource$Companion;",
+      "name": "getInstance",
+      "instructionAbsoluteOffset": 46209520,
+      "instructionUnits": 31
+    },
+    {
+      "regionBase": 43170704,
+      "methodId": 25997,
+      "class": "Lcn/ninebot/device/motor/network/MotorHttpClient;",
+      "name": "<init>",
+      "instructionAbsoluteOffset": 46216884,
+      "instructionUnits": 29
+    },
+    {
+      "regionBase": 43170704,
+      "methodId": 25892,
+      "class": "Lcn/ninebot/device/motor/network/MotorApiSource$Companion$getInstance$2$1$serverRegion$1;",
+      "name": "getFormalUrl",
+      "instructionAbsoluteOffset": 46209008,
+      "instructionUnits": 7
+    },
+    {
+      "regionBase": 43170704,
+      "methodId": 25894,
+      "class": "Lcn/ninebot/device/motor/network/MotorApiSource$Companion$getInstance$2$1$serverRegion$1;",
+      "name": "getTestUrl",
+      "instructionAbsoluteOffset": 46209064,
+      "instructionUnits": 7
+    }
+  ],
+  "transportMethods": [
+    {
+      "regionBase": 31502464,
+      "methodId": 30950,
+      "class": "Lcn/ninebot/commonlibs/nbnet/CommonHttpClient;",
+      "name": "<init>",
+      "instructionAbsoluteOffset": 35326268,
+      "instructionUnits": 9
+    },
+    {
+      "regionBase": 31502464,
+      "methodId": 30957,
+      "class": "Lcn/ninebot/commonlibs/nbnet/CommonHttpClient;",
+      "name": "customizeOkHttpClient",
+      "instructionAbsoluteOffset": 35325280,
+      "instructionUnits": 377
+    },
+    {
+      "regionBase": 31502464,
+      "methodId": 30967,
+      "class": "Lcn/ninebot/commonlibs/nbnet/CommonHttpClient;",
+      "name": "getParametersProvider",
+      "instructionAbsoluteOffset": 35324644,
+      "instructionUnits": 9
+    },
+    {
+      "regionBase": 31502464,
+      "methodId": 30971,
+      "class": "Lcn/ninebot/commonlibs/nbnet/CommonHttpClient;",
+      "name": "needEncrypt",
+      "instructionAbsoluteOffset": 35324624,
+      "instructionUnits": 2
+    },
+    {
+      "regionBase": 31502464,
+      "methodId": 31650,
+      "class": "Lcn/ninebot/commonlibs/nbnet/YiDunSecurityPolicy;",
+      "name": "encryptor",
+      "instructionAbsoluteOffset": 35367284,
+      "instructionUnits": 5
+    },
+    {
+      "regionBase": 31502464,
+      "methodId": 31654,
+      "class": "Lcn/ninebot/commonlibs/nbnet/YiDunSecurityPolicy;",
+      "name": "isNewEncrypt",
+      "instructionAbsoluteOffset": 35366924,
+      "instructionUnits": 18
+    },
+    {
+      "regionBase": 31502464,
+      "methodId": 31658,
+      "class": "Lcn/ninebot/commonlibs/nbnet/YiDunSecurityPolicy;",
+      "name": "rawEncryptor",
+      "instructionAbsoluteOffset": 35367312,
+      "instructionUnits": 21
+    },
+    {
+      "regionBase": 31502464,
+      "methodId": 31659,
+      "class": "Lcn/ninebot/commonlibs/nbnet/YiDunSecurityPolicy;",
+      "name": "shouldAppendToken",
+      "instructionAbsoluteOffset": 35367012,
+      "instructionUnits": 23
+    },
+    {
+      "regionBase": 31502464,
+      "methodId": 31642,
+      "class": "Lcn/ninebot/commonlibs/nbnet/YiDunSecurityPolicy$Config;",
+      "name": "<init>",
+      "instructionAbsoluteOffset": 35366892,
+      "instructionUnits": 7
+    },
+    {
+      "regionBase": 31502464,
+      "methodId": 31651,
+      "class": "Lcn/ninebot/commonlibs/nbnet/YiDunSecurityPolicy;",
+      "name": "getConfig",
+      "instructionAbsoluteOffset": 35367112,
+      "instructionUnits": 15
+    },
+    {
+      "regionBase": 31502464,
+      "methodId": 31614,
+      "class": "Lcn/ninebot/commonlibs/nbnet/YiDunRiskEncrypt;",
+      "name": "decrypt",
+      "instructionAbsoluteOffset": 35363776,
+      "instructionUnits": 16
+    },
+    {
+      "regionBase": 31502464,
+      "methodId": 31615,
+      "class": "Lcn/ninebot/commonlibs/nbnet/YiDunRiskEncrypt;",
+      "name": "encrypt",
+      "instructionAbsoluteOffset": 35363824,
+      "instructionUnits": 12
+    },
+    {
+      "regionBase": 31502464,
+      "methodId": 31635,
+      "class": "Lcn/ninebot/commonlibs/nbnet/YiDunRiskSecurity;",
+      "name": "decrypt",
+      "instructionAbsoluteOffset": 35364956,
+      "instructionUnits": 139
+    },
+    {
+      "regionBase": 31502464,
+      "methodId": 31636,
+      "class": "Lcn/ninebot/commonlibs/nbnet/YiDunRiskSecurity;",
+      "name": "encrypt",
+      "instructionAbsoluteOffset": 35365264,
+      "instructionUnits": 110
+    },
+    {
+      "regionBase": 51233168,
+      "methodId": 1451,
+      "class": "Lcn/ninebot/lib/network/interceptor/BaseParametersInterceptor;",
+      "name": "encode",
+      "instructionAbsoluteOffset": 52243992,
+      "instructionUnits": 22
+    },
+    {
+      "regionBase": 51233168,
+      "methodId": 1452,
+      "class": "Lcn/ninebot/lib/network/interceptor/BaseParametersInterceptor;",
+      "name": "intercept",
+      "instructionAbsoluteOffset": 52244052,
+      "instructionUnits": 184
+    },
+    {
+      "regionBase": 51233168,
+      "methodId": 1453,
+      "class": "Lcn/ninebot/lib/network/interceptor/BaseParametersInterceptor;",
+      "name": "isCanInjectToBody",
+      "instructionAbsoluteOffset": 52243536,
+      "instructionUnits": 61
+    },
+    {
+      "regionBase": 58815624,
+      "methodId": 8286,
+      "class": "Lcn/ninebot/library/network/encrypt/netease/NeteaseDecrypt;",
+      "name": "decodeContent",
+      "instructionAbsoluteOffset": 60317864,
+      "instructionUnits": 14
+    },
+    {
+      "regionBase": 58815624,
+      "methodId": 8289,
+      "class": "Lcn/ninebot/library/network/encrypt/netease/NeteaseDecrypt;",
+      "name": "encryptContent",
+      "instructionAbsoluteOffset": 60317964,
+      "instructionUnits": 14
+    },
+    {
+      "regionBase": 58815624,
+      "methodId": 8290,
+      "class": "Lcn/ninebot/library/network/encrypt/netease/NeteaseDecrypt;",
+      "name": "encryptContent",
+      "instructionAbsoluteOffset": 60318008,
+      "instructionUnits": 58
+    }
+  ],
+  "remainingUnknown": [
+    "dynamic host selected by actual vehicle configuration",
+    "actual encryption version/configuration without reading runtime cache",
+    "security SDK initialization and encrypted wire compatibility",
+    "country-independent vehicle fault/history protocol closure"
+  ],
+  "implementationDecision": "No business client added: request and model evidence exist, but complete authenticated/encrypted transport is not established."
+}
