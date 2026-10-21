@@ -1,6 +1,10 @@
 # 一期认证验收（2026-10-20）
 
-最新状态：用户自行新增专用传统 login 钥匙串条目，通过 Keychain 入口运行 v3 auth-only 验收并报告 overall passed，password login、profile、restore、refresh、restore-refreshed、profile-refreshed、logout 七阶段全部通过。**该账号的密码认证 CLI 生命周期已通过；SMS、人机挑战和真实桌面 GUI 仍未验收，一期整体不能据此全部宣布完成。**
+最新状态（2026-10-21）：独立 SDK 桌面真实首次登录、车辆和月度行程/详情已观察通过；重启后的后台 restore、真实 profile 与在线底图资源已通过。自然自动刷新和当前真实窗口视觉复核仍未完成。地图失败来自验收启动器全 HTTP(S) 拦截，已修复原服务域名放行并完成回归。详见 [独立桌面最新验收记录](./DESKTOP_ACCEPTANCE.md)。
+
+以下保留 2026-10-20 各轮阶段记录，其中“本轮未做 GUI”等描述指当时的验证范围；当前状态以上述最新验收记录为准。
+
+当时状态：用户自行新增专用传统 login 钥匙串条目，通过 Keychain 入口运行 v3 auth-only 验收并报告 overall passed，password login、profile、restore、refresh、restore-refreshed、profile-refreshed、logout 七阶段全部通过。**该账号的密码认证 CLI 生命周期已通过；SMS、人机挑战和真实桌面 GUI 仍未验收，一期整体不能据此全部宣布完成。**
 
 来源为用户报告，由主对话 `01a15445-dbe5-747e-b370-4757dc0bf0eb` 于2026-10-20转交；本轮未重新登录或独立观察真实请求，也未保存凭据或原始响应。字段修复与逆向依据见 [官方APK刷新差异](AUTH_REFRESH_APK_EVIDENCE.md)。用户报告的 Keychain 取用成功及凭据交接边界见 [本地凭据交接方案](AUTH_CREDENTIAL_HANDOFF.md)。
 
