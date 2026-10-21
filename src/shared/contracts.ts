@@ -73,7 +73,7 @@ export interface RuntimeSecurityStatus {
     };
   };
   binary: {
-    status: "verified" | "mismatch" | "unsupported" | "unavailable";
+    status: "verified" | "mismatch" | "unsupported" | "unavailable" | "not-required";
     sha256: string | null;
     expectedSha256: string | null;
     platform: string;

@@ -1,7 +1,6 @@
 import { basename } from "node:path";
 import type { NinebotAuthSessionManager } from "@jiuhao/ninebot-client";
 import { candidateRequestTimeoutMs } from "./candidate-client.js";
-import { resolveCandidateSource } from "./data-source.js";
 import type { RuntimeSecurityStatus } from "../shared/contracts.js";
 
 /** Builds renderer-safe diagnostics for the pure SDK runtime. */
@@ -12,13 +11,13 @@ export const createSdkRuntimeDiagnostics =
     candidate: {
       requestTimeoutMs: candidateRequestTimeoutMs,
       domains: {
-        vehicle: resolveCandidateSource(process.env, "vehicle"),
-        telemetry: resolveCandidateSource(process.env, "telemetry"),
-        travel: resolveCandidateSource(process.env, "travel"),
+        vehicle: "candidate",
+        telemetry: "candidate",
+        travel: "candidate",
       },
     },
     binary: {
-      status: "unsupported",
+      status: "not-required",
       sha256: null,
       expectedSha256: null,
       platform: process.platform,

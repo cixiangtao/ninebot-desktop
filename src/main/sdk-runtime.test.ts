@@ -22,7 +22,12 @@ describe("SDK runtime diagnostics", () => {
     })();
 
     expect(status.version).toBe("typescript-sdk");
-    expect(status.binary.status).toBe("unsupported");
+    expect(status.binary.status).toBe("not-required");
+    expect(status.candidate.domains).toEqual({
+      vehicle: "candidate",
+      telemetry: "candidate",
+      travel: "candidate",
+    });
     expect(status.policy.allowedCommands).toEqual([]);
     expect(status.policy.passwordTransport).toBe("in-memory-call");
     expect(status.storage.tokensPresent).toBe(false);

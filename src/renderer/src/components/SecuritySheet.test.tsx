@@ -68,4 +68,41 @@ describe("SecuritySheet", () => {
     expect(markup).not.toContain(status.storage.directoryName);
     expect(markup).not.toContain(status.policy.allowedCommands.join(" · "));
   });
+  it("describes in-process SDK credentials without a binary or fallback warning", () => {
+    const sdkStatus = {
+      ...status,
+      version: "typescript-sdk",
+      binary: { ...status.binary, status: "not-required" as const },
+      candidate: {
+        ...status.candidate,
+        domains: {
+          vehicle: "candidate" as const,
+          telemetry: "candidate" as const,
+          travel: "candidate" as const,
+        },
+      },
+      policy: {
+        ...status.policy,
+        passwordTransport: "in-memory-call" as const,
+        smsCodeTransport: "in-memory-call" as const,
+      },
+    };
+    const markup = renderToStaticMarkup(
+      <SecuritySheet
+        open
+        busy={false}
+        error={null}
+        status={sdkStatus}
+        profile={null}
+        profileError={null}
+        onClose={() => undefined}
+        onRefresh={async () => undefined}
+        onLogout={async () => undefined}
+      />,
+    );
+    expect(markup).toContain("内置只读服务");
+    expect(markup).toContain("进程内调用");
+    expect(markup).not.toContain("自动回退");
+    expect(markup).not.toContain("登录瞬间可能被本机进程工具观察到");
+  });
 });

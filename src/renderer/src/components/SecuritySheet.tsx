@@ -28,6 +28,7 @@ interface SecuritySheetProps {
 }
 
 const binaryStatusLabels: Record<RuntimeSecurityStatus["binary"]["status"], string> = {
+  "not-required": "内置只读服务",
   verified: "完整性已验证",
   mismatch: "哈希不匹配，已阻止执行",
   unsupported: "当前平台尚未验证",
@@ -36,7 +37,7 @@ const binaryStatusLabels: Record<RuntimeSecurityStatus["binary"]["status"], stri
 
 const permissionLabels: Record<RuntimeSecurityStatus["storage"]["permissions"], string> = {
   restricted: "仅当前用户可读写",
-  "platform-default": "由当前 Windows 用户保护",
+  "platform-default": "由当前系统用户保护",
   "needs-attention": "权限需要收紧",
   unavailable: "暂时无法检查",
 };
@@ -73,8 +74,9 @@ export const SecuritySheet = ({
     setConfirmingLogout(false);
   };
 
+  const sdkRuntime = status?.version === "typescript-sdk";
   const binaryTone =
-    status?.binary.status === "verified"
+    status?.binary.status === "verified" || status?.binary.status === "not-required"
       ? "good"
       : status?.binary.status === "mismatch"
         ? "danger"
@@ -164,23 +166,31 @@ export const SecuritySheet = ({
             <div className="security-group">
               <SecurityRow
                 icon={<Timer size={18} />}
-                label="候选读取等待上限"
+                label={sdkRuntime ? "读取等待上限" : "候选读取等待上限"}
                 value={`${Math.round(status.candidate.requestTimeoutMs / 1000)} 秒`}
-                hint="候选数据源超时后自动回退到默认读取路径"
+                hint={
+                  sdkRuntime
+                    ? "超时后返回错误，可手动重试"
+                    : "候选数据源超时后自动回退到默认读取路径"
+                }
                 tone="good"
               />
               <SecurityRow
                 icon={<Database size={18} />}
-                label="候选数据源"
+                label={sdkRuntime ? "内置数据服务" : "候选数据源"}
                 value={`${Object.values(status.candidate.domains).filter((source) => source === "candidate").length}/3 已启用`}
-                hint="只显示启用数量；未启用域继续使用默认读取路径"
+                hint={
+                  sdkRuntime
+                    ? "车辆、状态和行程均使用内置只读服务"
+                    : "只显示启用数量；未启用域继续使用默认读取路径"
+                }
                 tone="good"
               />
               <SecurityRow
                 icon={<Binary size={18} />}
                 label="本地数据运行环境"
                 value={binaryStatusLabels[status.binary.status]}
-                hint="固定版本运行，连接前会校验文件完整性"
+                hint={sdkRuntime ? "无需启动外部数据进程" : "固定版本运行，连接前会校验文件完整性"}
                 tone={binaryTone}
               />
               <SecurityRow
@@ -204,9 +214,13 @@ export const SecuritySheet = ({
               />
               <SecurityRow
                 icon={<ShieldCheck size={18} />}
-                label="进程隔离"
-                value="最小环境变量"
-                hint="保留网络代理与证书配置；不继承项目密钥等无关环境变量"
+                label={sdkRuntime ? "数据访问隔离" : "进程隔离"}
+                value={sdkRuntime ? "受限接口" : "最小环境变量"}
+                hint={
+                  sdkRuntime
+                    ? "页面仅能调用已开放的本地接口"
+                    : "保留网络代理与证书配置；不继承项目密钥等无关环境变量"
+                }
                 tone="good"
               />
               <SecurityRow
@@ -226,9 +240,13 @@ export const SecuritySheet = ({
               <SecurityRow
                 icon={<KeyRound size={18} />}
                 label="登录凭据传输"
-                value="本地进程参数"
-                hint="密码或短信验证码不会进入日志，但登录瞬间可能被本机进程工具观察到"
-                tone="warning"
+                value={sdkRuntime ? "进程内调用" : "本地进程参数"}
+                hint={
+                  sdkRuntime
+                    ? "密码和验证码只在内存中传递，不作为命令行参数"
+                    : "密码或短信验证码不会进入日志，但登录瞬间可能被本机进程工具观察到"
+                }
+                tone={sdkRuntime ? "good" : "warning"}
               />
             </div>
           ) : null}
@@ -241,7 +259,11 @@ export const SecuritySheet = ({
           <div className="security-session">
             <div>
               <strong>本地登录会话</strong>
-              <p>退出后清除本地登录令牌与车辆缓存，保留非敏感配置。</p>
+              <p>
+                {sdkRuntime
+                  ? "退出后清除登录令牌与会话内存缓存；车辆路由元数据按账号隔离保留。"
+                  : "退出后清除本地登录令牌与车辆缓存，保留非敏感配置。"}
+              </p>
             </div>
             {confirmingLogout ? (
               <div className="flex flex-none items-center gap-2">
