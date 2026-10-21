@@ -27,6 +27,25 @@ const mapResourceKind = (input) => {
   return "otherMapResource";
 };
 
+// Observe only completion and presence, forwarding the original result/error unchanged.
+// No credential/profile fields or error messages enter diagnostics; no extra requests are made.
+const observeAuthLifecycle = (prototype, record) => {
+  for (const method of ["restore", "refresh", "whoami"]) {
+    const original = prototype[method];
+    prototype[method] = async function () {
+      record(method, "started");
+      try {
+        const result = await original.call(this);
+        record(method, "completed", method === "restore" ? result !== null : undefined);
+        return result;
+      } catch (error) {
+        record(method, "failed");
+        throw error;
+      }
+    };
+  }
+};
+
 const launch = ({ root, project = resolve(__dirname, "..") }) => {
   const { app, session } = require("electron");
   root = resolve(root);
@@ -49,6 +68,7 @@ const launch = ({ root, project = resolve(__dirname, "..") }) => {
   app.setPath("userData", userData);
   if (app.getPath("userData") !== userData) throw new Error("Isolated user data required");
   const mapNetwork = { allowedRequests: 0, blockedExternalRequests: 0, resources: {} };
+  const authLifecycle = {};
   const record = (status, extra = {}) => {
     Object.assign(
       state,
@@ -66,6 +86,7 @@ const launch = ({ root, project = resolve(__dirname, "..") }) => {
         allowedRendererOrigin: mapOrigin,
         otherRendererHttpBlocked: true,
         mapNetwork,
+        authLifecycle,
       },
       extra,
     );
@@ -129,13 +150,27 @@ const launch = ({ root, project = resolve(__dirname, "..") }) => {
       });
     });
   });
-  return import(pathToFileURL(join(project, "out/main/index.js")).href).catch(() => {
-    record("launch-failed", { failure: "product-main" });
-    app.exit(1);
-  });
+  return import("@jiuhao/ninebot-client")
+    .then(({ NinebotAuthSessionManager }) => {
+      observeAuthLifecycle(
+        NinebotAuthSessionManager.prototype,
+        (method, outcome, authenticated) => {
+          const entry = (authLifecycle[method] ??= { started: 0, completed: 0, failed: 0 });
+          entry[outcome] += 1;
+          entry.lastEventUTC = new Date().toISOString();
+          if (authenticated !== undefined) entry.restoredSessionPresent = authenticated;
+          scheduleRecord();
+        },
+      );
+      return import(pathToFileURL(join(project, "out/main/index.js")).href);
+    })
+    .catch(() => {
+      record("launch-failed", { failure: "product-main" });
+      app.exit(1);
+    });
 };
 
-module.exports = { allowRendererHttpRequest, mapResourceKind, launch };
+module.exports = { allowRendererHttpRequest, mapResourceKind, observeAuthLifecycle, launch };
 if (require.main === module) {
   const root = process.env.NINEBOT_DESKTOP_ACCEPTANCE_ROOT;
   if (!root) throw new Error("NINEBOT_DESKTOP_ACCEPTANCE_ROOT is required");
