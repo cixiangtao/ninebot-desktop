@@ -137,7 +137,16 @@ if (verifyArtifacts) {
     resolve(projectRoot, `release/ninebot-desktop-${packageJson.version}-win-x64.zip`),
   ];
   await Promise.all(artifacts.map((path) => access(path)));
-  await run("tar.exe", ["-tf", artifacts[1]]);
+  await run("pwsh.exe", [
+    "-NoProfile",
+    "-NonInteractive",
+    "-File",
+    resolve(projectRoot, "scripts/verify-windows-zip.ps1"),
+    "-ArchivePath",
+    artifacts[1],
+    "-AppDirectory",
+    appDirectory,
+  ]);
   const checksums = await Promise.all(
     artifacts.map(async (path) => `${await sha256(path)}  ${path.split(/[\\/]/).at(-1)}`),
   );
