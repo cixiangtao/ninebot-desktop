@@ -8,6 +8,9 @@ export const ipcChannels = {
   cancelSmsCode: "ninebot:auth:cancel-sms-code",
   smsCodeLogin: "ninebot:auth:sms-code-login",
   authLogout: "ninebot:auth:logout",
+  accountsList: "ninebot:accounts:list",
+  accountsSwitch: "ninebot:accounts:switch",
+  accountsRemove: "ninebot:accounts:remove",
   runtimeSecurity: "ninebot:runtime:security",
   listVehicles: "ninebot:vehicles:list",
   getVehicleSnapshot: "ninebot:vehicles:snapshot",
@@ -44,6 +47,18 @@ export interface AccountProfile {
   maskedIdentifier: string | null;
   identifierKind: "phone" | "email" | "username" | "unknown";
   passwordConfigured: boolean | null;
+}
+
+/** Local account summaries never include session tokens or upstream user IDs. */
+export interface SavedAccount {
+  id: string;
+  label: string;
+  needsLogin: boolean;
+}
+export interface SavedAccountsState {
+  supported: boolean;
+  activeId: string | null;
+  accounts: SavedAccount[];
 }
 
 export interface PasswordLoginInput {
@@ -334,12 +349,18 @@ export interface NinebotBridge {
     /** Current-session reads require reconnection; notification never clears stored tokens. */
     onSessionExpired: (listener: () => void) => () => void;
     status: () => Promise<BridgeResult<AuthStatus>>;
-    profile: () => Promise<BridgeResult<AccountProfile>>;
+    /** Passive settings inspection leaves the account selector open on an expired session. */
+    profile: (options?: { passive?: boolean }) => Promise<BridgeResult<AccountProfile>>;
     passwordLogin: (input: PasswordLoginInput) => Promise<BridgeResult<AuthStatus>>;
     requestSmsCode: (input: SmsCodeRequestInput) => Promise<BridgeResult<SmsCodeRequestStatus>>;
     cancelSmsCode: (input: SmsCodeCancelInput) => Promise<BridgeResult<{ cancelled: true }>>;
     smsCodeLogin: (input: SmsCodeLoginInput) => Promise<BridgeResult<AuthStatus>>;
     logout: () => Promise<BridgeResult<AuthStatus>>;
+  };
+  accounts: {
+    list: () => Promise<BridgeResult<SavedAccountsState>>;
+    switch: (input: { id: string }) => Promise<BridgeResult<SavedAccountsState>>;
+    remove: (input: { id: string }) => Promise<BridgeResult<SavedAccountsState>>;
   };
   runtime: {
     security: () => Promise<BridgeResult<RuntimeSecurityStatus>>;

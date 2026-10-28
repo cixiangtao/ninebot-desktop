@@ -47,7 +47,8 @@
     "build:desktop:sdk-only": "node scripts/build-sdk-only.ts",
     "package:sdk:mac:dir": "node scripts/package-sdk-only.ts --platform=darwin",
     "package:sdk:win:dir": "node scripts/package-sdk-only.ts --platform=win32",
-    "qa:sdk-portability": "pnpm run build:sdk && node scripts/qa-sdk-portability.mjs"
+    "qa:sdk-portability": "pnpm run build:sdk && node scripts/qa-sdk-portability.mjs",
+    "qa:accounts": "pnpm run build && node scripts/qa-accounts.mjs"
   },
   "dependencies": {
     "@jiuhao/ninebot-client": "workspace:*",

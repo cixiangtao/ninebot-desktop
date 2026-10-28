@@ -19,6 +19,16 @@ describe("desktop session bridge", () => {
     expect(invoke.mock.calls[0]).toEqual([ipcChannels.listVehicles]);
   });
 
+  it("allows settings to inspect an expired account without interrupting account selection", async () => {
+    const bridge = createDesktopBridge(async () => expired);
+    const listener = vi.fn();
+    bridge.auth.onSessionExpired(listener);
+    expect(await bridge.auth.profile({ passive: true })).toEqual(expired);
+    expect(listener).not.toHaveBeenCalled();
+    await bridge.auth.profile();
+    expect(listener).toHaveBeenCalledOnce();
+  });
+
   it("keeps login rejection and temporary outages distinct from session loss", async () => {
     const invoke = vi.fn(async () => expired);
     const bridge = createDesktopBridge(invoke);

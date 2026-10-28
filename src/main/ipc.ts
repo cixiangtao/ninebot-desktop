@@ -23,6 +23,7 @@ import {
   type RideSpeedVerificationResult,
   type RuntimeSecurityStatus,
   type SmsCodeRequestStatus,
+  type SavedAccountsState,
   type VehicleLocationRead,
   type VehicleSnapshot,
   type VehicleSummary,
@@ -361,7 +362,9 @@ export const registerIpcHandlers = (
     rideMonthCache.clear();
     rideDetailCache.clear();
   };
+  let accountGeneration = 0;
   const clearSessionState = (resetRideSequence = false) => {
+    if (resetRideSequence) accountGeneration += 1;
     telemetryReader.clear?.();
     travelReader.clear?.();
     vehicleReader.clear?.();
@@ -377,6 +380,42 @@ export const registerIpcHandlers = (
     if (!result.ok && result.error.code === "AUTH_REQUIRED") clearSessionState(true);
     return result;
   };
+
+  ipcMain.handle(ipcChannels.accountsList, async (): Promise<BridgeResult<SavedAccountsState>> => {
+    try {
+      return ok(
+        client.accounts
+          ? await client.accounts.list()
+          : { supported: false, activeId: null, accounts: [] },
+      );
+    } catch (error) {
+      return handleError(error);
+    }
+  });
+  for (const [channel, operation] of [
+    [ipcChannels.accountsSwitch, "switch"],
+    [ipcChannels.accountsRemove, "remove"],
+  ] as const) {
+    ipcMain.handle(
+      channel,
+      async (_event, input: unknown): Promise<BridgeResult<SavedAccountsState>> => {
+        try {
+          const { id } = z.object({ id: z.string().uuid() }).parse(input);
+          if (!client.accounts)
+            throw new NinebotClientError("当前运行版本暂不支持多账号。", "unsupported");
+          smsFlow.cancelAll();
+          const before = await client.accounts.list();
+          if (operation === "switch" || before.activeId === id) clearSessionState(true);
+          const result = await client.accounts[operation](id);
+          if (before.activeId !== result.activeId || operation === "switch")
+            clearSessionState(true);
+          return ok(result);
+        } catch (error) {
+          return handleError(error);
+        }
+      },
+    );
+  }
 
   ipcMain.handle(ipcChannels.authStatus, async (): Promise<BridgeResult<AuthStatus>> => {
     try {
@@ -627,13 +666,18 @@ export const registerIpcHandlers = (
         if (rides.some(({ ride }) => !ride || ride.serialNumber !== serialNumber)) {
           return fail({ code: "INVALID_INPUT", message: "行程已失效，请重新选择月份。" });
         }
+        const generation = accountGeneration;
         const batch = await loadRideSpeedVerifications(rideIds, async (rideId) => {
+          if (generation !== accountGeneration)
+            throw new NinebotClientError("账号已切换，请重新读取数据。", "upstream");
           const ride = travelIds.get(rideId);
           if (!ride || ride.serialNumber !== serialNumber) {
             throw new Error("Ride mapping changed during speed verification");
           }
           return readRideDetail(vehicleId, rideId, serialNumber, ride.travelId, ride.dayMileageKm);
         });
+        if (generation !== accountGeneration)
+          throw new NinebotClientError("账号已切换，请重新读取数据。", "upstream");
         const fatalFailure = batch.failures.find(
           ({ error }) => error instanceof NinebotClientError && error.kind !== "upstream",
         );

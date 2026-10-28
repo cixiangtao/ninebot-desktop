@@ -4637,3 +4637,69 @@ select:focus-visible {
     animation-iteration-count: 1 !important;
   }
 }
+
+/* Account management follows the existing settings surface and theme roles. */
+.saved-accounts-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 0 0 16px;
+}
+.saved-accounts-heading h3 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 19px;
+  font-weight: 680;
+}
+.saved-accounts-heading p,
+.saved-accounts-empty {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.saved-accounts-list {
+  margin-bottom: 24px;
+}
+.saved-account-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--line);
+}
+.saved-account-identity {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+  gap: 8px;
+}
+.saved-account-identity strong {
+  overflow-wrap: anywhere;
+  font-size: 14px;
+  color: var(--ink);
+}
+.saved-account-identity span {
+  font-size: 12px;
+  color: var(--muted);
+}
+.saved-account-current {
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 650;
+}
+.saved-account-actions {
+  display: flex;
+  gap: 8px;
+}
+.settings-privacy {
+  margin-top: 24px;
+}
+.settings-privacy summary {
+  cursor: pointer;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 650;
+  padding: 12px 0;
+}

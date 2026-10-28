@@ -1,4 +1,4 @@
-import type { RuntimeSecurityStatus } from "../shared/contracts.js";
+import type { RuntimeSecurityStatus, SavedAccountsState } from "../shared/contracts.js";
 import type { TravelReader } from "./travel-source.js";
 import type { VehicleReader } from "./vehicle-source.js";
 import type { VehicleTelemetryReader } from "./vehicle-snapshot.js";
@@ -37,6 +37,11 @@ export const isNinebotHumanVerificationError = (error: unknown): boolean =>
  * therefore be swapped without changing renderer handlers.
  */
 export interface NinebotAppClient extends VehicleTelemetryReader, TravelReader, VehicleReader {
+  accounts?: {
+    list: () => Promise<SavedAccountsState>;
+    switch: (id: string) => Promise<SavedAccountsState>;
+    remove: (id: string) => Promise<SavedAccountsState>;
+  };
   login(user: string, areaCode: string, password: string): Promise<void>;
   /** True when requestSmsCode accepts a completed human-verification result. */
   supportsSmsVerification?: boolean;

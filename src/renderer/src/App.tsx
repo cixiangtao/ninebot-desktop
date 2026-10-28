@@ -25,6 +25,7 @@ import {
 } from "react";
 import type {
   AccountProfile,
+  SavedAccountsState,
   BridgeError,
   BridgeResult,
   MonthSummaryExportFormat,
@@ -382,6 +383,8 @@ export default function App() {
   const [securityBusy, setSecurityBusy] = useState(false);
   const [securityStatus, setSecurityStatus] = useState<RuntimeSecurityStatus | null>(null);
   const [securityError, setSecurityError] = useState<string | null>(null);
+  const settingsRequest = useRef(0);
+  const [savedAccounts, setSavedAccounts] = useState<SavedAccountsState | null>(null);
   const [accountProfile, setAccountProfile] = useState<AccountProfile | null>(null);
   const [accountProfileError, setAccountProfileError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -464,6 +467,7 @@ export default function App() {
 
   const resetAuthenticatedView = useCallback(
     (reconnect = false) => {
+      ++settingsRequest.current;
       ++liveRequestRef.current;
       ++snapshotRequestRef.current;
       ++locationRequestRef.current;
@@ -471,6 +475,8 @@ export default function App() {
       resetComparison();
       resetRideSpeedVerification();
       setAccountConnected(false);
+      setSavedAccounts(null);
+      setSecurityStatus(null);
       setLoading(false);
       setLoginBusy(false);
       setSecurityOpen(false);
@@ -1038,12 +1044,11 @@ export default function App() {
     setError(null);
     try {
       unwrap(await window.ninebot.auth.passwordLogin(input));
+      resetAuthenticatedView();
       setSecurityStatus(null);
-      setAccountProfile(null);
-      setAccountProfileError(null);
+      setSavedAccounts(null);
       setAccountConnected(true);
-      setLoginOpen(false);
-      await loadLiveData(month);
+      await loadLiveData(thisMonth);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "连接账号失败。");
     } finally {
@@ -1089,12 +1094,11 @@ export default function App() {
     setError(null);
     try {
       unwrap(await window.ninebot.auth.smsCodeLogin(input));
+      resetAuthenticatedView();
       setSecurityStatus(null);
-      setAccountProfile(null);
-      setAccountProfileError(null);
+      setSavedAccounts(null);
       setAccountConnected(true);
-      setLoginOpen(false);
-      await loadLiveData(month);
+      await loadLiveData(thisMonth);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "验证码登录失败。");
     } finally {
@@ -1179,15 +1183,36 @@ export default function App() {
 
   const loadSecurityStatus = useCallback(async () => {
     if (!window.ninebot) return;
+    const requestId = ++settingsRequest.current;
     setSecurityBusy(true);
     setSecurityError(null);
     setAccountProfileError(null);
     try {
-      const [securityResult, profileResult] = await Promise.all([
+      const [securityResult, profileResult, accountsResult] = await Promise.all([
         window.ninebot.runtime.security(),
-        window.ninebot.auth.profile(),
+        window.ninebot.auth.profile({ passive: true }),
+        window.ninebot.accounts.list(),
       ]);
-      setSecurityStatus(unwrap(securityResult));
+      if (requestId !== settingsRequest.current) return;
+      const nextAccounts = unwrap(accountsResult);
+      const nextStatus = unwrap(securityResult);
+      const expired = !profileResult.ok && profileResult.error.code === "AUTH_REQUIRED";
+      if (expired && nextStatus.storage.tokensPresent) {
+        resetAuthenticatedView();
+        setSecurityOpen(true);
+        setSecurityBusy(false);
+      }
+      setSavedAccounts(
+        expired
+          ? {
+              ...nextAccounts,
+              accounts: nextAccounts.accounts.map((account) =>
+                account.id === nextAccounts.activeId ? { ...account, needsLogin: true } : account,
+              ),
+            }
+          : nextAccounts,
+      );
+      setSecurityStatus(nextStatus);
       if (profileResult.ok) {
         setAccountProfile(profileResult.data);
       } else {
@@ -1197,15 +1222,51 @@ export default function App() {
         }
       }
     } catch (cause) {
-      setSecurityError(cause instanceof Error ? cause.message : "无法读取运行时安全状态。");
+      if (requestId === settingsRequest.current)
+        setSecurityError(cause instanceof Error ? cause.message : "无法读取设置。");
     } finally {
-      setSecurityBusy(false);
+      if (requestId === settingsRequest.current) setSecurityBusy(false);
     }
-  }, []);
+  }, [resetAuthenticatedView]);
 
   const openSecurity = () => {
     setSecurityOpen(true);
     void loadSecurityStatus();
+  };
+
+  const switchAccount = async (id: string) => {
+    if (!window.ninebot) return;
+    // Invalidate every view/read before switching, including map position consent and playback.
+    resetAuthenticatedView();
+    setSecurityBusy(true);
+    setSavedAccounts(null);
+    setSecurityStatus(null);
+    try {
+      setSavedAccounts(unwrap(await window.ninebot.accounts.switch({ id })));
+      setAccountConnected(true);
+      await loadLiveData(thisMonth);
+    } catch (cause) {
+      await loadLiveData(thisMonth);
+      setError(cause instanceof Error ? cause.message : "无法切换账号。");
+    } finally {
+      setSecurityBusy(false);
+    }
+  };
+
+  const removeAccount = async (id: string) => {
+    if (!window.ninebot) return;
+    const wasActive = savedAccounts?.activeId === id;
+    setSecurityBusy(true);
+    setSecurityError(null);
+    try {
+      const next = unwrap(await window.ninebot.accounts.remove({ id }));
+      if (wasActive) resetAuthenticatedView();
+      setSavedAccounts(next);
+    } catch (cause) {
+      setSecurityError(cause instanceof Error ? cause.message : "无法移除账号。");
+    } finally {
+      setSecurityBusy(false);
+    }
   };
 
   const logout = async () => {
@@ -2213,21 +2274,33 @@ export default function App() {
         }}
         onExport={exportYearSummary}
       />
-      <SecuritySheet
-        open={securityOpen}
-        busy={securityBusy}
-        error={securityError}
-        status={securityStatus}
-        profile={accountProfile}
-        profileError={accountProfileError}
-        onClose={() => {
-          setSecurityOpen(false);
-          setSecurityError(null);
-          setAccountProfileError(null);
-        }}
-        onRefresh={loadSecurityStatus}
-        onLogout={logout}
-      />
+      {securityOpen ? (
+        <SecuritySheet
+          open={securityOpen}
+          busy={securityBusy}
+          error={securityError}
+          status={securityStatus}
+          profile={accountProfile}
+          profileError={accountProfileError}
+          onClose={() => {
+            ++settingsRequest.current;
+            setSecurityBusy(false);
+            setSecurityOpen(false);
+            setSecurityError(null);
+            setAccountProfileError(null);
+          }}
+          onRefresh={loadSecurityStatus}
+          onLogout={logout}
+          accounts={savedAccounts}
+          onAddAccount={() => {
+            setSecurityOpen(false);
+            setError(null);
+            setLoginOpen(true);
+          }}
+          onSwitchAccount={switchAccount}
+          onRemoveAccount={removeAccount}
+        />
+      ) : null}
     </div>
   );
 }

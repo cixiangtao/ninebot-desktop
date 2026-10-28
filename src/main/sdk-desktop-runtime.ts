@@ -1,3 +1,4 @@
+import { createMultiAccountRuntime } from "./account-runtime.js";
 import {
   createNinebotNodeAuthSessionManager,
   type NinebotAuthSessionManager,
@@ -19,7 +20,7 @@ export const resolveDesktopAuthSource = (
 ): "sdk" | "legacy" => (environment.NINEBOT_AUTH_SOURCE === "sdk" ? "sdk" : "legacy");
 
 /** No legacy process or automatic fallback; all reads use this manager's fresh session. */
-export const createSdkDesktopRuntime = async ({
+export const createSingleSdkDesktopRuntime = async ({
   configDirectory,
   auth = createNinebotNodeAuthSessionManager({
     directory: configDirectory,
@@ -69,5 +70,18 @@ export const createSdkDesktopRuntime = async ({
     onProfileFailure: (failure) =>
       emitRuntimeDiagnostic(onDiagnostic, { category: "profile-failure", failure }),
   });
-  return Object.assign(client, { stopDiagnostics });
+  return Object.assign(client, { auth, stopDiagnostics });
+};
+
+/** Production SDK accounts have independent session/device files and read contexts. */
+export const createSdkDesktopRuntime = async (
+  options: Parameters<typeof createSingleSdkDesktopRuntime>[0],
+) => {
+  // Injected managers are owned by tests or embedders; never copy their session into another store.
+  if (options.auth) return createSingleSdkDesktopRuntime(options);
+  return createMultiAccountRuntime({
+    directory: options.configDirectory,
+    createRuntime: (configDirectory) =>
+      createSingleSdkDesktopRuntime({ ...options, configDirectory }),
+  });
 };

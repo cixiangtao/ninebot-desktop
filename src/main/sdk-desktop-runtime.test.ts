@@ -13,6 +13,7 @@ import {
 import { ipcChannels, type BridgeResult } from "../shared/contracts.js";
 import { createSdkDesktopRuntime, resolveDesktopAuthSource } from "./sdk-desktop-runtime.js";
 import { registerIpcHandlers } from "./ipc.js";
+import { NinebotClientError } from "./app-client.js";
 
 const mocks = vi.hoisted(() => ({
   handlers: new Map<string, (...args: unknown[]) => Promise<BridgeResult<unknown>>>(),
@@ -57,7 +58,8 @@ vi.mock("./travel-source.js", () => ({
   }),
 }));
 
-const invoke = (name: string, input?: unknown) => mocks.handlers.get(name)!(null, input);
+const sender = { id: 1, once: vi.fn(), on: vi.fn() };
+const invoke = (name: string, input?: unknown) => mocks.handlers.get(name)!({ sender }, input);
 
 describe("SDK desktop authentication through real IPC handlers (synthetic providers)", () => {
   it("propagates expired-session refresh rejection from domain reads as AUTH_REQUIRED", async () => {
@@ -153,7 +155,11 @@ describe("SDK desktop authentication through real IPC handlers (synthetic provid
     const create = async () => {
       const auth = new NinebotAuthSessionManager({ provider, store, now: () => now });
       const client = await createSdkDesktopRuntime({ configDirectory: "/unused-synthetic", auth });
-      registerIpcHandlers(client);
+      registerIpcHandlers(client, client, client, client, {
+        smsVerificationPresenter: async () => {
+          throw new NinebotClientError("synthetic verification unavailable", "verification");
+        },
+      });
       return { auth, client };
     };
     const { auth, client } = await create();

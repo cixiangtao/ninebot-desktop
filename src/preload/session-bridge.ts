@@ -29,12 +29,18 @@ export const createDesktopBridge = (
         };
       },
       status: () => call(ipcChannels.authStatus),
-      profile: () => read(ipcChannels.authProfile),
+      profile: (options) =>
+        options?.passive ? call(ipcChannels.authProfile) : read(ipcChannels.authProfile),
       passwordLogin: (input) => change(ipcChannels.passwordLogin, input),
       requestSmsCode: (input) => call(ipcChannels.requestSmsCode, input),
       cancelSmsCode: (input) => call(ipcChannels.cancelSmsCode, input),
       smsCodeLogin: (input) => change(ipcChannels.smsCodeLogin, input),
       logout: () => change(ipcChannels.authLogout),
+    },
+    accounts: {
+      list: () => call(ipcChannels.accountsList),
+      switch: (input) => change(ipcChannels.accountsSwitch, input),
+      remove: (input) => change(ipcChannels.accountsRemove, input),
     },
     runtime: { security: () => call(ipcChannels.runtimeSecurity) },
     vehicles: {
