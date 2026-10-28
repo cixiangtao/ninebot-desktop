@@ -1,301 +1,166 @@
 # @jiuhao/ninebot-client
 
-`@jiuhao/ninebot-client` is a read-only TypeScript client for the Ninebot
-candidate protocol used by this project. It packages the request construction,
-encryption, response decoding, and service routing behind one small session
-client so an Electron or Node.js host can provide its own transport.
+九号只读协议 SDK。桌面端、CLI、浏览器及未来移动端共用协议规则、两阶段登录、会话生命周期和完整月份分页；网络、加密、凭据存储由宿主提供。SDK 不提供车辆控制，也不需要自建中转服务器。
 
-The current build is Node-oriented: the public candidate entry imports the
-Node crypto implementation for AES, RSA, MD5, and secure randomness. A browser
-or mobile host cannot import this build directly; it needs a future compatible
-crypto provider/build before it can reuse the session client.
+当前版本为私有开发包 `0.0.0`，尚未发布到 npm，不是九号官方 SDK。此阶段完成公共 API 与平台边界拆分，不代表已经在 React Native、微信小程序或九号真实服务上完成新适配器验收。
 
-The platform-neutral orchestration is available from
-`@jiuhao/ninebot-client/candidate-session-core`. It has no Node crypto import:
-browser, React Native, and other hosts can inject their own encrypted vehicle,
-telemetry, and travel clients while sharing field assembly, request-id
-propagation, cancellation, and session cleanup. Hosts without Web Crypto must
-also provide a `nonceFactory`.
+## 包入口
 
-The package is currently private (`0.0.0`) and is not an official Ninebot SDK.
-The `auth` entry now provides a platform-neutral `NinebotAuthSessionManager`,
-an async session-store contract, and an injected auth-provider contract. The
-manager handles login-result replacement, persistence, expiry-aware refresh,
-logout cleanup, and defensive session copies without retaining passwords.
-Vehicle control remains out of scope. Callers must keep credentials out of
-source control and logs.
+| 入口                                   | 用途                                                        | 平台要求                                |
+| -------------------------------------- | ----------------------------------------------------------- | --------------------------------------- |
+| `@jiuhao/ninebot-client`               | `createNinebotSdk`、认证、会话、请求与适配器契约            | 无 Node/Electron 导入                   |
+| `@jiuhao/ninebot-client/platform-web`  | Web Crypto 加密适配器                                       | Web Crypto、BigInt、TextEncoder/Decoder |
+| `@jiuhao/ninebot-client/platform-node` | Node 加密适配器                                             | Node.js                                 |
+| `@jiuhao/ninebot-client/track`         | 轨迹字符串解析、采样极速定位、插值、速度区间和 GeoJSON 计算 | 无网络、登录、存储或地图引擎依赖        |
+| `@jiuhao/ninebot-client/node`          | 原根入口的 Node API 兼容集合                                | Node.js；包含研究工具，移动端不要导入   |
+| `@jiuhao/ninebot-client/auth-node`     | 文件存储与两阶段登录的 Node 快捷工厂                        | Node.js                                 |
 
-Password authentication now has two stages: Passport returns account tokens,
-then encrypted `POST /user/user/login` establishes the business UID. Passport
-`uid` and `business_uid` fields are never used as the business identity.
-`createNinebotPassportAuthProvider` requires an `initializeBusinessSession`
-callback and returns a complete session only after both stages succeed. SMS
-requests now call the observed Passport send-code/consume-code endpoints with
-SHA-256 signing; SMS login uses the same Business bootstrap. A server challenge
-is surfaced as a bounded error without claiming that SMS was sent. Embedded
-human-challenge interaction is not implemented. See the [phase-one acceptance
-checklist](../../docs/AUTH_PHASE1.md) for the separate real and synthetic acceptance status.
+已有细分入口继续保留。`candidate-session` 仍是 Node 工厂，但已经使用共享服务实现；`candidate-session-core` 保留注入客户端的底层接口。`transport-web` 是共享 Fetch transport 的兼容别名，现已包含 Passport 和 Business 服务类型及认证重定向拒绝策略。
 
-The lifecycle layer can be imported without pulling in Node-only crypto:
+**迁移提示：** 以前从根入口导入 Node 工厂、文件存储或协议研究工具的代码，需要改为 `/node` 或对应专用子入口。仓库内桌面调用已迁移。默认桌面产品仍使用原 ninecli 运行时，SDK-only 的 opt-in 边界不变。
+
+## 公共 API
+
+构造 SDK 不产生请求。调用顺序为登录（或恢复）→ 车辆发现 → 月度行程 → 轨迹详情。
 
 ```ts
-import { NinebotAuthSessionManager } from "@jiuhao/ninebot-client/auth";
+import {
+  createNinebotSdk,
+  createFetchNinebotTransport,
+  defaultNinebotServiceEndpoints,
+  createMemoryNinebotAuthSessionStore,
+} from "@jiuhao/ninebot-client";
+import { createNinebotWebCryptoAdapter } from "@jiuhao/ninebot-client/platform-web";
+import { parseTrail, getTrackMaximumPoint } from "@jiuhao/ninebot-client/track";
+
+const client = createNinebotSdk({
+  transport: createFetchNinebotTransport({
+    origins: Object.fromEntries(
+      defaultNinebotServiceEndpoints.map(({ service, upstreamOrigin }) => [
+        service,
+        upstreamOrigin,
+      ]),
+    ),
+    timeoutMs: 15_000,
+  }),
+  crypto: createNinebotWebCryptoAdapter(),
+  // 示例只在内存保存；需要重启恢复时，注入宿主的安全存储。
+  sessionStore: createMemoryNinebotAuthSessionStore(),
+  // 由宿主提供稳定的设备上下文，不能每次请求重新生成 deviceId。
+  deviceStore: secureDeviceStore,
+});
+
+await client.auth.restore(); // 仅恢复本地完整会话，不验证服务端有效性。
+await client.auth.loginWithPassword({ areaCode: "86", user, password });
+
+const vehicles = await client.vehicles.list({ service: "ebike", vehicleType });
+const request = { service: "ebike" as const, serialNumber, vehicleType };
+const month = await client.travels.list({ ...request, month: "202610" });
+const detail = await client.travels.get({ ...request, travelId });
+
+// durationSeconds 应由调用方从响应的实际时长字段归一化取得。
+const points = parseTrail(detail.trail, durationSeconds);
+const peak = getTrackMaximumPoint(points);
+await client.auth.logout();
 ```
 
-The Passport client exposes the reconstructed password-login, refresh, and
-`whoami` boundaries. The Node entry exports `createNinebotPassportSigner`,
-which reconstructs the sorted raw query canonical string and SHA-256 signature
-observed in ninecli 0.1.7. `whoami` sends the raw access token in Authorization,
-without a `Bearer` prefix. Hosts may inject a signer for protocol tests.
+上例中的账号、车辆标识、设备存储和时长是宿主输入，不是 SDK 内置值。车辆类型与服务族继续显式传入，SDK 不猜测车型。车辆/轨迹响应保留现有协议数据结构，不能当作稳定的 UI 展示模型；共享车辆的权限校验与敏感字段展示仍由应用负责。
 
-## Passive authentication diagnostics
+`auth` 同时提供 `requestSmsCode`、`loginWithSmsCode`、`refresh`、`whoami`、`getSession`、`getRefreshEligibility`、`observeDiagnostics`。服务端人机校验按现有错误类型返回。宿主展示正常验证界面后，可通过 `requestSmsCode({ areaCode, phone, validate })` 显式重试发码；`validate` 是本次用户验证产生的不透明结果，只用于该次请求的正文及签名，不会存储或自动重用。SDK 不代替用户完成验证，不自动重试挑战。只有 Passport 令牌和 Business UID 两阶段都成功后才持久化完整会话；密码不进入存储。
 
-`auth.getRefreshEligibility()` returns only `status` (`unavailable`,
-`expiry-unknown`, `fresh`, `due`), `refreshSupported`, and `nextEligibleAtMs`
-(null when expiry is unknown). It reads in-memory metadata, never loads files,
-returns credentials, or contacts a service. Eligibility is not a scheduled refresh:
-a normal request must reach `ensureSession`, and business cache hits can avoid it.
+`travels.list` 默认逐页读取完整月份并验证总数、重复 ID、月份和汇总一致性。设置 `paginateTravelMonths: false` 只读取第一页，不承诺整月完整。业务读取会调用会话管理器按过期时间刷新；显式恢复、登录、刷新和退出会使旧读取失效。请求开始前的异步会话/设备加载、加密阶段，以及不遵守 AbortSignal 的迟到响应，都不能在会话失效后向调用方交付旧结果。
 
-`auth.observeDiagnostics(listener)` returns an unsubscribe function. Its fixed
-operation/state events distinguish automatic expiry refresh, explicit refresh,
-shared in-flight refreshes, completion, and failure. Events omit tokens, accounts,
-profiles, request arguments and error text. Synchronous and asynchronous listener
-failures are contained. Desktop opt-in logging and evidence interpretation are
-covered in the [desktop acceptance guide](../../docs/DESKTOP_ACCEPTANCE.md).
+所有只读方法接受 `signal?: AbortSignal`，也支持底层 `headers` 扩展。应用不应允许用户覆盖认证相关头。`telemetry.status` 和 `telemetry.battery` 保留既有只读能力；移动产品可以只使用登录、车辆和轨迹。
 
-## Node authentication
+### 短信登录与正常用户验证
 
-The new `auth-node` factory composes Passport, encrypted business login, gzip
-response decoding, device metadata, and file-backed session management:
+宿主先请求发码；只有明确的人机验证拒绝才展示验证组件。下面的 `showVerification` 是宿主实现的 UI 回调：使用配置加载正常验证组件，让用户自行完成验证，成功返回组件的 `validate`，取消返回 `null`。它不是 SDK 自带的弹窗方法。
 
 ```ts
-import { createNinebotNodeAuthSessionManager } from "@jiuhao/ninebot-client/auth-node";
+import { PassportLoginBusinessError, ninebotSmsVerification } from "@jiuhao/ninebot-client";
 
-const auth = createNinebotNodeAuthSessionManager({
-  directory: "/absolute/private/ninebot-sdk",
-});
+async function requestSms(
+  phone: string,
+  areaCode: string,
+  showVerification: (
+    config: typeof ninebotSmsVerification,
+    signal: AbortSignal,
+  ) => Promise<string | null>,
+  signal: AbortSignal,
+): Promise<boolean> {
+  // 固定本次手机号；修改号码、切换方式或关闭面板时，由宿主 abort。
+  const input = { phone, areaCode };
+  signal.throwIfAborted();
+  try {
+    await client.auth.requestSmsCode({ ...input, signal });
+    signal.throwIfAborted();
+    return true;
+  } catch (error) {
+    if (
+      !(error instanceof PassportLoginBusinessError) ||
+      error.rejection !== "human-verification"
+    ) {
+      throw error;
+    }
+  }
 
-await auth.restore(); // Local files only; this does not verify upstream validity.
-await auth.loginWithPassword({
-  areaCode: "86",
-  user: usernameFromUserInput,
-  password: passwordFromUserInput,
-});
+  signal.throwIfAborted();
+  const validate = await showVerification(ninebotSmsVerification, signal);
+  signal.throwIfAborted();
+  if (validate === null) return false;
+  // 只重试一次。重复挑战继续抛错，不自动循环打开验证或发短信。
+  await client.auth.requestSmsCode({ ...input, validate, signal });
+  signal.throwIfAborted();
+  return true;
+}
 
-const session = await auth.ensureSession(); // Refreshes near expiry when available.
-// Pass session.accessToken and session.businessUid to authorized read-only clients.
-await auth.logout();
+// 发码成功且用户输入收到的短信验证码后：
+await client.auth.loginWithSmsCode({ areaCode: "86", phone, code });
 ```
 
-Use a private, isolated directory for acceptance testing. A successful Passport
-response alone is insufficient: business login must return the observed success
-code `1` (numeric or string) and a nonempty string `data.uid`. Missing UUID,
-business failure, invalid UID, or HTTP failure rejects login without replacing
-the previous complete session. Passwords and intermediate Passport sessions are
-not written to the session file. Refresh updates account tokens and retains the
-business UID from the completed login.
+示例沿用上文构造的 `client`。宿主负责在取消时关闭验证界面；这里的 `signal` 贯穿宿主交互、SDK 异步签名和 transport；取消后不会开始新的发码请求，也不会接受迟到成功，但不能撤回已经提交给服务器的发码请求。自定义 transport 应传递该信号给平台网络 API。验证结果不应进入日志、持久存储或应用状态快照。`ninebotSmsVerification` 来自固定版本的官方 Android 包，不保证配置跨版本、跨平台永久有效；真实验收与证据范围见 [短信验证接入](../../docs/AUTH_SMS_VERIFICATION.md)。
 
-New device contexts use the observed Android protocol defaults (`13`, `Xiaomi`,
-region `bj`); existing device metadata is preserved. These values describe the
-wire protocol context. `deviceDefaults` affects newly generated contexts only.
-The factory accepts partial `origins`, a custom `fetch`, and `timeoutMs` (15 seconds
-by default), or an injected `transport` that takes precedence over those options.
-`now` controls business service time and expiry checks; Passport timestamps use
-the Passport request builder's system clock.
+## 平台适配契约
 
-The store writes `auth-session.json` with restricted permissions and can read an
-existing complete legacy `tokens.json`. An incomplete legacy session without a
-business UID must log in again. Explicit logout removes both token files so a
-restart cannot restore the legacy session. Use a separate directory if the
-legacy session must remain available to another application. Device metadata is
-retained. Concurrent refreshes are shared; superseded login/refresh results
-cannot replace a newer account or restore credentials after logout.
+- **`NinebotTransport`**：发送固定结构的请求，返回 HTTP 状态、响应头和字节数组。实现必须保留二进制数据、支持取消，并阻止 Passport 签名请求被自动重定向到其他位置。
+- **`NinebotCryptoAdapter`**：提供安全随机 nonce、Passport 签名，以及异步 `encode`。每次 `encode` 返回自己的 `decode` 闭包，响应密钥上下文不得跨请求共享。
+- **`NinebotAuthSessionStore`**：异步 `load/save/clear`，只保存完整会话。移动端应接系统安全存储，不使用普通明文偏好存储保存令牌。
+- **`deviceStore`**：提供 `load()`，返回稳定的 `deviceId/region/osVersion/osModel`。这些值是协议上下文，默认 Android wire 字段不代表宿主必须是 Android。
+- **`responseBodyDecoder`**：可选解压边界。默认读取 `response.body`；若 transport 返回未解压的 gzip 字节，必须注入解压器。Node 可用 `/response-node` 的 `decodeGzipBody`，自动解压的 Fetch 不应重复解压。
 
-This implementation has passed local HTTP integration tests using synthetic
-credentials, encrypted responses, and gzip. The user has reported real CLI password
-lifecycle acceptance, and isolated SDK desktop login/restore/profile have passed;
-real desktop natural refresh remains unverified. The desktop production entry
-continues to default to ninecli; SDK authentication requires explicit opt-in.
+Node 调用方可以对同一个 `createNinebotSdk` 注入 `createNinebotNodeCryptoAdapter()`、`createFileNinebotAuthSessionStore()`、`createFileNinebotDeviceContextStore()` 和 `decodeGzipBody`。已有 `createNinebotNodeAuthSessionManager` 也已改为使用共享认证组装，不维护第二份业务登录规则。
 
-From this repository, `pnpm protocol:auth -- --service=ebike --month=202609`
-runs the real-service acceptance flow with terminal credential prompts and a
-fresh temporary directory. It checks persisted login/refresh, profile and
-read-only service access, then logout restoration and cleanup. Empty vehicle or
-ride samples produce an incomplete result. See the repository's
-[acceptance guide](../../docs/PROTOCOL_RESEARCH.md#真实-sdk-认证验收) for scope,
-exit codes and noninteractive input. This command still requires a real account
-run before the new authentication path is eligible for production use.
+Web 适配器使用 AES-CBC、SHA-256 和安全随机数；RSAES-PKCS1-v1_5 由现有 BigInt 实现完成。原生移动环境若缺少相应 Web Crypto 能力，可以实现同一适配器接口，无需改协议或会话代码。核心仍需要标准 Promise、Uint8Array、TextEncoder/Decoder、AbortController/Signal 与所用 ES2023 方法，宿主需验证这些能力。
 
-Password authentication can also be blocked by an interactive upstream check.
-The basic request does not implement challenge presentation or submission.
-`PassportLoginBusinessError.rejection` and the acceptance report's
-`passportRejection` classify explicit server descriptions into bounded categories;
-undocumented codes (including `2`) alone remain `unknown`. The error retains no
-raw server description or challenge data. A verification requirement needs a
-normal interactive integration or a separately authorized existing-session flow;
-request parity alone does not establish that a fresh login will succeed.
+浏览器直接访问官方服务受 CORS 与受限请求头约束；离线浏览器验收不证明官方接口允许浏览器直连。React Native 需要核验手动重定向、二进制与解压行为；微信小程序需要自己的请求适配和正式环境域名验证。公共包不会绕过平台网络限制。
 
-The private `0.0.0` API changed: Passport login/refresh now return
-`NinebotPassportSession` (no business UID), `parsePassportRefreshSession` accepts
-the previous Passport session, and `createNinebotPassportAuthProvider` requires
-its business initializer options. Complete sessions remain
-`NinebotAuthSession`. Custom runtime adapters must supply both login stages.
+## 轨迹分析
 
-## Build
+`track` 入口不导入 SDK 登录或任何平台适配器。桌面主进程的 `parseTrail` 和渲染层的轨迹计算已经引用该入口，避免两端维护不同极速算法。`getTrackMaximumPoint` 返回采样峰值及索引，不把它宣称为物理测量真值，也不自动剔除 GPS 异常点。`offsetSeconds` 仍按总时长插值估算，因为原轨迹字符串没有逐点时间戳。现有五档配色与键盘/SVG 计算作为兼容辅助保留，应用可以自行选择呈现方式。
 
-From the repository root:
+## 构建与验证
+
+在仓库根目录运行：
 
 ```sh
 pnpm --filter @jiuhao/ninebot-client build
 pnpm --filter @jiuhao/ninebot-client typecheck:browser
+pnpm exec vitest run packages/ninebot-client/src
+pnpm run qa:sdk-portability
 ```
 
-The generated declaration and JavaScript files are written to this package's
-`dist/` directory. The package is not published by the current release
-workflow.
+`typecheck:browser` 在不加载 Node 类型的配置下检查公共入口、声明依赖和 Web 适配器。`qa:sdk-portability` 会打包到临时目录、解包、检查 JS/声明的传递依赖、编译独立消费者，并在真实 Chromium 中导入成品，完成合成数据的两阶段登录、车辆、月度、轨迹、极速计算、恢复与退出；结束清理测试目录和浏览器。不使用真实账号，不访问九号接口，不打开桌面产品窗口。
 
-`typecheck:browser` checks the platform-neutral session, auth, Passport, and
-web crypto/transport layers against the DOM library without Node-only imports.
-It does not make the Node service clients or file stores browser-compatible.
+SDK 测试使用同一加密协议对端覆盖 Node 与 Web 适配器，并验证分页、并发响应密钥隔离、过期刷新、认证失败不落盘、退出后迟到数据丢弃，以及加密过程取消后不发送请求。既有桌面与协议测试继续保留。
 
-## Minimal usage
+## 分发边界
 
-The fetch factory uses the validated Ninebot service origins by default. Pass
-the session fields supplied by the host application; values below are
-placeholders and must not be replaced with real credentials in a committed
-file.
+该包当前零生产依赖；本地 tarball 包含 `dist` 与 README。原根入口迁移属于尚未发布的 `0.0.0` API 调整。首次公开发行前仍需确定包名/版本策略、许可证与协议材料分发依据，并完成目标平台的真实登录、自然刷新、短信挑战和轨迹验收。本次不修改 npm 账号、不上传包、不宣称官方授权。
 
-```ts
-import { createNinebotFetchCandidateSessionClient } from "@jiuhao/ninebot-client/candidate-session";
+实现与验收背景见仓库中的 [认证验收](../../docs/AUTH_PHASE1.md)、[桌面验收](../../docs/DESKTOP_ACCEPTANCE.md)和 [ninecli 替代记录](../../docs/NINECLI_REPLACEMENT.md)。这些仓库相对链接仅用于源码阅读，不是 npm 包的运行依赖。
 
-const client = createNinebotFetchCandidateSessionClient({
-  platform: 2,
-  session: {
-    sys_language: "zh-hans-cn",
-    client_ver: "610063322",
-    device_id: process.env.NINEBOT_DEVICE_ID!,
-    regionx: process.env.NINEBOT_REGION!,
-    language: "zh",
-    ostype: "and",
-    lang: "zh",
-    platform_ver: "13 device",
-    platform: "android",
-    login_country: "CN",
-    access_token: process.env.NINEBOT_ACCESS_TOKEN!,
-    uid: process.env.NINEBOT_UID!,
-  },
-});
+## 多账号宿主
 
-const status = await client.status({
-  service: "ebike",
-  serialNumber: "YOUR_SERIAL_NUMBER",
-});
+SDK 实例拥有各自的认证生命周期与注入的 session/device store。多账号宿主应为每个账号创建独立实例和独立存储，保留 access token、refresh token、业务 UID 及对应设备上下文，切换时选择该实例并废弃旧请求的展示结果。不要只把不同账号的 access token 填进一个共享实例或混用设备上下文。
 
-// Drop the in-memory session when the account is logged out or changed.
-client.clear();
-```
-
-`status` and `battery` accept `ebike` or `motor`. `listVehicles` additionally
-needs the service's observed `vehicleType`. `month` and `detail` use the
-same service and vehicle type, plus a `YYYYMM` month or a travel id.
-
-Every request receives a generated request id and per-request nonce by
-default. Tests or protocol fixtures can inject `clock`, `nonceFactory`, and
-`requestIdFactory` for deterministic values. A custom `fetch` implementation
-or partial `origins` map can be supplied to the fetch factory for a proxy,
-test double, or another runtime. `timeoutMs` optionally bounds each request;
-the caller can still cancel sooner with `AbortSignal`:
-
-```ts
-const client = createNinebotFetchCandidateSessionClient({
-  platform: 2,
-  session,
-  origins: { travel: "https://example.test" },
-  fetch: myFetch,
-  timeoutMs: 15_000,
-});
-```
-
-The client keeps the session only in an in-memory closure. Calling `clear()`
-cancels in-flight requests and makes all future operations fail closed until a
-new client is created.
-
-For a non-Node runtime, compose the same lifecycle around platform-specific
-clients:
-
-```ts
-import { createNinebotCandidateSessionClientFromClients } from "@jiuhao/ninebot-client/candidate-session-core";
-
-const client = createNinebotCandidateSessionClientFromClients({
-  session,
-  clients: {
-    vehicles: browserVehicleClient,
-    telemetry: browserTelemetryClient,
-    travel: browserTravelClient,
-  },
-  nonceFactory: securePlatformNonce,
-});
-```
-
-The injected clients own encryption and transport details; the core only
-assembles the observed plaintext fields and controls the in-memory session
-lifecycle.
-
-The `@jiuhao/ninebot-client/crypto-web` subpath now exposes the first
-platform-neutral crypto provider primitives: canonical/Android Base64, MD5
-checkcodes, Web Crypto AES-CBC, browser-compatible RSAES-PKCS1-v1_5, the
-observed four-input response key mixer, and secure random material generation.
-AES/RSA functions expose asynchronous APIs; AES requires
-`globalThis.crypto.subtle`, while RSA uses Web Crypto randomness and a
-BigInt-based public operation because RSAES-PKCS1-v1_5 is not consistently
-available in Web Crypto implementations. This is a primitive layer for the
-future web/mobile codec, not yet a drop-in replacement for the Node candidate
-service clients.
-
-`@jiuhao/ninebot-client/crypto-web-codec` composes those primitives into the
-observed encrypted request envelope and response `r`/inner-Base64 decoding
-chain. It keeps response key-data bound to the originating request and uses
-async methods to match Web Crypto-friendly providers. Service-specific browser
-clients and login are still outside this package boundary.
-
-`@jiuhao/ninebot-client/transport-web` provides the matching Fetch boundary
-for `ebike`, `motor`, and `travel`: it preserves binary response bytes, passes
-through caller cancellation, and can enforce a per-request timeout. It does
-not add cookies, login, token persistence, or vehicle-control operations.
-
-All five read-only methods also accept an optional `AbortSignal`. Hosts can
-cancel a request when the user switches vehicles or leaves a page:
-
-```ts
-const controller = new AbortController();
-const pending = client.detail({
-  service: "ebike",
-  serialNumber: "YOUR_SERIAL_NUMBER",
-  vehicleType: 14363,
-  travelId: "YOUR_TRAVEL_ID",
-  signal: controller.signal,
-});
-
-controller.abort();
-await pending.catch(() => undefined);
-```
-
-## Protocol boundary
-
-This package is intended for personal, authorized, read-only data access and
-for compatibility research. It should not be used to bypass account checks,
-defeat anti-abuse controls, or send vehicle-control commands. Keep captured
-payloads private and redact tokens, device identifiers, serial numbers, and
-location data before sharing diagnostics.
-
-## Independent auth-result contract
-
-The platform-neutral `auth-result` subpath observes decoded authentication
-responses without retaining tokens or upstream descriptions. Assessment requires
-an explicit operation-specific policy; there is no default Business success-code
-or partial-session compatibility policy. This module is not wired into the current
-authentication client or desktop entry.
-
-The separate `auth-result-reference` subpath models fixed ninecli 0.1.7 and current
-TS response behavior for offline comparison only. These references are not
-production acceptance rules. See [the contract and evidence boundaries](../../docs/AUTH_RESULT_CONTRACT.md).
+本仓库桌面端的本机账号目录位于主进程宿主层，页面只接收不透明本地 ID 和脱敏标识。现有单账号 SDK API 保持可用，移动端可按同样实例隔离方式提供自己的安全存储适配器；桌面文件目录本身不是跨端接口。
