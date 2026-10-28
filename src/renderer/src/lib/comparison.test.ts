@@ -61,6 +61,14 @@ describe("ride comparison metrics", () => {
     expect(metrics[6]).toEqual(expect.objectContaining({ key: "batteryUsed", delta: 1 }));
   });
 
+  it("keeps missing track peaks unavailable instead of comparing an interface fallback", () => {
+    const metrics = createRideComparisonMetrics(
+      createDetail({ sampledMaxSpeed: null, declaredMaxSpeed: 41 }),
+      createDetail({ sampledMaxSpeed: 37, declaredMaxSpeed: 41 }),
+    );
+    expect(metrics[0]).toMatchObject({ baseValue: null, comparisonValue: 37, delta: null });
+  });
+
   it("keeps efficiency unavailable when energy or positive mileage is missing", () => {
     const metrics = createRideComparisonMetrics(
       createDetail({ energyWh: null }),

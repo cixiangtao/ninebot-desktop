@@ -208,6 +208,7 @@ export interface RideSummary {
   endTime: number;
   mileageKm: number;
   durationSeconds: number;
+  /** Upstream speed reference; never a substitute for a track-sample peak. */
   declaredMaxSpeed: number | null;
   /** Ride energy returned by ninecli's `ec` field, in watt-hours. */
   energyWh: number | null;
@@ -293,6 +294,7 @@ export interface RideSpeedVerificationInput {
 export interface RideSpeedVerification {
   /** Opaque renderer-safe ride id; no upstream travel id or GPS point crosses this bridge. */
   id: string;
+  /** Upstream speed reference; never a substitute for a track-sample peak. */
   declaredMaxSpeed: number | null;
   sampledMaxSpeed: number | null;
 }
@@ -323,7 +325,7 @@ export type MonthSummaryExportFormat = "csv" | "json";
 
 export interface MonthSummaryExportInput {
   vehicleName: string;
-  /** Already-loaded month aggregate, daily mileage, and at most 20 selectable ride rows. */
+  /** Already-loaded month aggregate, daily mileage, and paginated selectable ride rows. */
   month: RideMonth;
   /** Optional track-derived maxima already verified during this renderer session. */
   speedVerifications: RideSpeedVerification[];

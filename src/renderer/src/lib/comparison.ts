@@ -21,7 +21,7 @@ export interface RideComparisonMetric {
   delta: number | null;
 }
 
-/** Builds comparable ride metrics while preserving the sampled-first maximum-speed rule. */
+/** Builds comparable ride metrics while preserving the track-only peak rule. */
 export const createRideComparisonMetrics = (
   base: RideDetail,
   comparison: RideDetail,
@@ -29,14 +29,11 @@ export const createRideComparisonMetrics = (
   const rows = [
     {
       key: "maximumSpeed",
-      label: "轨迹实测极速",
+      label: "轨迹峰值",
       unit: "km/h",
       precision: 0,
-      baseValue: resolveDisplayedMaxSpeed(base.sampledMaxSpeed, base.declaredMaxSpeed),
-      comparisonValue: resolveDisplayedMaxSpeed(
-        comparison.sampledMaxSpeed,
-        comparison.declaredMaxSpeed,
-      ),
+      baseValue: resolveDisplayedMaxSpeed(base.sampledMaxSpeed),
+      comparisonValue: resolveDisplayedMaxSpeed(comparison.sampledMaxSpeed),
     },
     {
       key: "averageSpeed",

@@ -21,7 +21,7 @@ interface MonthSummaryExportSheetProps {
   rideCount: number;
   visibleRideCount: number;
   verifiedSpeedCount: number;
-  unresolvedCappedSpeedCount: number;
+  unreadSpeedCount: number;
   ridesTruncated: boolean;
   onClose: () => void;
   onExport: (format: MonthSummaryExportFormat) => Promise<void>;
@@ -58,7 +58,7 @@ export const MonthSummaryExportSheet = ({
   rideCount,
   visibleRideCount,
   verifiedSpeedCount,
-  unresolvedCappedSpeedCount,
+  unreadSpeedCount,
   ridesTruncated,
   onClose,
   onExport,
@@ -119,10 +119,10 @@ export const MonthSummaryExportSheet = ({
         <div className="month-summary-export-evidence">
           <Gauge size={18} />
           <p>
-            极速依据：已用轨迹校验 {verifiedSpeedCount}/{visibleRideCount} 条
-            {unresolvedCappedSpeedCount > 0
-              ? `；${unresolvedCappedSpeedCount} 条未校验的 25 km/h 旧摘要会保持为空。`
-              : "；没有把未验证的旧摘要当作真实极速。"}
+            极速依据：已读取轨迹结果 {verifiedSpeedCount}/{visibleRideCount} 条
+            {unreadSpeedCount > 0
+              ? `；${unreadSpeedCount} 条未读取或无有效采样的轨迹峰值会保持为空。`
+              : "；没有把未验证的轨迹峰值当作真实极速。"}
           </p>
         </div>
 

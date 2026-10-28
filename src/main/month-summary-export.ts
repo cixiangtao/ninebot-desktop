@@ -1,3 +1,4 @@
+import { resolveTrackPeakSpeed } from "../shared/ride-speed.js";
 import type {
   MonthSummaryExportFormat,
   MonthSummaryExportInput,
@@ -6,7 +7,7 @@ import type {
 } from "../shared/contracts.js";
 import { sanitizeExportBaseName } from "./ride-export.js";
 
-type MaximumSpeedSource = "track" | "declared" | "unverified-capped" | "unavailable";
+type MaximumSpeedSource = "track" | "unread" | "unavailable";
 
 interface ExportRide extends Omit<RideSummary, "id"> {
   sequence: number;
@@ -22,23 +23,6 @@ const escapeCsvCell = (value: string | number | boolean | null) => {
   return /[",\r\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text;
 };
 
-const isLikelyCappedDeclaration = (
-  declaredMaxSpeed: number | null,
-  sampledMaxSpeed: number | null,
-) =>
-  declaredMaxSpeed === 25 &&
-  sampledMaxSpeed !== null &&
-  Math.abs(sampledMaxSpeed - declaredMaxSpeed) >= 0.5;
-
-const resolveMaximumSpeedSource = (
-  declaredMaxSpeed: number | null,
-  sampledMaxSpeed: number | null,
-): MaximumSpeedSource => {
-  if (sampledMaxSpeed !== null) return "track";
-  if (declaredMaxSpeed === 25) return "unverified-capped";
-  return declaredMaxSpeed === null ? "unavailable" : "declared";
-};
-
 const createExportRides = (input: MonthSummaryExportInput): ExportRide[] => {
   const verifications = new Map<string, RideSpeedVerification>(
     input.speedVerifications.map((verification) => [verification.id, verification]),
@@ -46,8 +30,9 @@ const createExportRides = (input: MonthSummaryExportInput): ExportRide[] => {
   return input.month.rides.map((ride, index) => {
     const verification = verifications.get(ride.id);
     const declaredMaxSpeed = verification?.declaredMaxSpeed ?? ride.declaredMaxSpeed;
-    const sampledMaxSpeedKmh = verification?.sampledMaxSpeed ?? null;
-    const maximumSpeedSource = resolveMaximumSpeedSource(declaredMaxSpeed, sampledMaxSpeedKmh);
+    const sampledMaxSpeedKmh = resolveTrackPeakSpeed(verification?.sampledMaxSpeed ?? null);
+    const maximumSpeedSource =
+      verification === undefined ? "unread" : sampledMaxSpeedKmh === null ? "unavailable" : "track";
     return {
       sequence: index + 1,
       startTime: ride.startTime,
@@ -61,10 +46,7 @@ const createExportRides = (input: MonthSummaryExportInput): ExportRide[] => {
       averageSpeedKmh:
         ride.durationSeconds > 0 ? ride.mileageKm / (ride.durationSeconds / 3_600) : 0,
       sampledMaxSpeedKmh,
-      displayedMaxSpeedKmh:
-        maximumSpeedSource === "unverified-capped" || maximumSpeedSource === "unavailable"
-          ? null
-          : (sampledMaxSpeedKmh ?? declaredMaxSpeed),
+      displayedMaxSpeedKmh: sampledMaxSpeedKmh,
       maximumSpeedSource,
     };
   });
@@ -77,11 +59,16 @@ const createCoverage = (input: MonthSummaryExportInput, rides: ExportRide[]) => 
   ridesTruncated: input.month.summary.ridesTruncated,
   verifiedSpeedCount: rides.filter(({ maximumSpeedSource }) => maximumSpeedSource === "track")
     .length,
-  correctedSpeedCount: rides.filter(({ declaredMaxSpeed, sampledMaxSpeedKmh }) =>
-    isLikelyCappedDeclaration(declaredMaxSpeed, sampledMaxSpeedKmh),
+  speedDifferenceCount: rides.filter(
+    ({ declaredMaxSpeed, sampledMaxSpeedKmh }) =>
+      declaredMaxSpeed !== null &&
+      sampledMaxSpeedKmh !== null &&
+      Math.abs(declaredMaxSpeed - sampledMaxSpeedKmh) >= 0.5,
   ).length,
-  unverifiedCappedSpeedCount: rides.filter(
-    ({ maximumSpeedSource }) => maximumSpeedSource === "unverified-capped",
+  unreadSpeedCount: rides.filter(({ maximumSpeedSource }) => maximumSpeedSource === "unread")
+    .length,
+  unavailableSpeedCount: rides.filter(
+    ({ maximumSpeedSource }) => maximumSpeedSource === "unavailable",
   ).length,
 });
 
@@ -112,8 +99,8 @@ const createCsv = (input: MonthSummaryExportInput) => {
       "aggregate_available",
       "rides_truncated",
       "verified_speed_count",
-      "corrected_speed_count",
-      "unverified_capped_speed_count",
+      "speed_difference_count",
+      "unread_speed_count",
     ],
     [
       "month",
@@ -140,8 +127,8 @@ const createCsv = (input: MonthSummaryExportInput) => {
       input.month.summary.aggregateAvailable,
       input.month.summary.ridesTruncated,
       coverage.verifiedSpeedCount,
-      coverage.correctedSpeedCount,
-      coverage.unverifiedCappedSpeedCount,
+      coverage.speedDifferenceCount,
+      coverage.unreadSpeedCount,
     ],
   ];
 
@@ -210,7 +197,8 @@ const createJson = (input: MonthSummaryExportInput) => {
   const rides = createExportRides(input);
   return `${JSON.stringify(
     {
-      schemaVersion: 1,
+      schemaVersion: 2,
+      maximumSpeedMetric: "track-sample-maximum",
       exportedBy: "韭号出行",
       exportedAt: new Date().toISOString(),
       vehicleName: input.vehicleName,

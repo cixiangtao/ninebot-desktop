@@ -46,6 +46,7 @@ import type {
   YearSummaryExportFormat,
   YearSummaryExportMonth,
 } from "../../shared/contracts";
+import { RidePeakQueue, type RidePeakQueueState } from "./lib/ride-peak-queue";
 import { ThemePicker } from "./components/ThemePicker";
 import { LoginSheet } from "./components/LoginSheet";
 import { LocationDashboard } from "./components/LocationDashboard";
@@ -55,7 +56,7 @@ import { PlaybackRateControl } from "./components/PlaybackRateControl";
 import { RideComparisonDashboard } from "./components/RideComparisonDashboard";
 import { RideActivityCalendar } from "./components/RideActivityCalendar";
 import { RideExportSheet } from "./components/RideExportSheet";
-import { RideSpeedReading } from "./components/RideSpeedReading";
+import { RideHistoryList } from "./components/RideHistoryList";
 import { RideSpeedVerificationPanel } from "./components/RideSpeedVerificationPanel";
 import { RouteMap } from "./components/RouteMap";
 import { SecuritySheet } from "./components/SecuritySheet";
@@ -81,10 +82,8 @@ import {
   formatDuration,
   formatLongDuration,
   formatMonth,
-  formatRideDate,
   getMonthYear,
   getMonthFromUnixSeconds,
-  isLikelyCappedMaxSpeedDeclaration,
   resolveDisplayedMaxSpeed,
 } from "./lib/format";
 import type { CoordinateDisplayMode } from "./lib/coordinate";
@@ -128,12 +127,6 @@ type DetailRefreshState =
   | { status: "idle" }
   | { status: "loading" }
   | { status: "success" }
-  | { status: "error"; message: string };
-
-type RideSpeedVerificationState =
-  | { status: "idle" }
-  | { status: "loading" }
-  | { status: "success"; failedRideCount: number }
   | { status: "error"; message: string };
 
 const PLAYBACK_SEGMENT_DURATION_MS = 180;
@@ -367,8 +360,22 @@ export default function App() {
   const [rideSpeedVerifications, setRideSpeedVerifications] = useState<
     Record<string, RideSpeedVerification>
   >({});
-  const [rideSpeedVerificationState, setRideSpeedVerificationState] =
-    useState<RideSpeedVerificationState>({ status: "idle" });
+  const [rideSpeedVerificationState, setRideSpeedVerificationState] = useState<RidePeakQueueState>({
+    loading: false,
+    failedCount: 0,
+    error: null,
+  });
+  const [visibleRideIds, setVisibleRideIds] = useState<string[]>([]);
+  const [ridePeakQueue] = useState(
+    () =>
+      new RidePeakQueue(
+        (reading) =>
+          setRideSpeedVerifications((current) =>
+            current[reading.id] ? current : { ...current, [reading.id]: reading },
+          ),
+        setRideSpeedVerificationState,
+      ),
+  );
   const [comparisonDetail, setComparisonDetail] = useState<RideDetail | null>(null);
   const [comparisonRideId, setComparisonRideId] = useState<string | null>(null);
   const [comparisonLoading, setComparisonLoading] = useState(false);
@@ -377,6 +384,7 @@ export default function App() {
   const [isPlaying, setIsPlaying] = useState(false);
   const [playbackRate, setPlaybackRate] = useState<PlaybackRate>(1);
   const [loading, setLoading] = useState(false);
+  const [rideDetailLoading, setRideDetailLoading] = useState(false);
   const [loginOpen, setLoginOpen] = useState(false);
   const [loginBusy, setLoginBusy] = useState(false);
   const activeSmsRequest = useRef<string | null>(null);
@@ -427,7 +435,6 @@ export default function App() {
   const locationRequestRef = useRef(0);
   const statisticsRequestRef = useRef(0);
   const comparisonRequestRef = useRef(0);
-  const rideSpeedVerificationRequestRef = useRef(0);
   const viewRef = useRef<AppView>(view);
   const vehicleRef = useRef(vehicle);
   const statisticsYearRef = useRef(statisticsYear);
@@ -446,13 +453,19 @@ export default function App() {
     setComparisonError(null);
   }, []);
 
-  const resetRideSpeedVerification = useCallback((initialDetail: RideDetail | null = null) => {
-    ++rideSpeedVerificationRequestRef.current;
-    setRideSpeedVerifications(
-      initialDetail ? { [initialDetail.id]: createRideSpeedVerification(initialDetail) } : {},
-    );
-    setRideSpeedVerificationState({ status: "idle" });
-  }, []);
+  const resetRideSpeedVerification = useCallback(
+    (initialDetail: RideDetail | null = null, preserveReadings = false) => {
+      ridePeakQueue.reset();
+      setVisibleRideIds([]);
+      setRideSpeedVerifications((current) => ({
+        ...(preserveReadings ? current : {}),
+        ...(initialDetail
+          ? { [initialDetail.id]: createRideSpeedVerification(initialDetail) }
+          : {}),
+      }));
+    },
+    [ridePeakQueue],
+  );
 
   const rememberRideSpeedVerification = useCallback((nextDetail: RideDetail) => {
     setRideSpeedVerifications((current) => ({
@@ -479,6 +492,7 @@ export default function App() {
       setSavedAccounts(null);
       setSecurityStatus(null);
       setLoading(false);
+      setRideDetailLoading(false);
       setLoginBusy(false);
       setSecurityOpen(false);
       setLoginOpen(reconnect);
@@ -720,11 +734,12 @@ export default function App() {
       }
       const shouldLoadFirstRideDetail = !rideDetailDeferredRef.current;
       const requestId = ++liveRequestRef.current;
+      setRideDetailLoading(false);
       setLoading(true);
       setError(null);
       setIsPlaying(false);
       resetComparison();
-      resetRideSpeedVerification();
+      resetRideSpeedVerification(null, Boolean(knownVehicle) && !refresh);
       if (viewRef.current === "comparison") {
         viewRef.current = "rides";
         setView("rides");
@@ -790,7 +805,9 @@ export default function App() {
         if (viewRef.current === "statistics") {
           void loadYearStatistics(statisticsYearRef.current, nextVehicle);
         }
+        setLoading(false);
         if (!firstRide || !shouldLoadFirstRideDetail) return nextVehicle;
+        setRideDetailLoading(true);
         const nextDetail = await retryTransientBridgeRead(() =>
           bridge.rides.detail({ vehicleId: nextVehicle.id, rideId: firstRide.id }).then(unwrap),
         );
@@ -806,7 +823,10 @@ export default function App() {
           setError(cause instanceof Error ? cause.message : "读取九号数据失败。");
         }
       } finally {
-        if (requestId === liveRequestRef.current) setLoading(false);
+        if (requestId === liveRequestRef.current) {
+          setLoading(false);
+          setRideDetailLoading(false);
+        }
       }
     },
     [
@@ -902,12 +922,14 @@ export default function App() {
     if (!preservePlayback) seekPlayback(0);
     setDetailRefreshState(refresh ? { status: "loading" } : { status: "idle" });
     if (mode === "demo" || !window.ninebot) {
+      setRideDetailLoading(false);
       setDetail(createDemoDetail(ride));
       setDetailRefreshState({ status: "idle" });
       return;
     }
     const requestId = ++liveRequestRef.current;
-    if (!refresh) setLoading(true);
+    if (!refresh) setDetail(null);
+    setRideDetailLoading(!refresh);
     setError(null);
     try {
       const nextDetail = unwrap(
@@ -934,7 +956,7 @@ export default function App() {
         else setError(message);
       }
     } finally {
-      if (requestId === liveRequestRef.current && !refresh) setLoading(false);
+      if (requestId === liveRequestRef.current && !refresh) setRideDetailLoading(false);
     }
   };
 
@@ -951,6 +973,7 @@ export default function App() {
     }
     ++liveRequestRef.current;
     setLoading(false);
+    setRideDetailLoading(false);
     setIsPlaying(false);
     setDetail(null);
     setSelectedRideId(null);
@@ -958,39 +981,41 @@ export default function App() {
     seekPlayback(0);
   };
 
-  const verifyMonthRideSpeeds = async () => {
-    if (rides.length === 0 || rideSpeedVerificationState.status === "loading") return;
-    const requestId = ++rideSpeedVerificationRequestRef.current;
-    setRideSpeedVerificationState({ status: "loading" });
-    try {
-      const result =
-        mode === "demo" || !window.ninebot
-          ? {
-              rides: rides.map((ride) => createRideSpeedVerification(createDemoDetail(ride))),
-              failedRideCount: 0,
-            }
-          : unwrap(
-              await window.ninebot.rides.verifySpeeds({
-                vehicleId: vehicle.id,
-                rideIds: rides.map(({ id }) => id),
-              }),
-            );
-      if (requestId !== rideSpeedVerificationRequestRef.current) return;
-      setRideSpeedVerifications(
-        Object.fromEntries(result.rides.map((verification) => [verification.id, verification])),
-      );
-      setRideSpeedVerificationState({
-        status: "success",
-        failedRideCount: result.failedRideCount,
-      });
-    } catch (cause) {
-      if (requestId === rideSpeedVerificationRequestRef.current) {
-        setRideSpeedVerificationState({
-          status: "error",
-          message: cause instanceof Error ? cause.message : "无法校验本月极速。",
-        });
+  useEffect(() => {
+    const bridge = window.ninebot;
+    const readPeak = async (id: string): Promise<RideSpeedVerification> => {
+      if (mode === "demo" || !bridge) {
+        const ride = rides.find((candidate) => candidate.id === id);
+        if (!ride) throw new Error("行程已失效。");
+        return createRideSpeedVerification(createDemoDetail(ride));
       }
-    }
+      const result = unwrap(
+        await bridge.rides.verifySpeeds({ vehicleId: vehicle.id, rideIds: [id] }),
+      );
+      const reading = result.rides.find((candidate) => candidate.id === id);
+      if (!reading) throw new Error("轨迹读取失败，可重试。");
+      return reading;
+    };
+    ridePeakQueue.update(
+      visibleRideIds.filter((id) => rides.some((ride) => ride.id === id)),
+      rideSpeedVerifications,
+      !loading && view === "rides" && mode !== "unauthenticated" ? readPeak : null,
+    );
+  }, [
+    ridePeakQueue,
+    visibleRideIds,
+    rideSpeedVerifications,
+    loading,
+    view,
+    mode,
+    vehicle.id,
+    rides,
+  ]);
+
+  useEffect(() => () => ridePeakQueue.reset(false), [ridePeakQueue]);
+
+  const verifyMonthRideSpeeds = () => {
+    ridePeakQueue.requestAll(rides.map(({ id }) => id));
   };
 
   const loadComparisonRide = async (ride: RideSummary) => {
@@ -1273,6 +1298,7 @@ export default function App() {
   const logout = async () => {
     if (!window.ninebot) return;
     ++liveRequestRef.current;
+    setRideDetailLoading(false);
     ++snapshotRequestRef.current;
     ++locationRequestRef.current;
     ++statisticsRequestRef.current;
@@ -1302,7 +1328,7 @@ export default function App() {
     setMonthExportError(null);
     setMonthExportNotice(null);
     resetComparison();
-    resetRideSpeedVerification();
+    resetRideSpeedVerification(null, true);
     setMonth(nextMonth);
     setMonthPickerYear(getMonthYear(nextMonth));
     setMonthPickerOpen(false);
@@ -1532,36 +1558,22 @@ export default function App() {
   const activePoint = interpolateTrackPoint(track, playbackPosition);
   const elapsedSeconds = activePoint?.offsetSeconds ?? 0;
   const progress = track.length <= 1 ? 0 : (playbackPosition / (track.length - 1)) * 100;
-  const maxSpeed = detail
-    ? resolveDisplayedMaxSpeed(detail.sampledMaxSpeed, detail.declaredMaxSpeed)
-    : 0;
+  const maxSpeed = detail ? resolveDisplayedMaxSpeed(detail.sampledMaxSpeed) : null;
   const rideEnergyEfficiency = detail
     ? calculateRideEnergyEfficiency(detail.energyWh, detail.mileageKm)
     : null;
   const rideDayShare = detail ? calculateRideDayShare(detail.mileageKm, detail.dayMileageKm) : null;
-  const declaredMaxSpeedLikelyCapped = detail
-    ? isLikelyCappedMaxSpeedDeclaration(detail.sampledMaxSpeed, detail.declaredMaxSpeed)
-    : false;
+  const rideDataLoading = loading || rideDetailLoading;
   const detailRefreshing = detailRefreshState.status === "loading";
-  const speedVerificationLoading = rideSpeedVerificationState.status === "loading";
+  const speedVerificationLoading = rideSpeedVerificationState.loading;
   const verifiedSpeedCount = rides.filter(({ id }) => rideSpeedVerifications[id]).length;
-  const correctedSpeedCount = rides.filter(({ id }) => {
+  const unavailableSpeedCount = rides.filter(({ id }) => {
     const verification = rideSpeedVerifications[id];
     return (
-      verification !== undefined &&
-      isLikelyCappedMaxSpeedDeclaration(verification.sampledMaxSpeed, verification.declaredMaxSpeed)
+      verification !== undefined && resolveDisplayedMaxSpeed(verification.sampledMaxSpeed) === null
     );
   }).length;
-  const unresolvedSpeedPlaceholderCount = rides.filter((ride) => {
-    const verification = rideSpeedVerifications[ride.id];
-    const sampledMaxSpeed = verification?.sampledMaxSpeed ?? null;
-    const declaredMaxSpeed = verification?.declaredMaxSpeed ?? ride.declaredMaxSpeed;
-    return sampledMaxSpeed === null && declaredMaxSpeed === 25;
-  }).length;
-  const failedSpeedVerificationCount =
-    rideSpeedVerificationState.status === "success"
-      ? rideSpeedVerificationState.failedRideCount
-      : 0;
+  const failedSpeedVerificationCount = rideSpeedVerificationState.failedCount;
 
   const refreshCurrentRide = () => {
     if (mode !== "live" || !currentRide || detailRefreshing) return;
@@ -1632,7 +1644,7 @@ export default function App() {
                     : "轨迹回放"}
           </span>
           <div className="workspace-status no-drag">
-            {loading ||
+            {rideDataLoading ||
             detailRefreshing ||
             speedVerificationLoading ||
             snapshotLoading ||
@@ -1789,15 +1801,10 @@ export default function App() {
                     <RideSpeedVerificationPanel
                       totalCount={rides.length}
                       verifiedCount={verifiedSpeedCount}
-                      correctedCount={correctedSpeedCount}
                       failedCount={failedSpeedVerificationCount}
-                      placeholderCount={unresolvedSpeedPlaceholderCount}
+                      unavailableCount={unavailableSpeedCount}
                       loading={speedVerificationLoading}
-                      error={
-                        rideSpeedVerificationState.status === "error"
-                          ? rideSpeedVerificationState.message
-                          : null
-                      }
+                      error={rideSpeedVerificationState.error}
                       disabled={loading || rides.length === 0}
                       onVerify={() => void verifyMonthRideSpeeds()}
                     />
@@ -1820,36 +1827,14 @@ export default function App() {
                           </button>
                         </p>
                       ) : null}
-                      {displayedRides.map((ride) => (
-                        <button
-                          key={ride.id}
-                          type="button"
-                          onClick={() => void selectRide(ride)}
-                          className={`ride-row ${selectedRideId === ride.id ? "ride-row-active" : ""}`}
-                        >
-                          <span className="route-thumb" aria-hidden="true">
-                            <i />
-                            <i />
-                            <i />
-                            <i />
-                          </span>
-                          <span className="min-w-0 flex-1 text-left">
-                            <strong className="block text-[14px] font-[650] text-[#283645]">
-                              {formatRideDate(ride.startTime)}
-                            </strong>
-                            <span className="mt-1 block truncate text-xs font-medium text-slate-500">
-                              {ride.mileageKm.toFixed(1)} km ·{" "}
-                              {formatDuration(ride.durationSeconds)}
-                              {ride.energyWh !== null ? ` · ${ride.energyWh.toFixed(0)} Wh` : ""}
-                            </span>
-                          </span>
-                          <RideSpeedReading
-                            ride={ride}
-                            verification={rideSpeedVerifications[ride.id] ?? null}
-                          />
-                        </button>
-                      ))}
-
+                      <RideHistoryList
+                        rides={displayedRides}
+                        selectedRideId={selectedRideId}
+                        verifications={rideSpeedVerifications}
+                        truncated={rideMonthSummary.ridesTruncated}
+                        onSelect={(ride) => void selectRide(ride)}
+                        onVisibleRidesChange={setVisibleRideIds}
+                      />
                       {!loading && displayedRides.length === 0 ? (
                         <p className="ride-list-empty">
                           {selectedRideDay !== null &&
@@ -1966,10 +1951,12 @@ export default function App() {
                         <div className="flex items-start justify-between gap-3">
                           <div>
                             <p className="flex items-center gap-2 text-xs font-semibold text-slate-500">
-                              最高速度
+                              轨迹峰值
                             </p>
                             <div className="mt-1 flex items-baseline gap-2">
-                              <strong className="metric-number">{Math.round(maxSpeed)}</strong>
+                              <strong className="metric-number">
+                                {maxSpeed === null ? "—" : Math.round(maxSpeed)}
+                              </strong>
                               <span className="text-sm font-semibold text-slate-500">km/h</span>
                             </div>
                           </div>
@@ -1982,7 +1969,7 @@ export default function App() {
                                 mode !== "live" ||
                                 currentRide === null ||
                                 detailRefreshing ||
-                                loading
+                                rideDataLoading
                               }
                               aria-label="刷新当前行程"
                               title={
@@ -2002,7 +1989,9 @@ export default function App() {
                               type="button"
                               onClick={openComparison}
                               disabled={
-                                comparisonCandidates.length === 0 || loading || detailRefreshing
+                                comparisonCandidates.length === 0 ||
+                                rideDataLoading ||
+                                detailRefreshing
                               }
                               aria-label="对比当前行程"
                               title="对比当前行程"
@@ -2016,7 +2005,9 @@ export default function App() {
                                 setExportError(null);
                                 setExportOpen(true);
                               }}
-                              disabled={detail.track.length === 0 || loading || detailRefreshing}
+                              disabled={
+                                detail.track.length === 0 || rideDataLoading || detailRefreshing
+                              }
                               aria-label="导出当前行程"
                               title="导出当前行程"
                             >
@@ -2070,9 +2061,7 @@ export default function App() {
                               : detailRefreshState.status === "loading" ||
                                   detailRefreshState.status === "success"
                                 ? "ride-detail-refresh-active"
-                                : declaredMaxSpeedLikelyCapped
-                                  ? "ride-detail-source-warning"
-                                  : ""
+                                : ""
                           }`}
                           role={detailRefreshState.status === "error" ? "alert" : "status"}
                           title={
@@ -2087,12 +2076,7 @@ export default function App() {
                               ? "当前行程已重新读取"
                               : detailRefreshState.status === "error"
                                 ? "刷新失败，旧数据已保留，请再次刷新"
-                                : detail.sampledMaxSpeed !== null &&
-                                    detail.declaredMaxSpeed !== null
-                                  ? declaredMaxSpeedLikelyCapped
-                                    ? `旧记录摘要固定返回 25 km/h，已忽略；当前显示由 ${detail.track.length} 个轨迹点计算。`
-                                    : `接口摘要 ${detail.declaredMaxSpeed.toFixed(0)} km/h · 轨迹采样 ${detail.sampledMaxSpeed.toFixed(0)} km/h`
-                                  : "\u00a0"}
+                                : `接口极速 ${detail.declaredMaxSpeed === null ? "—" : `${detail.declaredMaxSpeed.toFixed(0)} km/h`} · 轨迹峰值 ${maxSpeed === null ? "不可用" : `${Math.round(maxSpeed)} km/h`}`}
                         </p>
                         {exportNotice ? (
                           <p className="ride-export-notice" role="status">
@@ -2180,22 +2164,28 @@ export default function App() {
                     </>
                   ) : (
                     <section className="empty-month-panel" aria-live="polite">
-                      {loading ? (
+                      {rideDataLoading ? (
                         <LoaderCircle size={22} className="animate-spin text-[#0a9f92]" />
                       ) : (
                         <CalendarDays size={22} />
                       )}
                       <div>
                         <strong>
-                          {loading
-                            ? `正在读取${formatMonth(month)}`
-                            : rides.length > 0
-                              ? "选择一条行程查看轨迹"
-                              : `${formatMonth(month)}没有行程`}
+                          {rideDataLoading
+                            ? rideDetailLoading
+                              ? "正在读取骑行轨迹"
+                              : `正在读取${formatMonth(month)}`
+                            : error
+                              ? "轨迹读取失败"
+                              : rides.length > 0
+                                ? "选择一条行程查看轨迹"
+                                : `${formatMonth(month)}没有行程`}
                         </strong>
                         <p>
-                          {loading
-                            ? "正在从九号账号读取这个月的骑行记录。"
+                          {rideDataLoading
+                            ? rideDetailLoading
+                              ? "正在读取所选行程的轨迹详情。"
+                              : "正在从九号账号读取这个月的骑行记录。"
                             : error
                               ? "读取失败，请检查网络后重新尝试。"
                               : rides.length > 0
@@ -2203,10 +2193,14 @@ export default function App() {
                                 : "可以从左侧选择其他年份和月份继续查看。"}
                         </p>
                       </div>
-                      {!loading && error && mode === "live" ? (
+                      {!rideDataLoading && error && mode === "live" ? (
                         <button
                           type="button"
-                          onClick={() => void loadLiveData(month, vehicle, { refresh: true })}
+                          onClick={() =>
+                            void (currentRide
+                              ? selectRide(currentRide)
+                              : loadLiveData(month, vehicle, { refresh: true }))
+                          }
                         >
                           <RefreshCw size={14} />
                           重新读取
@@ -2262,7 +2256,7 @@ export default function App() {
         rideCount={rideMonthSummary.rideCount}
         visibleRideCount={rideMonthSummary.visibleRideCount}
         verifiedSpeedCount={verifiedSpeedCount}
-        unresolvedCappedSpeedCount={unresolvedSpeedPlaceholderCount}
+        unreadSpeedCount={rides.length - verifiedSpeedCount}
         ridesTruncated={rideMonthSummary.ridesTruncated}
         onClose={() => {
           setMonthExportOpen(false);

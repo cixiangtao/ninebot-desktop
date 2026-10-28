@@ -907,79 +907,61 @@ select:focus-visible {
 }
 
 .ride-speed-verification {
-  margin: 9px 8px 0;
-  padding: 9px 10px;
-  border-radius: 12px;
-  background: #edf2f3;
+  position: relative;
+  margin: 8px 8px 0;
+  color: var(--muted);
 }
-
-.ride-speed-verification-heading,
-.ride-speed-verification-heading span {
+.ride-speed-verification-help summary {
   display: flex;
   align-items: center;
-}
-
-.ride-speed-verification-heading {
-  justify-content: space-between;
   gap: 8px;
+  min-height: 32px;
+  padding-right: 88px;
+  font-size: 12px;
+  cursor: pointer;
+  list-style: none;
 }
-
-.ride-speed-verification-heading span {
-  min-width: 0;
-  gap: 6px;
-  color: #31424e;
+.ride-speed-verification-help summary::-webkit-details-marker {
+  display: none;
 }
-
-.ride-speed-verification-heading strong {
-  font-size: 11px;
-  font-weight: 690;
+.ride-speed-verification-help summary:hover {
+  color: var(--accent);
 }
-
-.ride-speed-verification-heading button {
-  min-height: 27px;
-  flex: none;
-  padding: 0 9px;
+.ride-speed-verification-help[open] summary {
+  color: var(--accent);
+}
+.ride-speed-verification-help[open] .ride-speed-help-chevron {
+  transform: rotate(180deg);
+}
+.ride-speed-verification > button {
+  position: absolute;
+  right: 0;
+  top: 0;
+  min-height: 32px;
+  padding: 0 8px;
   border: 0;
   border-radius: 12px;
-  color: #087f76;
-  background: #ffffff;
-  font-size: 10px;
-  font-weight: 690;
-  box-shadow: 0 3px 10px rgb(47 64 76 / 8%);
+  color: var(--accent);
+  background: var(--accent-soft);
+  font-size: 12px;
+  font-weight: 650;
 }
-
-.ride-speed-verification-heading button:hover {
-  color: #ffffff;
-  background: #087f76;
+.ride-speed-verification > button:hover {
+  background: var(--row-hover);
 }
-
-.ride-speed-verification-heading button:disabled {
+.ride-speed-verification > button:disabled {
   cursor: not-allowed;
   opacity: 0.45;
 }
-
 .ride-speed-verification p,
-.ride-speed-verification > small {
+.ride-speed-verification small {
   display: block;
-  line-height: 1.4;
+  margin: 8px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
 }
-
-.ride-speed-verification p {
-  margin-top: 6px;
-  color: #536472;
-  font-size: 10px;
-  font-weight: 630;
-}
-
-.ride-speed-verification > small {
-  margin-top: 3px;
-  color: #7b8993;
-  font-size: 9px;
-  font-weight: 560;
-}
-
 .ride-speed-verification .ride-speed-verification-error {
-  color: #9b3038;
+  color: var(--error, #9b3038);
 }
 
 .ride-activity-calendar {
@@ -1208,27 +1190,138 @@ select:focus-visible {
   opacity: 0.45;
 }
 
-.ride-row {
+.ride-history-groups,
+.ride-day-cards {
+  display: grid;
+  gap: 8px;
+}
+.ride-history-groups {
+  gap: 16px;
+}
+.ride-day-heading {
   display: flex;
-  width: 100%;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  margin: 0 4px 8px;
+}
+.ride-day-total {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 18px;
+  font-variant-numeric: tabular-nums;
+}
+.ride-day-total small {
+  font-size: inherit;
+}
+.ride-day-heading h3 {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 650;
+}
+.ride-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  gap: 11px;
-  padding: 9px;
+  width: 100%;
+  min-height: 70px;
+  gap: 8px;
+  padding: 12px;
   border: 0;
   border-radius: 13px;
-  background: transparent;
-  transition:
-    background 160ms ease-out,
-    box-shadow 160ms ease-out;
+  color: var(--ink);
+  background: var(--canvas);
+  text-align: left;
+  font-variant-numeric: tabular-nums;
+  transition: background 160ms ease-out;
 }
-
 .ride-row:hover {
-  background: rgb(255 255 255 / 66%);
+  background: var(--row-hover);
 }
-
+.ride-row:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
 .ride-row-active {
-  background: #ffffff;
-  box-shadow: 0 6px 20px rgb(47 64 76 / 9%);
+  background: var(--row-selected);
+  box-shadow: none;
+}
+.ride-card-identity {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+.ride-card-time {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 18px;
+}
+.ride-card-summary {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 0 4px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 18px;
+}
+.ride-card-distance {
+  white-space: nowrap;
+}
+.ride-card-duration {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 4px;
+  white-space: nowrap;
+}
+.ride-card-distance strong {
+  color: var(--ink);
+  font-size: 16px;
+  line-height: 18px;
+  font-weight: 650;
+}
+.ride-card-speed {
+  display: grid;
+  min-width: 66px;
+  gap: 4px;
+  justify-items: end;
+  text-align: right;
+}
+.ride-card-speed-label {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 14px;
+}
+.ride-card-speed .ride-speed-reading {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+  width: auto;
+  color: var(--ink);
+}
+.ride-card-speed .ride-speed-reading strong {
+  color: var(--ink);
+  font-size: 28px;
+  line-height: 1;
+  font-weight: 400;
+  letter-spacing: -0.02em;
+}
+.ride-card-speed .ride-speed-reading small {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1;
+  font-weight: 500;
+}
+.ride-card-speed .ride-speed-reading .ride-speed-unavailable {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 18px;
+  font-weight: 500;
+  letter-spacing: normal;
 }
 
 .ride-speed-reading {
@@ -1278,45 +1371,6 @@ select:focus-visible {
 
 .ride-speed-reading[data-source="placeholder"] em {
   color: #647481;
-}
-
-.route-thumb {
-  position: relative;
-  width: 48px;
-  height: 48px;
-  flex: none;
-  overflow: hidden;
-  border-radius: 12px;
-  background: #eaf2f1;
-}
-
-.route-thumb::before {
-  position: absolute;
-  inset: 8px 14px;
-  content: "";
-  border: 2px solid #17bfae;
-  border-top-color: transparent;
-  border-radius: 40% 60% 55% 45%;
-  transform: rotate(-18deg);
-}
-
-.route-thumb i:first-child,
-.route-thumb i:last-child {
-  position: absolute;
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: #12bfae;
-}
-
-.route-thumb i:first-child {
-  left: 13px;
-  bottom: 11px;
-}
-.route-thumb i:last-child {
-  right: 12px;
-  top: 10px;
-  background: #ff666b;
 }
 
 .secondary-button,

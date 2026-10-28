@@ -48,7 +48,9 @@
     "package:sdk:mac:dir": "node scripts/package-sdk-only.ts --platform=darwin",
     "package:sdk:win:dir": "node scripts/package-sdk-only.ts --platform=win32",
     "qa:sdk-portability": "pnpm run build:sdk && node scripts/qa-sdk-portability.mjs",
-    "qa:accounts": "pnpm run build && node scripts/qa-accounts.mjs"
+    "qa:accounts": "pnpm run build && node scripts/qa-accounts.mjs",
+    "qa:ride-selection": "pnpm run build && node scripts/qa-ride-selection.mjs",
+    "qa:track-peak": "pnpm run build && node scripts/qa-track-peak.mjs"
   },
   "dependencies": {
     "@jiuhao/ninebot-client": "workspace:*",
