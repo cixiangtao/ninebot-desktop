@@ -2402,54 +2402,10 @@ select:focus-visible {
   font-weight: 620;
 }
 
-.vehicle-range-comparison {
+.vehicle-battery-score {
   margin-top: 16px;
   padding-top: 14px;
   border-top: 1px solid rgb(218 226 230 / 82%);
-}
-
-.vehicle-range-comparison > span {
-  color: #829099;
-  font-size: 9px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-}
-
-.vehicle-range-comparison > div {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 7px;
-  margin-top: 8px;
-}
-
-.vehicle-range-comparison p {
-  min-width: 0;
-  margin: 0;
-  padding: 8px;
-  border-radius: 10px;
-  background: #f2f6f7;
-}
-
-.vehicle-range-comparison small,
-.vehicle-range-comparison strong {
-  display: block;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.vehicle-range-comparison small {
-  color: #829099;
-  font-size: 8px;
-  font-weight: 630;
-}
-
-.vehicle-range-comparison strong {
-  margin-top: 3px;
-  color: #33444f;
-  font-size: 10px;
-  font-weight: 710;
-  font-variant-numeric: tabular-nums;
 }
 
 .vehicle-charge-remaining {

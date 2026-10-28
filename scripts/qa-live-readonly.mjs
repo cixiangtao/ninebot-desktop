@@ -744,10 +744,12 @@ try {
   await window.waitForSelector(".vehicle-dashboard");
   await window.waitForFunction(() => document.querySelectorAll(".battery-pack-card").length > 0);
   await window.waitForFunction(
-    () => document.querySelectorAll(".vehicle-range-comparison p").length >= 2,
+    () => document.querySelectorAll(".vehicle-range-summary .device-metric").length >= 2,
   );
   const liveBatteryPackCards = await window.locator(".battery-pack-card").count();
-  const liveRangeEstimateCards = await window.locator(".vehicle-range-comparison p").count();
+  const liveRangeEstimateCards = await window
+    .locator(".vehicle-range-summary .device-metric")
+    .count();
   const liveVehicleContextText = await window
     .locator(".vehicle-dashboard-header > div > p:last-child")
     .textContent();
@@ -963,10 +965,10 @@ try {
             aiRangeKm: snapshot.data.aiEstimatedRangeKm,
             standardRangeKm: snapshot.data.estimatedRangeKm,
             preciseRangeKm: snapshot.data.preciseEstimatedRangeKm,
-            displayedRangeKm:
-              snapshot.data.aiEstimatedRangeKm ??
-              snapshot.data.preciseEstimatedRangeKm ??
-              snapshot.data.estimatedRangeKm,
+            displayedRangesKm: {
+              precise: snapshot.data.preciseEstimatedRangeKm,
+              basic: snapshot.data.estimatedRangeKm,
+            },
             remainingChargeTimePresent: snapshot.data.remainingChargeTimeText !== null,
             locked: snapshot.data.locked,
             poweredOn: snapshot.data.poweredOn,

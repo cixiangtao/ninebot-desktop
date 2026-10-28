@@ -34,9 +34,6 @@ interface VehicleDashboardProps {
 const formatValue = (value: number | null, digits = 0) =>
   value === null ? "—" : value.toFixed(digits);
 
-const createRangeEstimate = (label: string, value: number | null) =>
-  value === null ? [] : [{ label, value }];
-
 const formatUpdatedAt = (updatedAt: number | null) => {
   if (updatedAt === null) return "尚未同步";
   return new Intl.DateTimeFormat("zh-CN", {
@@ -106,12 +103,6 @@ export const VehicleDashboard = ({
         ? "剩余电量 · 车辆状态回退"
         : "暂无有效电量读数";
   const batterySourceWarning = batteryReadingsDiffer || snapshot?.batteryPercentSource === "status";
-  const rangeEstimates = [
-    ...createRangeEstimate("智能续航", snapshot?.aiEstimatedRangeKm ?? null),
-    ...createRangeEstimate("精细续航", snapshot?.preciseEstimatedRangeKm ?? null),
-    ...createRangeEstimate("基础续航", snapshot?.estimatedRangeKm ?? null),
-  ];
-  const primaryRange = rangeEstimates[0] ?? { label: "预计续航", value: null };
   const batteryPacks = snapshot?.batteryPacks ?? [];
   const batteryScores = batteryPacks.flatMap(({ score }) => (score === null ? [] : [score]));
   const lowestBatteryScore = batteryScores.length > 0 ? Math.min(...batteryScores) : null;
@@ -119,12 +110,18 @@ export const VehicleDashboard = ({
     ...new Set(batteryPacks.flatMap(({ cycleTip }) => (cycleTip ? [cycleTip] : []))),
   ];
   const chargeCompletion = formatChargeCompletion(snapshot?.chargeCompletionTime);
+  // The list can report zero while status still reports an active entitlement.
+  // Without a verified expiry date, zero cannot establish the remaining days.
   const smartServiceText =
     snapshot?.smartServiceExpired === true
       ? "智能服务已到期"
-      : vehicle.smartServiceRemainingDays !== null
+      : vehicle.smartServiceRemainingDays !== null && vehicle.smartServiceRemainingDays > 0
         ? `智能服务剩余 ${vehicle.smartServiceRemainingDays} 天`
-        : null;
+        : snapshot?.smartServiceExpired === false
+          ? "智能服务有效 · 剩余天数暂不可用"
+          : vehicle.smartServiceRemainingDays === 0
+            ? "智能服务剩余天数暂不可用"
+            : null;
   const lifecycleText =
     vehicle.activated === false
       ? "尚未激活"
@@ -154,7 +151,6 @@ export const VehicleDashboard = ({
     <div className="vehicle-dashboard">
       <header className="vehicle-dashboard-header">
         <div>
-          <p className="vehicle-dashboard-eyebrow">设备概览</p>
           <h1>{vehicle.name}</h1>
           <p>{vehicleContext}</p>
         </div>
@@ -291,13 +287,21 @@ export const VehicleDashboard = ({
             </div>
           </div>
 
-          <div className="vehicle-energy-summary">
+          <div className="vehicle-energy-summary vehicle-range-summary" aria-label="续航估算">
             <DeviceMetric
               icon={<Gauge size={17} />}
-              label={primaryRange.label}
-              value={formatValue(primaryRange.value, 1)}
+              label="精细续航"
+              value={formatValue(snapshot?.preciseEstimatedRangeKm ?? null, 1)}
               unit="km"
             />
+            <DeviceMetric
+              icon={<Gauge size={17} />}
+              label="基础续航"
+              value={formatValue(snapshot?.estimatedRangeKm ?? null, 1)}
+              unit="km"
+            />
+          </div>
+          <div className="vehicle-battery-score">
             <DeviceMetric
               icon={<ShieldCheck size={17} />}
               label={batteryPacks.length > 1 ? "最低评分" : "电池评分"}
@@ -305,20 +309,6 @@ export const VehicleDashboard = ({
               unit="分"
             />
           </div>
-
-          {rangeEstimates.length > 1 ? (
-            <div className="vehicle-range-comparison" aria-label="续航估算对比">
-              <span>算法估算</span>
-              <div>
-                {rangeEstimates.map((estimate) => (
-                  <p key={estimate.label}>
-                    <small>{estimate.label}</small>
-                    <strong>{estimate.value.toFixed(1)} km</strong>
-                  </p>
-                ))}
-              </div>
-            </div>
-          ) : null}
 
           {snapshot?.charging && (snapshot.remainingChargeTimeText || chargeCompletion) ? (
             <div className="vehicle-charge-remaining" role="status">

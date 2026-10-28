@@ -201,7 +201,7 @@ try {
   );
   console.log(
     "range-estimate-source-count",
-    await window.locator(".vehicle-range-comparison p").count(),
+    await window.locator(".vehicle-range-summary .device-metric").count(),
   );
   console.log(
     "charging-time-visible",
@@ -245,7 +245,7 @@ try {
   console.log("single-battery-pack-count", await window.locator(".battery-pack-card").count());
   console.log(
     "single-vehicle-range-estimates",
-    await window.locator(".vehicle-range-comparison p").count(),
+    await window.locator(".vehicle-range-summary .device-metric").count(),
   );
   console.log(
     "power-and-acc-separated",

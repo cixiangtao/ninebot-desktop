@@ -71,6 +71,45 @@ describe("VehicleDashboard battery provenance", () => {
     expect(inactiveMarkup).toContain("尚未激活");
   });
 
+  it("does not present the list's zero days as an expiry when status reports an active service", () => {
+    const markup = renderDashboard(
+      { ...demoVehicleSnapshot, smartServiceExpired: false },
+      { ...demoVehicle, smartServiceRemainingDays: 0 },
+    );
+
+    expect(markup).toContain("智能服务有效 · 剩余天数暂不可用");
+    expect(markup).not.toContain("智能服务剩余 0 天");
+    expect(markup).not.toContain("智能服务已到期");
+  });
+
+  it("keeps a zero-day list value inconclusive without a current expiry status", () => {
+    const markup = renderDashboard(
+      { ...demoVehicleSnapshot, smartServiceExpired: null },
+      { ...demoVehicle, smartServiceRemainingDays: 0 },
+    );
+
+    expect(markup).toContain("智能服务剩余天数暂不可用");
+    expect(markup).not.toContain("智能服务剩余 0 天");
+    expect(markup).not.toContain("智能服务有效");
+    expect(markup).not.toContain("智能服务已到期");
+  });
+
+  it("shows reported positive days and gives an explicit expiry status precedence", () => {
+    const vehicle = { ...demoVehicle, smartServiceRemainingDays: 42 };
+    const activeMarkup = renderDashboard(
+      { ...demoVehicleSnapshot, smartServiceExpired: false },
+      vehicle,
+    );
+    const expiredMarkup = renderDashboard(
+      { ...demoVehicleSnapshot, smartServiceExpired: true },
+      vehicle,
+    );
+
+    expect(activeMarkup).toContain("智能服务剩余 42 天");
+    expect(expiredMarkup).toContain("智能服务已到期");
+    expect(expiredMarkup).not.toContain("智能服务剩余 42 天");
+  });
+
   it("discloses the automatic polling boundary and the latest state transition", () => {
     const markup = renderToStaticMarkup(
       <VehicleDashboard
