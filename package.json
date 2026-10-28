@@ -59,7 +59,7 @@
     "maplibre-gl": "6.6.0",
     "react": "19.2.8",
     "react-dom": "19.2.8",
-    "zod": "4.4.3"
+    "zod": "4.6.6"
   },
   "devDependencies": {
     "@tailwindcss/vite": "4.3.3",
@@ -67,7 +67,7 @@
     "@types/react": "19.2.18",
     "@types/react-dom": "19.2.5",
     "@vitejs/plugin-react": "5.2.0",
-    "electron": "44.0.0",
+    "electron": "44.9.1",
     "electron-builder": "26.15.3",
     "electron-vite": "5.0.0",
     "fflate": "0.8.3",
@@ -76,7 +76,7 @@
     "playwright": "1.62.1",
     "tailwindcss": "4.3.3",
     "typescript": "7.0.2",
-    "vite": "7.3.6",
+    "vite": "7.3.7",
     "vitest": "4.1.11"
   },
   "engines": {
