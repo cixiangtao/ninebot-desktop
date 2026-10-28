@@ -113,7 +113,6 @@ export const StatisticsDashboard = ({
     <div className="statistics-dashboard">
       <header className="statistics-header">
         <div>
-          <p>骑行统计</p>
           <h1>{vehicle.name}</h1>
           <span>
             {vehicle.model} · {vehicle.access === "shared" ? "共享车辆" : "自有车辆"} ·

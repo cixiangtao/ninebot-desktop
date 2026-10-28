@@ -4,6 +4,9 @@ import { createRoot } from "react-dom/client";
 import "maplibre-gl/dist/maplibre-gl.css";
 import App from "./App";
 import "./styles.css";
+import { applyTheme, readSavedTheme } from "./lib/theme";
+
+applyTheme(readSavedTheme());
 
 const root = document.querySelector<HTMLDivElement>("#root");
 if (!root) throw new Error("Missing #root element");

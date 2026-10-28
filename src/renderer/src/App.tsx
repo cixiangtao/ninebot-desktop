@@ -46,6 +46,7 @@ import type {
   YearSummaryExportFormat,
   YearSummaryExportMonth,
 } from "../../shared/contracts";
+import { ThemePicker } from "./components/ThemePicker";
 import { LoginSheet } from "./components/LoginSheet";
 import { LocationDashboard } from "./components/LocationDashboard";
 import { MonthSummaryExportSheet } from "./components/MonthSummaryExportSheet";
@@ -1580,246 +1581,57 @@ export default function App() {
 
   return (
     <div className="app-shell">
-      <aside className="sidebar">
-        <div className="sidebar-scroll">
-          <div className="brand-row">
-            <div className="brand-mark">
-              <Route size={21} strokeWidth={2.5} />
-            </div>
-            <strong>韭号出行</strong>
-          </div>
-
-          <section className="mt-8">
-            <p className="sidebar-label">我的车辆</p>
-            {mode === "live" ? (
-              <VehicleSwitcher
-                vehicles={vehicles}
-                selectedVehicle={vehicle}
-                live
-                open={vehiclePickerOpen}
-                disabled={loading || snapshotLoading || vehicles.length === 0}
-                onToggle={() => setVehiclePickerOpen((open) => !open)}
-                onSelect={selectVehicle}
-              />
-            ) : (
-              <button
-                className="account-connect-card"
-                type="button"
-                onClick={() => (accountConnected ? openSecurity() : setLoginOpen(true))}
-              >
-                <CircleUserRound size={21} />
-                <span>
-                  <strong>{accountConnected ? "账号已连接" : "尚未连接账号"}</strong>
-                  <small>{accountConnected ? "当前暂无车辆数据" : "连接后加载你的车辆"}</small>
-                </span>
-              </button>
-            )}
-          </section>
-
-          <nav className="mt-5 space-y-1" aria-label="主导航">
-            <NavItem
-              icon={<Bike size={18} />}
-              label="设备"
-              active={view === "device"}
-              onClick={showDevice}
-            />
-            <NavItem
-              icon={<MapIcon size={18} />}
-              label="地图"
-              active={view === "map"}
-              onClick={showMap}
-            />
-            <NavItem
-              icon={<Route size={18} />}
-              label="轨迹"
-              active={view === "rides" || view === "comparison"}
-              onClick={showRides}
-            />
-            <NavItem
-              icon={<ChartNoAxesCombined size={18} />}
-              label="统计"
-              active={view === "statistics"}
-              onClick={showStatistics}
-            />
-            <NavItem icon={<Settings size={18} />} label="设置" onClick={openSecurity} />
-          </nav>
-
-          {mode === "live" && view === "rides" ? (
-            <div className="mt-7 flex items-start justify-between gap-2 px-2">
-              <MonthNavigator
-                month={month}
-                visibleYear={monthPickerYear}
-                open={monthPickerOpen}
-                disabled={loading}
-                minimumMonth={historyStartMonth}
-                onToggle={() => {
-                  setMonthPickerYear(getMonthYear(month));
-                  setMonthPickerOpen((open) => !open);
-                }}
-                onVisibleYearChange={setMonthPickerYear}
-                onSelect={selectMonth}
-              />
-              <div className="flex flex-none items-center gap-1.5">
-                <button
-                  className="icon-button"
-                  type="button"
-                  onClick={() => {
-                    setMonthExportError(null);
-                    setMonthExportOpen(true);
-                  }}
-                  aria-label="导出本月清单"
-                  disabled={loading}
-                >
-                  <Download size={16} />
-                </button>
-                <button
-                  className="icon-button"
-                  type="button"
-                  onClick={() =>
-                    void (mode === "live"
-                      ? loadLiveData(month, vehicle, { refresh: true })
-                      : Promise.resolve())
-                  }
-                  aria-label="刷新行程"
-                  disabled={loading}
-                >
-                  <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
-                </button>
-              </div>
-            </div>
-          ) : null}
-
-          {view === "rides" ? (
-            <div className="ride-month-summary" aria-label="月度行程汇总">
-              <div>
-                <strong>{rideMonthSummary.rideCount} 次</strong>
-                <span>{rideMonthSummary.mileageKm.toFixed(1)} km</span>
-                {rideMonthSummary.energyWh !== null ? (
-                  <span>{(rideMonthSummary.energyWh / 1000).toFixed(2)} kWh</span>
-                ) : null}
-              </div>
-              <small>
-                {loading
-                  ? "正在读取整月汇总…"
-                  : rideMonthSummary.ridesTruncated
-                    ? `可选择 ${rideMonthSummary.visibleRideCount} / ${rideMonthSummary.rideCount} 次行程`
-                    : rideMonthSummary.aggregateAvailable
-                      ? "整月汇总 · 明细完整"
-                      : "按当前可见明细汇总"}
-              </small>
-              {monthExportNotice ? (
-                <p className="month-export-notice" role="status">
-                  {monthExportNotice}
-                </p>
-              ) : null}
-            </div>
-          ) : null}
-
-          {view === "rides" ? (
-            <RideSpeedVerificationPanel
-              totalCount={rides.length}
-              verifiedCount={verifiedSpeedCount}
-              correctedCount={correctedSpeedCount}
-              failedCount={failedSpeedVerificationCount}
-              placeholderCount={unresolvedSpeedPlaceholderCount}
-              loading={speedVerificationLoading}
-              error={
-                rideSpeedVerificationState.status === "error"
-                  ? rideSpeedVerificationState.message
-                  : null
-              }
-              disabled={loading || rides.length === 0}
-              onVerify={() => void verifyMonthRideSpeeds()}
-            />
-          ) : null}
-
-          {view === "rides" ? (
-            <RideActivityCalendar
-              month={month}
-              days={rideDays}
-              rides={rides}
-              selectedDay={selectedRideDay}
-              disabled={loading}
-              onSelectDay={selectRideDay}
-            />
-          ) : null}
-
-          {view === "rides" ? (
-            <div className="mt-3 space-y-1.5" aria-label="骑行记录">
-              {selectedRideDay !== null ? (
-                <p className="ride-day-filter-note">
-                  <span>{selectedRideDay} 日的可选行程</span>
-                  <button type="button" onClick={() => selectRideDay(null)}>
-                    显示全部
-                  </button>
-                </p>
-              ) : null}
-              {displayedRides.map((ride) => (
-                <button
-                  key={ride.id}
-                  type="button"
-                  onClick={() => void selectRide(ride)}
-                  className={`ride-row ${selectedRideId === ride.id ? "ride-row-active" : ""}`}
-                >
-                  <span className="route-thumb" aria-hidden="true">
-                    <i />
-                    <i />
-                    <i />
-                    <i />
-                  </span>
-                  <span className="min-w-0 flex-1 text-left">
-                    <strong className="block text-[14px] font-[650] text-[#283645]">
-                      {formatRideDate(ride.startTime)}
-                    </strong>
-                    <span className="mt-1 block truncate text-xs font-medium text-slate-500">
-                      {ride.mileageKm.toFixed(1)} km · {formatDuration(ride.durationSeconds)}
-                      {ride.energyWh !== null ? ` · ${ride.energyWh.toFixed(0)} Wh` : ""}
-                    </span>
-                  </span>
-                  <RideSpeedReading
-                    ride={ride}
-                    verification={rideSpeedVerifications[ride.id] ?? null}
-                  />
-                </button>
-              ))}
-              {!loading && displayedRides.length === 0 ? (
-                <p className="ride-list-empty">
-                  {selectedRideDay !== null &&
-                  (rideDays.find(({ day }) => day === selectedRideDay)?.mileageKm ?? 0) > 0
-                    ? `${selectedRideDay} 日的里程已计入整月汇总，但不在九号返回的可选明细中`
-                    : `${formatMonth(month)}暂无骑行记录`}
-                </p>
-              ) : null}
-            </div>
-          ) : null}
+      <aside className="navigation-rail" aria-label="应用导航">
+        <div className="rail-brand" title="韭号出行">
+          <span className="brand-mark">
+            <Route size={23} strokeWidth={2.2} />
+          </span>
+          <strong>韭号出行</strong>
         </div>
-
-        <div className="border-t border-slate-200/80 p-4">
-          <button
-            className="secondary-button w-full"
-            type="button"
-            onClick={() => setLoginOpen(true)}
-          >
-            <CircleUserRound size={17} />
-            {mode === "live" || accountConnected ? "重新连接账号" : "连接九号账号"}
-          </button>
+        <nav className="primary-navigation" aria-label="主导航">
+          <NavItem
+            icon={<Bike size={18} />}
+            label="设备"
+            active={view === "device"}
+            onClick={showDevice}
+          />
+          <NavItem
+            icon={<MapIcon size={18} />}
+            label="地图"
+            active={view === "map"}
+            onClick={showMap}
+          />
+          <NavItem
+            icon={<Route size={18} />}
+            label="轨迹"
+            active={view === "rides" || view === "comparison"}
+            onClick={showRides}
+          />
+          <NavItem
+            icon={<ChartNoAxesCombined size={18} />}
+            label="统计"
+            active={view === "statistics"}
+            onClick={showStatistics}
+          />
+        </nav>
+        <div className="rail-footer">
+          <NavItem icon={<Settings size={20} />} label="设置" onClick={openSecurity} />
         </div>
       </aside>
-
-      <main className="main-stage">
+      <div className="workspace">
         <header className="titlebar">
-          <span className="text-sm font-[660] text-[#25313d]">
+          <span className="workspace-title">
             {view === "device"
-              ? "车辆"
+              ? "设备概览"
               : view === "map"
-                ? "地图"
+                ? "车辆位置"
                 : view === "statistics"
-                  ? "统计"
+                  ? "骑行统计"
                   : view === "comparison"
                     ? "行程对比"
-                    : "韭号出行"}
+                    : "轨迹回放"}
           </span>
-          <div className="no-drag absolute right-5 flex items-center gap-2">
+          <div className="workspace-status no-drag">
             {loading ||
             detailRefreshing ||
             speedVerificationLoading ||
@@ -1866,350 +1678,548 @@ export default function App() {
               </button>
             ) : null}
           </div>
-        </header>
-
-        <div className="relative min-h-0 flex-1 overflow-hidden">
-          {mode === "unauthenticated" ? (
-            <UnauthenticatedPanel
-              connected={accountConnected}
-              onConnect={() => (accountConnected ? void loadLiveData(month) : setLoginOpen(true))}
-            />
-          ) : view === "device" ? (
-            <VehicleDashboard
-              vehicle={vehicle}
-              snapshot={vehicleSnapshot}
-              live={mode === "live"}
-              loading={snapshotLoading}
-              error={snapshotError}
-              updatedAt={snapshotUpdatedAt}
-              autoRefreshEnabled={snapshotAutoRefreshEnabled}
-              monitorEvent={snapshotMonitorEvent}
-              onAutoRefreshChange={toggleSnapshotAutoRefresh}
-              onRefresh={() => void loadVehicleSnapshot(vehicle, true, "manual")}
-              onConnect={() => setLoginOpen(true)}
-            />
-          ) : view === "map" ? (
-            <LocationDashboard
-              vehicle={vehicle}
-              location={vehicleLocation}
-              permission={locationPermission}
-              authorized={locationAuthorized}
-              live={mode === "live"}
-              loading={locationLoading}
-              error={locationError}
-              updatedAt={locationUpdatedAt}
-              coordinateDisplayMode={coordinateDisplayMode}
-              onAuthorize={authorizeLocation}
-              onRefresh={() =>
-                void (mode === "live" ? loadVehicleLocation(vehicle) : authorizeLocation())
-              }
-              onClear={clearLocation}
-              onCoordinateDisplayModeChange={setCoordinateDisplayMode}
-            />
-          ) : view === "statistics" ? (
-            <StatisticsDashboard
-              vehicle={vehicle}
-              statistics={statistics}
-              rollingMonths={rollingStatisticsMonths}
-              year={statisticsYear}
-              currentMonth={thisMonth}
-              historyStartTime={historyStartTime}
-              live={mode === "live"}
-              loading={statisticsLoading}
-              progress={statisticsProgress}
-              error={statisticsError}
-              exportNotice={yearExportNotice}
-              activityMonths={statisticsSourceMonths}
-              onPreviousYear={() => selectStatisticsYear(statisticsYear - 1)}
-              onNextYear={() => selectStatisticsYear(statisticsYear + 1)}
-              onRefresh={() => void loadYearStatistics(statisticsYear, vehicle, true)}
-              onExport={() => {
-                setYearExportError(null);
-                setYearExportOpen(true);
-              }}
-              exportDisabled={statisticsLoading || statisticsSourceMonths.length === 0}
-              onSelectMonth={openStatisticsMonth}
-              onConnect={() => setLoginOpen(true)}
-            />
-          ) : view === "comparison" && detail ? (
-            <RideComparisonDashboard
-              vehicle={vehicle}
-              month={month}
-              base={detail}
-              comparison={comparisonDetail}
-              candidates={comparisonCandidates}
-              selectedRideId={comparisonRideId}
-              loading={comparisonLoading}
-              error={comparisonError}
-              onBack={closeComparison}
-              onSelect={(ride) => void loadComparisonRide(ride)}
-              onRetry={() => {
-                const selectedRide = comparisonCandidates.find(({ id }) => id === comparisonRideId);
-                if (selectedRide) void loadComparisonRide(selectedRide);
-              }}
-            />
-          ) : (
-            <>
-              <RouteMap
-                track={track}
-                playbackPosition={playbackPosition}
-                coordinateDisplayMode={coordinateDisplayMode}
-                onCoordinateDisplayModeChange={setCoordinateDisplayMode}
+          <ThemePicker />
+          <div className="workspace-vehicle no-drag">
+            {mode === "live" ? (
+              <VehicleSwitcher
+                vehicles={vehicles}
+                selectedVehicle={vehicle}
+                live
+                open={vehiclePickerOpen}
+                disabled={loading || snapshotLoading || vehicles.length === 0}
+                onToggle={() => setVehiclePickerOpen((open) => !open)}
+                onSelect={selectVehicle}
               />
-
-              {detail ? (
-                <>
-                  <section className="metrics-panel" aria-label="本次骑行指标">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="flex items-center gap-2 text-xs font-semibold text-slate-500">
-                          最高速度
-                          <span className="metric-source-badge">
-                            {detail.sampledMaxSpeed !== null ? "轨迹采样" : "接口摘要"}
-                          </span>
-                        </p>
-                        <div className="mt-1 flex items-baseline gap-2">
-                          <strong className="metric-number">{Math.round(maxSpeed)}</strong>
-                          <span className="text-sm font-semibold text-slate-500">km/h</span>
-                        </div>
-                      </div>
-                      <div className="ride-metric-actions">
-                        <button
-                          className="ride-export-trigger ride-detail-refresh-trigger"
-                          type="button"
-                          onClick={refreshCurrentRide}
-                          disabled={
-                            mode !== "live" || currentRide === null || detailRefreshing || loading
-                          }
-                          aria-label="刷新当前行程"
-                          title={
-                            mode === "live"
-                              ? "绕过详情缓存，重新读取当前行程"
-                              : "连接九号账号后可刷新真实行程"
-                          }
-                        >
-                          {detailRefreshing ? (
-                            <LoaderCircle size={15} className="animate-spin" />
-                          ) : (
-                            <RefreshCw size={15} />
-                          )}
-                        </button>
-                        <button
-                          className="ride-export-trigger"
-                          type="button"
-                          onClick={openComparison}
-                          disabled={
-                            comparisonCandidates.length === 0 || loading || detailRefreshing
-                          }
-                          aria-label="对比当前行程"
-                        >
-                          <GitCompareArrows size={15} />
-                          对比
-                        </button>
-                        <button
-                          className="ride-export-trigger"
-                          type="button"
-                          onClick={() => {
-                            setExportError(null);
-                            setExportOpen(true);
-                          }}
-                          disabled={detail.track.length === 0 || detailRefreshing}
-                          aria-label="导出当前行程"
-                        >
-                          <Download size={15} />
-                          导出
-                        </button>
-                      </div>
-                    </div>
-                    <div className="mt-5 grid grid-cols-3 gap-4 border-t border-slate-200/80 pt-4">
-                      <Metric label="平均速度" value={detail.averageSpeed.toFixed(1)} unit="km/h" />
-                      <Metric label="里程" value={detail.mileageKm.toFixed(1)} unit="km" />
-                      <Metric label="用时" value={formatLongDuration(detail.durationSeconds)} />
-                    </div>
-                    {detail.energyWh !== null || detail.batteryUsedPercent !== null ? (
-                      <div className="ride-energy-metrics" aria-label="本次骑行能耗">
-                        <Metric
-                          label="本次能耗"
-                          value={detail.energyWh?.toFixed(0) ?? "—"}
-                          unit={detail.energyWh !== null ? "Wh" : undefined}
-                        />
-                        <Metric
-                          label="电量消耗"
-                          value={detail.batteryUsedPercent?.toFixed(1) ?? "—"}
-                          unit={detail.batteryUsedPercent !== null ? "%" : undefined}
-                        />
-                        <Metric
-                          label="平均能耗"
-                          value={rideEnergyEfficiency?.toFixed(1) ?? "—"}
-                          unit={rideEnergyEfficiency !== null ? "Wh/km" : undefined}
-                        />
-                      </div>
-                    ) : null}
-                    {detail.dayMileageKm !== null ? (
-                      <div className="ride-day-context" aria-label="骑行日背景">
-                        <span>骑行日累计</span>
-                        <strong>{detail.dayMileageKm.toFixed(1)} km</strong>
-                        <small>
-                          {rideDayShare === null
-                            ? "本次占比不可用"
-                            : `本次占当天 ${rideDayShare.toFixed(1)}%`}
-                        </small>
-                      </div>
-                    ) : null}
-                    <p
-                      className={`ride-detail-refresh-state ${
-                        detailRefreshState.status === "error"
-                          ? "ride-detail-refresh-error"
-                          : detailRefreshState.status === "loading" ||
-                              detailRefreshState.status === "success"
-                            ? "ride-detail-refresh-active"
-                            : declaredMaxSpeedLikelyCapped
-                              ? "ride-detail-source-warning"
-                              : ""
-                      }`}
-                      role={detailRefreshState.status === "error" ? "alert" : "status"}
-                      title={
-                        detailRefreshState.status === "error"
-                          ? detailRefreshState.message
-                          : undefined
-                      }
-                    >
-                      {detailRefreshState.status === "loading"
-                        ? "正在绕过缓存重新读取当前行程…"
-                        : detailRefreshState.status === "success"
-                          ? "当前行程已重新读取"
-                          : detailRefreshState.status === "error"
-                            ? "刷新失败，旧数据已保留，请再次刷新"
-                            : detail.sampledMaxSpeed !== null && detail.declaredMaxSpeed !== null
-                              ? declaredMaxSpeedLikelyCapped
-                                ? `旧记录摘要固定返回 25 km/h，已忽略；当前显示由 ${detail.track.length} 个轨迹点计算。`
-                                : `接口摘要 ${detail.declaredMaxSpeed.toFixed(0)} km/h · 轨迹采样 ${detail.sampledMaxSpeed.toFixed(0)} km/h`
-                              : "\u00a0"}
-                    </p>
-                    {exportNotice ? (
-                      <p className="ride-export-notice" role="status">
-                        {exportNotice}
-                      </p>
-                    ) : null}
-                  </section>
-
-                  <section
-                    className={`playback-panel ${detailRefreshing ? "playback-panel-refreshing" : ""}`}
-                    aria-label="轨迹回放控制"
-                    aria-busy={detailRefreshing}
-                    inert={detailRefreshing}
-                  >
-                    <div className="flex items-center gap-4 border-b border-slate-200/75 pb-4">
-                      <button
-                        className="play-button"
-                        type="button"
-                        onClick={togglePlayback}
-                        disabled={track.length <= 1 || detailRefreshing}
-                        aria-label={isPlaying ? "暂停回放" : "开始回放"}
-                      >
-                        {isPlaying ? (
-                          <Pause size={19} fill="currentColor" />
-                        ) : (
-                          <Play size={19} fill="currentColor" />
-                        )}
-                      </button>
-                      <span className="w-[94px] text-sm font-semibold tabular-nums text-slate-700">
-                        {formatDuration(elapsedSeconds)}{" "}
-                        <span className="text-slate-400">
-                          / {formatDuration(detail.durationSeconds)}
-                        </span>
-                      </span>
-                      <input
-                        className="timeline-range flex-1"
-                        aria-label="回放进度"
-                        type="range"
-                        min={0}
-                        max={Math.max(0, track.length - 1)}
-                        step={0.01}
-                        value={playbackPosition}
-                        disabled={detailRefreshing}
-                        aria-valuetext={`${formatDuration(elapsedSeconds)}，共 ${formatDuration(detail.durationSeconds)}`}
-                        style={{ "--progress": `${progress}%` } as CSSProperties}
-                        onChange={(event) => {
-                          setIsPlaying(false);
-                          seekPlayback(Number(event.target.value));
-                        }}
-                      />
-                      <PlaybackRateControl
-                        value={playbackRate}
-                        disabled={track.length <= 1 || detailRefreshing}
-                        onChange={setPlaybackRate}
-                      />
-                    </div>
-                    <div className="mt-4 flex items-end gap-6">
-                      <div className="w-[112px] pb-2">
-                        <p className="text-xs font-semibold text-slate-500">当前速度</p>
-                        <div className="mt-1 flex items-baseline gap-1">
-                          <strong className="text-[43px] leading-none font-[720] tracking-[-0.035em] text-[#172332]">
-                            {Math.round(activePoint?.speed ?? 0)}
-                          </strong>
-                          <span className="text-xs font-semibold text-slate-500">km/h</span>
-                        </div>
-                      </div>
-                      <SpeedChart
-                        track={track}
-                        playbackPosition={playbackPosition}
-                        onSeek={(position) => {
-                          setIsPlaying(false);
-                          seekPlayback(position);
-                        }}
-                      />
-                    </div>
-                    <SpeedZoneDistribution
-                      track={track}
-                      activeSpeed={activePoint?.speed ?? 0}
-                      onSeek={(position) => {
-                        setIsPlaying(false);
-                        seekPlayback(position);
+            ) : (
+              <button
+                className="account-connect-card"
+                type="button"
+                onClick={() => (accountConnected ? openSecurity() : setLoginOpen(true))}
+              >
+                <CircleUserRound size={21} />
+                <span>
+                  <strong>{accountConnected ? "账号已连接" : "尚未连接账号"}</strong>
+                  <small>{accountConnected ? "当前暂无车辆数据" : "连接后加载你的车辆"}</small>
+                </span>
+              </button>
+            )}
+          </div>
+        </header>
+        <div className="workspace-body">
+          {view === "rides" && mode !== "unauthenticated" ? (
+            <aside className="sidebar" aria-label="行程浏览">
+              <div className="sidebar-content">
+                <div className="ride-library-heading">
+                  <h2>骑行记录</h2>
+                  <span>按月浏览</span>
+                </div>
+                {mode === "live" && view === "rides" ? (
+                  <div className="ride-month-toolbar">
+                    <MonthNavigator
+                      month={month}
+                      visibleYear={monthPickerYear}
+                      open={monthPickerOpen}
+                      disabled={loading}
+                      minimumMonth={historyStartMonth}
+                      onToggle={() => {
+                        setMonthPickerYear(getMonthYear(month));
+                        setMonthPickerOpen((open) => !open);
                       }}
+                      onVisibleYearChange={setMonthPickerYear}
+                      onSelect={selectMonth}
                     />
-                  </section>
-                </>
-              ) : (
-                <section className="empty-month-panel" aria-live="polite">
-                  {loading ? (
-                    <LoaderCircle size={22} className="animate-spin text-[#0a9f92]" />
-                  ) : (
-                    <CalendarDays size={22} />
-                  )}
-                  <div>
-                    <strong>
-                      {loading
-                        ? `正在读取${formatMonth(month)}`
-                        : rides.length > 0
-                          ? "选择一条行程查看轨迹"
-                          : `${formatMonth(month)}没有行程`}
-                    </strong>
-                    <p>
-                      {loading
-                        ? "正在从九号账号读取这个月的骑行记录。"
-                        : error
-                          ? "读取失败，请检查网络后重新尝试。"
-                          : rides.length > 0
-                            ? "当前只加载了月度列表；选择左侧具体行程后才会读取 GPS 轨迹。"
-                            : "可以从左侧选择其他年份和月份继续查看。"}
-                    </p>
+                    <div className="flex flex-none items-center gap-1.5">
+                      <button
+                        className="icon-button"
+                        type="button"
+                        onClick={() => {
+                          setMonthExportError(null);
+                          setMonthExportOpen(true);
+                        }}
+                        aria-label="导出本月清单"
+                        disabled={loading}
+                      >
+                        <Download size={16} />
+                      </button>
+                      <button
+                        className="icon-button"
+                        type="button"
+                        onClick={() =>
+                          void (mode === "live"
+                            ? loadLiveData(month, vehicle, { refresh: true })
+                            : Promise.resolve())
+                        }
+                        aria-label="刷新行程"
+                        disabled={loading}
+                      >
+                        <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
+                      </button>
+                    </div>
                   </div>
-                  {!loading && error && mode === "live" ? (
-                    <button
-                      type="button"
-                      onClick={() => void loadLiveData(month, vehicle, { refresh: true })}
-                    >
-                      <RefreshCw size={14} />
-                      重新读取
-                    </button>
-                  ) : null}
-                </section>
+                ) : null}
+
+                {view === "rides" ? (
+                  <div className="ride-list">
+                    <div className="ride-month-summary" aria-label="月度行程汇总">
+                      <div>
+                        <strong>{rideMonthSummary.rideCount} 次</strong>
+                        <span>{rideMonthSummary.mileageKm.toFixed(1)} km</span>
+                        {rideMonthSummary.energyWh !== null ? (
+                          <span>{(rideMonthSummary.energyWh / 1000).toFixed(2)} kWh</span>
+                        ) : null}
+                      </div>
+                      {loading ||
+                      rideMonthSummary.ridesTruncated ||
+                      !rideMonthSummary.aggregateAvailable ? (
+                        <small>
+                          {loading
+                            ? "正在读取整月汇总…"
+                            : rideMonthSummary.ridesTruncated
+                              ? `可选择 ${rideMonthSummary.visibleRideCount} / ${rideMonthSummary.rideCount} 次行程`
+                              : "按当前可见明细汇总"}
+                        </small>
+                      ) : null}
+                      {monthExportNotice ? (
+                        <p className="month-export-notice" role="status">
+                          {monthExportNotice}
+                        </p>
+                      ) : null}
+                    </div>
+
+                    <RideSpeedVerificationPanel
+                      totalCount={rides.length}
+                      verifiedCount={verifiedSpeedCount}
+                      correctedCount={correctedSpeedCount}
+                      failedCount={failedSpeedVerificationCount}
+                      placeholderCount={unresolvedSpeedPlaceholderCount}
+                      loading={speedVerificationLoading}
+                      error={
+                        rideSpeedVerificationState.status === "error"
+                          ? rideSpeedVerificationState.message
+                          : null
+                      }
+                      disabled={loading || rides.length === 0}
+                      onVerify={() => void verifyMonthRideSpeeds()}
+                    />
+
+                    <RideActivityCalendar
+                      month={month}
+                      days={rideDays}
+                      rides={rides}
+                      selectedDay={selectedRideDay}
+                      disabled={loading}
+                      onSelectDay={selectRideDay}
+                    />
+
+                    <div className="mt-3 space-y-1.5" aria-label="骑行记录">
+                      {selectedRideDay !== null ? (
+                        <p className="ride-day-filter-note">
+                          <span>{selectedRideDay} 日的可选行程</span>
+                          <button type="button" onClick={() => selectRideDay(null)}>
+                            显示全部
+                          </button>
+                        </p>
+                      ) : null}
+                      {displayedRides.map((ride) => (
+                        <button
+                          key={ride.id}
+                          type="button"
+                          onClick={() => void selectRide(ride)}
+                          className={`ride-row ${selectedRideId === ride.id ? "ride-row-active" : ""}`}
+                        >
+                          <span className="route-thumb" aria-hidden="true">
+                            <i />
+                            <i />
+                            <i />
+                            <i />
+                          </span>
+                          <span className="min-w-0 flex-1 text-left">
+                            <strong className="block text-[14px] font-[650] text-[#283645]">
+                              {formatRideDate(ride.startTime)}
+                            </strong>
+                            <span className="mt-1 block truncate text-xs font-medium text-slate-500">
+                              {ride.mileageKm.toFixed(1)} km ·{" "}
+                              {formatDuration(ride.durationSeconds)}
+                              {ride.energyWh !== null ? ` · ${ride.energyWh.toFixed(0)} Wh` : ""}
+                            </span>
+                          </span>
+                          <RideSpeedReading
+                            ride={ride}
+                            verification={rideSpeedVerifications[ride.id] ?? null}
+                          />
+                        </button>
+                      ))}
+
+                      {!loading && displayedRides.length === 0 ? (
+                        <p className="ride-list-empty">
+                          {selectedRideDay !== null &&
+                          (rideDays.find(({ day }) => day === selectedRideDay)?.mileageKm ?? 0) > 0
+                            ? `${selectedRideDay} 日的里程已计入整月汇总，但不在九号返回的可选明细中`
+                            : `${formatMonth(month)}暂无骑行记录`}
+                        </p>
+                      ) : null}
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            </aside>
+          ) : null}
+          <main className="main-stage">
+            <div
+              className={`view-content relative min-h-0 flex-1 overflow-hidden ${view === "rides" && detail ? "view-content-replay" : ""}`}
+            >
+              {mode === "unauthenticated" ? (
+                <UnauthenticatedPanel
+                  connected={accountConnected}
+                  onConnect={() =>
+                    accountConnected ? void loadLiveData(month) : setLoginOpen(true)
+                  }
+                />
+              ) : view === "device" ? (
+                <VehicleDashboard
+                  vehicle={vehicle}
+                  snapshot={vehicleSnapshot}
+                  live={mode === "live"}
+                  loading={snapshotLoading}
+                  error={snapshotError}
+                  updatedAt={snapshotUpdatedAt}
+                  autoRefreshEnabled={snapshotAutoRefreshEnabled}
+                  monitorEvent={snapshotMonitorEvent}
+                  onAutoRefreshChange={toggleSnapshotAutoRefresh}
+                  onRefresh={() => void loadVehicleSnapshot(vehicle, true, "manual")}
+                  onConnect={() => setLoginOpen(true)}
+                />
+              ) : view === "map" ? (
+                <LocationDashboard
+                  vehicle={vehicle}
+                  location={vehicleLocation}
+                  permission={locationPermission}
+                  authorized={locationAuthorized}
+                  live={mode === "live"}
+                  loading={locationLoading}
+                  error={locationError}
+                  updatedAt={locationUpdatedAt}
+                  coordinateDisplayMode={coordinateDisplayMode}
+                  onAuthorize={authorizeLocation}
+                  onRefresh={() =>
+                    void (mode === "live" ? loadVehicleLocation(vehicle) : authorizeLocation())
+                  }
+                  onClear={clearLocation}
+                  onCoordinateDisplayModeChange={setCoordinateDisplayMode}
+                />
+              ) : view === "statistics" ? (
+                <StatisticsDashboard
+                  vehicle={vehicle}
+                  statistics={statistics}
+                  rollingMonths={rollingStatisticsMonths}
+                  year={statisticsYear}
+                  currentMonth={thisMonth}
+                  historyStartTime={historyStartTime}
+                  live={mode === "live"}
+                  loading={statisticsLoading}
+                  progress={statisticsProgress}
+                  error={statisticsError}
+                  exportNotice={yearExportNotice}
+                  activityMonths={statisticsSourceMonths}
+                  onPreviousYear={() => selectStatisticsYear(statisticsYear - 1)}
+                  onNextYear={() => selectStatisticsYear(statisticsYear + 1)}
+                  onRefresh={() => void loadYearStatistics(statisticsYear, vehicle, true)}
+                  onExport={() => {
+                    setYearExportError(null);
+                    setYearExportOpen(true);
+                  }}
+                  exportDisabled={statisticsLoading || statisticsSourceMonths.length === 0}
+                  onSelectMonth={openStatisticsMonth}
+                  onConnect={() => setLoginOpen(true)}
+                />
+              ) : view === "comparison" && detail ? (
+                <RideComparisonDashboard
+                  vehicle={vehicle}
+                  month={month}
+                  base={detail}
+                  comparison={comparisonDetail}
+                  candidates={comparisonCandidates}
+                  selectedRideId={comparisonRideId}
+                  loading={comparisonLoading}
+                  error={comparisonError}
+                  onBack={closeComparison}
+                  onSelect={(ride) => void loadComparisonRide(ride)}
+                  onRetry={() => {
+                    const selectedRide = comparisonCandidates.find(
+                      ({ id }) => id === comparisonRideId,
+                    );
+                    if (selectedRide) void loadComparisonRide(selectedRide);
+                  }}
+                />
+              ) : (
+                <>
+                  <RouteMap
+                    track={track}
+                    playbackPosition={playbackPosition}
+                    coordinateDisplayMode={coordinateDisplayMode}
+                    onCoordinateDisplayModeChange={setCoordinateDisplayMode}
+                  />
+
+                  {detail ? (
+                    <>
+                      <section className="metrics-panel" aria-label="本次骑行指标">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="flex items-center gap-2 text-xs font-semibold text-slate-500">
+                              最高速度
+                            </p>
+                            <div className="mt-1 flex items-baseline gap-2">
+                              <strong className="metric-number">{Math.round(maxSpeed)}</strong>
+                              <span className="text-sm font-semibold text-slate-500">km/h</span>
+                            </div>
+                          </div>
+                          <div className="ride-metric-actions">
+                            <button
+                              className="ride-export-trigger ride-detail-refresh-trigger"
+                              type="button"
+                              onClick={refreshCurrentRide}
+                              disabled={
+                                mode !== "live" ||
+                                currentRide === null ||
+                                detailRefreshing ||
+                                loading
+                              }
+                              aria-label="刷新当前行程"
+                              title={
+                                mode === "live"
+                                  ? "绕过详情缓存，重新读取当前行程"
+                                  : "连接九号账号后可刷新真实行程"
+                              }
+                            >
+                              {detailRefreshing ? (
+                                <LoaderCircle size={15} className="animate-spin" />
+                              ) : (
+                                <RefreshCw size={15} />
+                              )}
+                            </button>
+                            <button
+                              className="ride-export-trigger"
+                              type="button"
+                              onClick={openComparison}
+                              disabled={
+                                comparisonCandidates.length === 0 || loading || detailRefreshing
+                              }
+                              aria-label="对比当前行程"
+                              title="对比当前行程"
+                            >
+                              <GitCompareArrows size={15} />
+                            </button>
+                            <button
+                              className="ride-export-trigger"
+                              type="button"
+                              onClick={() => {
+                                setExportError(null);
+                                setExportOpen(true);
+                              }}
+                              disabled={detail.track.length === 0 || loading || detailRefreshing}
+                              aria-label="导出当前行程"
+                              title="导出当前行程"
+                            >
+                              <Download size={15} />
+                            </button>
+                          </div>
+                        </div>
+                        <div className="mt-5 grid grid-cols-3 gap-4 border-t border-slate-200/80 pt-4">
+                          <Metric
+                            label="平均速度"
+                            value={detail.averageSpeed.toFixed(1)}
+                            unit="km/h"
+                          />
+                          <Metric label="里程" value={detail.mileageKm.toFixed(1)} unit="km" />
+                          <Metric label="用时" value={formatLongDuration(detail.durationSeconds)} />
+                        </div>
+                        {detail.energyWh !== null || detail.batteryUsedPercent !== null ? (
+                          <div className="ride-energy-metrics" aria-label="本次骑行能耗">
+                            <Metric
+                              label="本次能耗"
+                              value={detail.energyWh?.toFixed(0) ?? "—"}
+                              unit={detail.energyWh !== null ? "Wh" : undefined}
+                            />
+                            <Metric
+                              label="电量消耗"
+                              value={detail.batteryUsedPercent?.toFixed(1) ?? "—"}
+                              unit={detail.batteryUsedPercent !== null ? "%" : undefined}
+                            />
+                            <Metric
+                              label="平均能耗"
+                              value={rideEnergyEfficiency?.toFixed(1) ?? "—"}
+                              unit={rideEnergyEfficiency !== null ? "Wh/km" : undefined}
+                            />
+                          </div>
+                        ) : null}
+                        {detail.dayMileageKm !== null ? (
+                          <div className="ride-day-context" aria-label="骑行日背景">
+                            <span>骑行日累计</span>
+                            <strong>{detail.dayMileageKm.toFixed(1)} km</strong>
+                            <small>
+                              {rideDayShare === null
+                                ? "本次占比不可用"
+                                : `本次占当天 ${rideDayShare.toFixed(1)}%`}
+                            </small>
+                          </div>
+                        ) : null}
+                        <p
+                          className={`ride-detail-refresh-state ${
+                            detailRefreshState.status === "error"
+                              ? "ride-detail-refresh-error"
+                              : detailRefreshState.status === "loading" ||
+                                  detailRefreshState.status === "success"
+                                ? "ride-detail-refresh-active"
+                                : declaredMaxSpeedLikelyCapped
+                                  ? "ride-detail-source-warning"
+                                  : ""
+                          }`}
+                          role={detailRefreshState.status === "error" ? "alert" : "status"}
+                          title={
+                            detailRefreshState.status === "error"
+                              ? detailRefreshState.message
+                              : undefined
+                          }
+                        >
+                          {detailRefreshState.status === "loading"
+                            ? "正在绕过缓存重新读取当前行程…"
+                            : detailRefreshState.status === "success"
+                              ? "当前行程已重新读取"
+                              : detailRefreshState.status === "error"
+                                ? "刷新失败，旧数据已保留，请再次刷新"
+                                : detail.sampledMaxSpeed !== null &&
+                                    detail.declaredMaxSpeed !== null
+                                  ? declaredMaxSpeedLikelyCapped
+                                    ? `旧记录摘要固定返回 25 km/h，已忽略；当前显示由 ${detail.track.length} 个轨迹点计算。`
+                                    : `接口摘要 ${detail.declaredMaxSpeed.toFixed(0)} km/h · 轨迹采样 ${detail.sampledMaxSpeed.toFixed(0)} km/h`
+                                  : "\u00a0"}
+                        </p>
+                        {exportNotice ? (
+                          <p className="ride-export-notice" role="status">
+                            {exportNotice}
+                          </p>
+                        ) : null}
+                      </section>
+
+                      <section
+                        className={`playback-panel ${detailRefreshing ? "playback-panel-refreshing" : ""}`}
+                        aria-label="轨迹回放控制"
+                        aria-busy={detailRefreshing}
+                        inert={detailRefreshing}
+                      >
+                        <div className="flex items-center gap-4 border-b border-slate-200/75 pb-4">
+                          <button
+                            className="play-button"
+                            type="button"
+                            onClick={togglePlayback}
+                            disabled={track.length <= 1 || detailRefreshing}
+                            aria-label={isPlaying ? "暂停回放" : "开始回放"}
+                          >
+                            {isPlaying ? (
+                              <Pause size={19} fill="currentColor" />
+                            ) : (
+                              <Play size={19} fill="currentColor" />
+                            )}
+                          </button>
+                          <span className="w-[94px] text-sm font-semibold tabular-nums text-slate-700">
+                            {formatDuration(elapsedSeconds)}{" "}
+                            <span className="text-slate-400">
+                              / {formatDuration(detail.durationSeconds)}
+                            </span>
+                          </span>
+                          <input
+                            className="timeline-range flex-1"
+                            aria-label="回放进度"
+                            type="range"
+                            min={0}
+                            max={Math.max(0, track.length - 1)}
+                            step={0.01}
+                            value={playbackPosition}
+                            disabled={detailRefreshing}
+                            aria-valuetext={`${formatDuration(elapsedSeconds)}，共 ${formatDuration(detail.durationSeconds)}`}
+                            style={{ "--progress": `${progress}%` } as CSSProperties}
+                            onChange={(event) => {
+                              setIsPlaying(false);
+                              seekPlayback(Number(event.target.value));
+                            }}
+                          />
+                          <PlaybackRateControl
+                            value={playbackRate}
+                            disabled={track.length <= 1 || detailRefreshing}
+                            onChange={setPlaybackRate}
+                          />
+                        </div>
+                        <div className="mt-4 flex items-end gap-6">
+                          <div className="w-[112px] pb-2">
+                            <p className="text-xs font-semibold text-slate-500">当前速度</p>
+                            <div className="mt-1 flex items-baseline gap-1">
+                              <strong className="text-[43px] leading-none font-[720] tracking-[-0.035em] text-[#172332]">
+                                {Math.round(activePoint?.speed ?? 0)}
+                              </strong>
+                              <span className="text-xs font-semibold text-slate-500">km/h</span>
+                            </div>
+                          </div>
+                          <SpeedChart
+                            track={track}
+                            playbackPosition={playbackPosition}
+                            onSeek={(position) => {
+                              setIsPlaying(false);
+                              seekPlayback(position);
+                            }}
+                          />
+                        </div>
+                        <SpeedZoneDistribution
+                          track={track}
+                          activeSpeed={activePoint?.speed ?? 0}
+                          onSeek={(position) => {
+                            setIsPlaying(false);
+                            seekPlayback(position);
+                          }}
+                        />
+                      </section>
+                    </>
+                  ) : (
+                    <section className="empty-month-panel" aria-live="polite">
+                      {loading ? (
+                        <LoaderCircle size={22} className="animate-spin text-[#0a9f92]" />
+                      ) : (
+                        <CalendarDays size={22} />
+                      )}
+                      <div>
+                        <strong>
+                          {loading
+                            ? `正在读取${formatMonth(month)}`
+                            : rides.length > 0
+                              ? "选择一条行程查看轨迹"
+                              : `${formatMonth(month)}没有行程`}
+                        </strong>
+                        <p>
+                          {loading
+                            ? "正在从九号账号读取这个月的骑行记录。"
+                            : error
+                              ? "读取失败，请检查网络后重新尝试。"
+                              : rides.length > 0
+                                ? "当前只加载了月度列表；选择左侧具体行程后才会读取 GPS 轨迹。"
+                                : "可以从左侧选择其他年份和月份继续查看。"}
+                        </p>
+                      </div>
+                      {!loading && error && mode === "live" ? (
+                        <button
+                          type="button"
+                          onClick={() => void loadLiveData(month, vehicle, { refresh: true })}
+                        >
+                          <RefreshCw size={14} />
+                          重新读取
+                        </button>
+                      ) : null}
+                    </section>
+                  )}
+                </>
               )}
-            </>
-          )}
+            </div>
+          </main>
         </div>
-      </main>
+      </div>
 
       {loginOpen ? (
         <LoginSheet
@@ -2351,8 +2361,8 @@ interface MetricProps {
 
 const Metric = ({ label, value, unit }: MetricProps) => (
   <div className="min-w-0">
-    <p className="text-[11px] font-semibold text-slate-500">{label}</p>
-    <p className="mt-1 truncate text-[14px] font-[680] tabular-nums text-[#283645]">
+    <p className="metric-label text-[11px] font-semibold text-slate-500">{label}</p>
+    <p className="metric-reading mt-1 truncate text-[14px] font-[680] tabular-nums text-[#283645]">
       {value}
       {unit ? <span className="ml-1 text-[10px] font-semibold text-slate-500">{unit}</span> : null}
     </p>

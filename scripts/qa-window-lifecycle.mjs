@@ -37,6 +37,7 @@ const closeMainWindow = async () => {
 
 const assertRendererReady = async (window) => {
   await window.locator(".unauthenticated-page, .app-shell").first().waitFor();
+  await window.waitForFunction(() => document.documentElement.dataset.theme === "mint");
   assert.equal(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().length), 1);
 };
 

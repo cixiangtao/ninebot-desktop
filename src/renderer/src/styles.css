@@ -1,6 +1,47 @@
 @import "tailwindcss";
 
 :root {
+  color-scheme: light;
+  --canvas: #f5f7f8;
+  --surface: #ffffff;
+  --line: #e3e9eb;
+  --ink: #1d2937;
+  --muted: #586b76;
+  --accent: #087f76;
+  --accent-hover: #066a63;
+  --accent-soft: #e9f4f1;
+  --accent-highlight: #ffffff;
+  --heatmap-rgb: 9 159 146;
+  --chart-line: #0b9f91;
+  --chart-fill: #12c7b5;
+  --nav-bg: #f0f4f4;
+  --nav-text: var(--muted);
+  --nav-hover: #e4eceb;
+  --nav-active-bg: #dceee9;
+  --nav-active-text: #076b63;
+  --brand-bg: var(--accent);
+  --brand-text: #ffffff;
+  --sidebar-bg: #ffffff;
+  --row-selected: var(--accent-soft);
+  --row-hover: #f1f5f5;
+  --date-tile-bg: var(--nav-bg);
+  --row-date-bg: #d7eae4;
+  --row-date-text: var(--accent);
+  --panel-bg: #ffffff;
+  --panel-text: var(--ink);
+  --panel-muted: var(--muted);
+  --panel-number: var(--ink);
+  --panel-line: var(--line);
+  --panel-control-bg: var(--accent-soft);
+  --panel-accent: var(--accent);
+  --panel-warning: #795b18;
+  --panel-error: #9b3038;
+  --battery-fill: #12bfae;
+  --focus: #087f76;
+  --nav-focus: var(--focus);
+  --panel-focus: var(--focus);
+  --data-font: -apple-system, BlinkMacSystemFont, "SF Pro Display", sans-serif;
+  --replay-height: 226px;
   color: #1d2937;
   background: #edf1f5;
   font-family:
@@ -8,6 +49,227 @@
     "Helvetica Neue", sans-serif;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
+}
+
+:root[data-theme="blue"] {
+  --nav-active-text: #315fba;
+  --canvas: #f3f6fb;
+  --line: #dde5f0;
+  --accent: #315fba;
+  --accent-hover: #254c9b;
+  --accent-soft: #eaf0fc;
+  --heatmap-rgb: 65 111 196;
+  --chart-line: #416fc4;
+  --chart-fill: #8eb6f1;
+  --nav-bg: #eaf0fa;
+  --nav-hover: #dce6f8;
+  --nav-active-bg: #d7e4fc;
+  --row-hover: #f0f4fc;
+  --row-date-bg: #d7e4fc;
+  --battery-fill: #507fd0;
+  --focus: #315fba;
+}
+
+:root[data-theme="violet"] {
+  --nav-active-text: #684495;
+  --canvas: #f6f4f9;
+  --line: #e5dfec;
+  --accent: #7651ab;
+  --accent-hover: #60428d;
+  --accent-soft: #f0eafa;
+  --heatmap-rgb: 136 97 188;
+  --chart-line: #8861bc;
+  --chart-fill: #b89cdd;
+  --nav-bg: #f0edf7;
+  --nav-hover: #e6def2;
+  --nav-active-bg: #e6daf6;
+  --row-hover: #f4effa;
+  --row-date-bg: #e6daf6;
+  --battery-fill: #9670c5;
+  --focus: #7651ab;
+}
+
+:root[data-theme="apricot"] {
+  --nav-active-text: #8e471e;
+  --canvas: #f8f5ef;
+  --surface: #fffdf9;
+  --line: #eae1d5;
+  --accent: #a85926;
+  --accent-hover: #8b461d;
+  --accent-soft: #faeee1;
+  --heatmap-rgb: 182 106 50;
+  --chart-line: #b66a32;
+  --chart-fill: #e4ac70;
+  --nav-bg: #f7efe5;
+  --nav-hover: #f1e4d4;
+  --nav-active-bg: #f4e1cb;
+  --row-hover: #fbf1e6;
+  --row-date-bg: #f4e1cb;
+  --battery-fill: #d08746;
+  --focus: #a85926;
+}
+
+:root[data-theme="forest"] {
+  --canvas: #f0f1e9;
+  --surface: #fcfcf8;
+  --line: #dde2d5;
+  --ink: #203c34;
+  --muted: #596a60;
+  --accent: #173f35;
+  --accent-hover: #285648;
+  --accent-soft: #eaf0db;
+  --accent-highlight: #def28a;
+  --heatmap-rgb: 40 118 90;
+  --chart-line: #28765a;
+  --chart-fill: #b9d85b;
+  --nav-bg: #173f35;
+  --nav-text: #c1d2b9;
+  --nav-hover: #285648;
+  --nav-active-bg: #def28a;
+  --nav-active-text: #173f35;
+  --brand-bg: #def28a;
+  --brand-text: #173f35;
+  --sidebar-bg: #f6f7f0;
+  --date-tile-bg: #e9eddf;
+  --row-selected: #def28a;
+  --row-hover: #e9eedf;
+  --row-date-bg: #173f35;
+  --row-date-text: #def28a;
+  --panel-bg: #173f35;
+  --panel-text: #f8faed;
+  --panel-muted: #c1d2b9;
+  --panel-number: #def28a;
+  --panel-line: #456557;
+  --panel-control-bg: #285648;
+  --panel-accent: #def28a;
+  --panel-warning: #f4dc96;
+  --panel-error: #ffc8bc;
+  --battery-fill: #def28a;
+  --focus: #708c41;
+  --nav-focus: #def28a;
+  --panel-focus: #def28a;
+}
+
+.theme-picker {
+  position: relative;
+  flex: none;
+}
+.theme-trigger {
+  display: flex;
+  height: 36px;
+  align-items: center;
+  gap: 7px;
+  padding: 0 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: var(--accent);
+  background: var(--surface);
+  font-size: 12px;
+  font-weight: 650;
+}
+.theme-trigger:hover,
+.theme-trigger[aria-expanded="true"] {
+  background: var(--accent-soft);
+}
+.theme-panel {
+  position: absolute;
+  top: calc(100% + 12px);
+  right: 0;
+  width: 292px;
+  padding: 16px;
+  border-radius: 14px;
+  color: var(--ink);
+  background: var(--surface);
+  box-shadow: 0 12px 40px rgb(25 40 45 / 18%);
+}
+.theme-panel header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.theme-panel header > strong {
+  font-size: 16px;
+}
+.theme-panel header button {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border: 0;
+  border-radius: 7px;
+  color: var(--muted);
+  background: transparent;
+}
+.theme-panel header button:hover {
+  background: var(--accent-soft);
+}
+.theme-panel > p,
+.theme-panel footer {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.6;
+}
+.theme-panel fieldset {
+  display: grid;
+  gap: 6px;
+  margin: 14px 0;
+  padding: 0;
+  border: 0;
+}
+.theme-option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 62px;
+  padding: 10px;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  cursor: pointer;
+}
+.theme-option:hover {
+  background: var(--canvas);
+}
+.theme-option:has(input:checked) {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+.theme-option:has(input:focus-visible) {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+.theme-option > svg {
+  flex: none;
+  color: var(--accent);
+}
+.theme-swatches {
+  display: flex;
+  flex: none;
+  align-items: center;
+}
+.theme-swatches i {
+  width: 15px;
+  height: 28px;
+  border: 1px solid rgb(0 0 0 / 12%);
+}
+.theme-swatches i:first-child {
+  border-radius: 5px 0 0 5px;
+}
+.theme-swatches i:last-child {
+  border-radius: 0 5px 5px 0;
+}
+.theme-option-copy {
+  display: grid;
+  flex: 1;
+  gap: 4px;
+}
+.theme-option-copy strong {
+  font-size: 13px;
+  font-weight: 650;
+}
+.theme-option-copy small {
+  color: var(--muted);
+  font-size: 11px;
 }
 
 * {
@@ -40,13 +302,13 @@ button {
 button:focus-visible,
 input:focus-visible,
 select:focus-visible {
-  outline: 3px solid rgb(18 199 181 / 28%);
+  outline: 3px solid var(--focus);
   outline-offset: 2px;
 }
 
 ::selection {
-  color: #102d2b;
-  background: rgb(18 199 181 / 28%);
+  color: var(--accent);
+  background: var(--accent-soft);
 }
 
 ::-webkit-scrollbar {
@@ -67,24 +329,216 @@ select:focus-visible {
   background: #edf1f5;
 }
 
+.navigation-rail {
+  z-index: 40;
+  display: flex;
+  width: 88px;
+  flex: none;
+  flex-direction: column;
+  align-items: center;
+  padding: 56px 12px 20px;
+  border-right: 0;
+  background: var(--nav-bg);
+  -webkit-app-region: drag;
+}
+
+.rail-brand {
+  display: grid;
+  justify-items: center;
+  gap: 8px;
+  color: var(--nav-text);
+}
+
+.rail-brand strong {
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.primary-navigation {
+  display: grid;
+  width: 100%;
+  gap: 10px;
+  margin-top: 36px;
+}
+
+.navigation-rail .nav-item,
+.rail-account {
+  display: flex;
+  width: 100%;
+  min-height: 60px;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 7px;
+  padding: 10px 4px;
+  border: 0;
+  border-radius: 12px;
+  color: var(--nav-text);
+  background: transparent;
+  font-size: 11px;
+  font-weight: 600;
+  -webkit-app-region: no-drag;
+  transition:
+    background 150ms ease-out,
+    color 150ms ease-out;
+}
+
+.navigation-rail .nav-item svg {
+  width: 21px;
+  height: 21px;
+}
+.navigation-rail .nav-item:hover,
+.rail-account:hover {
+  color: var(--nav-text);
+  background: var(--nav-hover);
+}
+.navigation-rail .nav-item.nav-item-active {
+  color: var(--nav-active-text);
+  background: var(--nav-active-bg);
+}
+.rail-footer {
+  display: grid;
+  width: 100%;
+  gap: 8px;
+  margin-top: auto;
+}
+
+.workspace {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  flex-direction: column;
+}
+.workspace-body {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+}
+.workspace-title {
+  flex: none;
+  color: var(--ink);
+  font-size: 18px;
+  font-weight: 750;
+}
+.workspace-status {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  justify-content: flex-end;
+  gap: 8px;
+}
+.workspace-vehicle {
+  width: 252px;
+  flex: none;
+}
+.workspace-vehicle .vehicle-card {
+  margin: 0;
+  padding: 6px 10px;
+  border-radius: 10px;
+  background: var(--accent-soft);
+  box-shadow: none;
+}
+.workspace-vehicle .vehicle-card-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: transparent;
+}
+.workspace-vehicle .vehicle-card strong {
+  font-size: 13px;
+}
+.workspace-vehicle .vehicle-card span span {
+  margin-top: 2px;
+  font-size: 10px;
+}
+.workspace-vehicle .account-connect-card {
+  margin: 0;
+  padding: 7px 12px;
+  border: 0;
+  border-radius: 10px;
+  background: var(--accent-soft);
+}
+.workspace-vehicle .account-connect-card small {
+  font-size: 10px;
+}
+
+.ride-library-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+.ride-library-heading h2 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 19px;
+  font-weight: 680;
+}
+.ride-library-heading > span {
+  color: var(--muted);
+  font-size: 11px;
+}
+.ride-month-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 2px 16px;
+}
+.view-content-replay > .route-map {
+  bottom: var(--replay-height);
+}
+.playback-panel > div:first-child {
+  gap: 16px;
+  padding-bottom: 12px;
+}
+.playback-panel .speed-chart {
+  height: 90px;
+}
+
+.playback-panel > div:nth-child(2) {
+  margin-top: 12px;
+}
+.playback-panel .play-button {
+  color: var(--accent-highlight);
+  background: var(--accent);
+}
+.playback-panel .play-button:hover {
+  background: var(--accent-hover);
+}
+.statistics-summary-card:last-child {
+  border-radius: 0 13px 13px 0;
+  border-right: 0;
+}
+
 .sidebar {
   position: relative;
   z-index: 20;
   display: flex;
-  width: 304px;
-  min-width: 304px;
+  width: 292px;
+  min-width: 292px;
   flex-direction: column;
-  border-right: 1px solid rgb(184 197 205 / 48%);
-  background: rgb(247 249 250 / 88%);
-  box-shadow: 10px 0 34px rgb(67 84 96 / 7%);
-  backdrop-filter: blur(28px) saturate(1.16);
+  border-right: 1px solid var(--line);
+  background: var(--sidebar-bg);
 }
 
-.sidebar-scroll {
+.sidebar-content {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+  padding: 24px 16px 16px;
+}
+
+.sidebar-content > * {
+  flex-shrink: 0;
+}
+
+.sidebar-content > .ride-list {
   min-height: 0;
   flex: 1;
   overflow-y: auto;
-  padding: 58px 16px 18px;
+  overscroll-behavior-y: contain;
 }
 
 .brand-row {
@@ -99,13 +553,12 @@ select:focus-visible {
 
 .brand-mark {
   display: grid;
-  width: 36px;
-  height: 36px;
+  width: 38px;
+  height: 38px;
   place-items: center;
-  border-radius: 11px;
-  color: white;
-  background: #12bfae;
-  box-shadow: 0 7px 18px rgb(18 176 161 / 22%);
+  border-radius: 12px;
+  color: var(--brand-text);
+  background: var(--brand-bg);
 }
 
 .sidebar-label {
@@ -302,11 +755,16 @@ select:focus-visible {
 }
 
 .month-navigation {
+  position: relative;
   min-width: 0;
   flex: 1;
 }
 
 .month-picker {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 35;
   width: 216px;
   margin-top: 10px;
   padding: 10px;
@@ -736,8 +1194,8 @@ select:focus-visible {
 }
 
 .coordinate-preview-control-route {
-  bottom: 300px;
-  left: 24px;
+  bottom: 60px;
+  left: 16px;
 }
 
 .coordinate-preview-control-location {
@@ -886,12 +1344,12 @@ select:focus-visible {
 
 .primary-button {
   color: #ffffff;
-  background: #182833;
+  background: var(--accent);
   box-shadow: 0 8px 20px rgb(27 46 58 / 18%);
 }
 
 .primary-button:hover {
-  background: #223946;
+  background: var(--accent-hover);
 }
 .primary-button:disabled {
   cursor: not-allowed;
@@ -908,15 +1366,15 @@ select:focus-visible {
 .titlebar {
   -webkit-app-region: drag;
   position: relative;
-  z-index: 15;
+  z-index: 30;
   display: flex;
-  height: 50px;
+  height: 72px;
   flex: none;
   align-items: center;
-  justify-content: center;
-  border-bottom: 1px solid rgb(185 198 205 / 42%);
-  background: rgb(246 248 249 / 78%);
-  backdrop-filter: blur(24px) saturate(1.16);
+  gap: 24px;
+  padding: 0 28px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
 }
 
 .no-drag,
@@ -988,11 +1446,14 @@ select:focus-visible {
 }
 
 .online-map .maplibregl-ctrl-bottom-right {
-  right: 72px;
-  bottom: 262px;
+  right: 16px;
+  bottom: 12px;
 }
 
 .online-map .maplibregl-ctrl-attrib {
+  max-width: 260px;
+  font-size: 9px;
+  line-height: 16px;
   color: #5d6c76;
   background: rgb(255 255 255 / 82%);
   backdrop-filter: blur(14px);
@@ -1095,7 +1556,7 @@ select:focus-visible {
 }
 
 .map-provider-note {
-  bottom: 262px;
+  bottom: 16px;
   left: 24px;
   padding: 6px 10px;
   border-radius: 999px;
@@ -1104,7 +1565,7 @@ select:focus-visible {
 }
 
 .map-fallback-note {
-  bottom: 262px;
+  bottom: 16px;
   left: 24px;
   gap: 7px;
   padding: 6px 7px 6px 10px;
@@ -1171,11 +1632,11 @@ select:focus-visible {
 
 .map-controls {
   position: absolute;
-  right: 24px;
-  bottom: 306px;
+  left: 24px;
+  top: 108px;
   z-index: 8;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   gap: 8px;
 }
 
@@ -1210,10 +1671,9 @@ select:focus-visible {
 .playback-panel {
   position: absolute;
   z-index: 10;
-  border-radius: 16px;
-  background: rgb(255 255 255 / 92%);
-  box-shadow: 0 14px 36px rgb(47 64 76 / 14%);
-  backdrop-filter: blur(24px) saturate(1.1);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: 0 8px 28px rgb(32 49 54 / 10%);
 }
 
 .empty-month-panel {
@@ -1340,14 +1800,17 @@ select:focus-visible {
 }
 
 .metrics-panel {
-  top: 24px;
-  right: 24px;
-  width: 330px;
-  padding: 22px;
+  top: 16px;
+  right: 16px;
+  width: 312px;
+  padding: 20px;
+  color: var(--panel-text);
+  background: var(--panel-bg);
 }
 
 .metric-number {
-  color: #172332;
+  font-family: var(--data-font);
+  color: var(--panel-number);
   font-size: 50px;
   font-weight: 730;
   font-variant-numeric: tabular-nums;
@@ -1375,7 +1838,7 @@ select:focus-visible {
 }
 
 .speed-chart:focus-visible {
-  outline: 3px solid rgb(18 199 181 / 28%);
+  outline: 3px solid var(--focus);
   outline-offset: 3px;
 }
 
@@ -1444,7 +1907,7 @@ select:focus-visible {
 }
 
 .speed-zone-options button:focus-visible {
-  outline: 3px solid rgb(18 199 181 / 28%);
+  outline: 3px solid var(--focus);
   outline-offset: 2px;
 }
 
@@ -1497,6 +1960,20 @@ select:focus-visible {
 .ride-export-trigger:disabled {
   cursor: not-allowed;
   opacity: 0.45;
+}
+
+.ride-metric-actions .ride-export-trigger {
+  width: 32px;
+  height: 32px;
+  justify-content: center;
+  padding: 0;
+}
+
+.metrics-panel > div:first-child > div:first-child > p {
+  white-space: nowrap;
+}
+.metric-source-badge {
+  white-space: nowrap;
 }
 
 .ride-detail-refresh-trigger {
@@ -1583,10 +2060,8 @@ select:focus-visible {
 .ride-comparison-dashboard {
   height: 100%;
   overflow-y: auto;
-  padding: clamp(30px, 4vw, 54px);
-  background:
-    radial-gradient(circle at 84% 4%, rgb(18 199 181 / 8%), transparent 30%),
-    linear-gradient(145deg, #f2f5f6 0%, #e9eef0 100%);
+  padding: clamp(28px, 3.5vw, 48px);
+  background: var(--canvas);
 }
 
 .ride-comparison-header,
@@ -1939,10 +2414,8 @@ select:focus-visible {
 .vehicle-dashboard {
   height: 100%;
   overflow-y: auto;
-  padding: clamp(30px, 4vw, 54px);
-  background:
-    radial-gradient(circle at 14% 8%, rgb(18 199 181 / 9%), transparent 32%),
-    linear-gradient(145deg, #f2f5f6 0%, #e9eef0 100%);
+  padding: clamp(28px, 3.5vw, 48px);
+  background: var(--canvas);
 }
 
 .vehicle-dashboard-header {
@@ -2084,7 +2557,6 @@ select:focus-visible {
   border-radius: 11px;
   color: #485b67;
   background: rgb(255 255 255 / 90%);
-  box-shadow: 0 7px 20px rgb(47 64 76 / 9%);
   font-size: 11px;
   font-weight: 680;
 }
@@ -2251,15 +2723,17 @@ select:focus-visible {
 .vehicle-energy-card,
 .device-status-card,
 .battery-detail-card {
-  border-radius: 22px;
-  background: rgb(255 255 255 / 91%);
-  box-shadow: 0 18px 44px rgb(47 64 76 / 10%);
-  backdrop-filter: blur(24px) saturate(1.08);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
 }
 
 .vehicle-energy-card {
   min-height: 462px;
   padding: 25px;
+  border-color: transparent;
+  color: var(--panel-text);
+  background: var(--panel-bg);
 }
 
 .device-card-heading,
@@ -2294,8 +2768,11 @@ select:focus-visible {
   height: 206px;
   place-items: center;
   border-radius: 50%;
-  background: conic-gradient(#12bfae var(--battery-level), #e2e9eb var(--battery-level));
-  box-shadow: 0 15px 38px rgb(18 164 151 / 13%);
+  background: conic-gradient(
+    var(--battery-fill) var(--battery-level),
+    var(--panel-line) var(--battery-level)
+  );
+  box-shadow: none;
 }
 
 .battery-orbit::before {
@@ -2303,8 +2780,8 @@ select:focus-visible {
   inset: 13px;
   content: "";
   border-radius: 50%;
-  background: #ffffff;
-  box-shadow: inset 0 0 0 1px rgb(215 225 228 / 68%);
+  background: var(--panel-bg);
+  box-shadow: none;
 }
 
 .battery-orbit > div {
@@ -2315,7 +2792,8 @@ select:focus-visible {
 }
 
 .battery-orbit strong {
-  color: #172332;
+  font-family: var(--data-font);
+  color: var(--panel-number);
   font-size: 66px;
   font-weight: 740;
   font-variant-numeric: tabular-nums;
@@ -2491,10 +2969,8 @@ select:focus-visible {
 
 .battery-pack-card {
   min-width: 0;
-  padding: 13px;
-  border: 1px solid rgb(215 224 228 / 80%);
-  border-radius: 15px;
-  background: rgb(250 252 252 / 80%);
+  padding: 12px 0;
+  border-top: 1px solid var(--line);
 }
 
 .battery-pack-heading {
@@ -2600,10 +3076,8 @@ select:focus-visible {
 .statistics-dashboard {
   height: 100%;
   overflow-y: auto;
-  padding: clamp(30px, 4vw, 54px);
-  background:
-    radial-gradient(circle at 84% 4%, rgb(18 199 181 / 8%), transparent 30%),
-    linear-gradient(145deg, #f2f5f6 0%, #e9eef0 100%);
+  padding: clamp(28px, 3.5vw, 48px);
+  background: var(--canvas);
 }
 
 .statistics-header {
@@ -2655,7 +3129,6 @@ select:focus-visible {
   align-items: center;
   border-radius: 11px;
   background: rgb(255 255 255 / 90%);
-  box-shadow: 0 7px 20px rgb(47 64 76 / 8%);
 }
 
 .statistics-year-switcher button {
@@ -2695,7 +3168,6 @@ select:focus-visible {
   border-radius: 11px;
   color: #485b67;
   background: rgb(255 255 255 / 90%);
-  box-shadow: 0 7px 20px rgb(47 64 76 / 9%);
   font-size: 11px;
   font-weight: 680;
   white-space: nowrap;
@@ -2773,44 +3245,49 @@ select:focus-visible {
   display: grid;
   max-width: 1080px;
   grid-template-columns: repeat(6, minmax(0, 1fr));
-  gap: 12px;
-  margin: 0 auto 18px;
+  gap: 0;
+  margin: 0 auto 24px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
 }
 
 .statistics-summary-card,
 .statistics-chart-card,
 .statistics-month-card,
 .year-activity-card {
-  border-radius: 19px;
-  background: rgb(255 255 255 / 91%);
-  box-shadow: 0 16px 40px rgb(47 64 76 / 9%);
-  backdrop-filter: blur(24px) saturate(1.08);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
 }
 
 .statistics-summary-card {
   min-width: 0;
-  padding: 18px;
+  padding: 24px 20px;
+  border: 0;
+  border-right: 1px solid var(--line);
+  border-radius: 0;
 }
 
 .statistics-summary-card > span {
   display: grid;
-  width: 34px;
-  height: 34px;
-  place-items: center;
-  border-radius: 11px;
+  width: auto;
+  height: auto;
+  place-items: start;
   color: #087f76;
-  background: #e7f8f5;
 }
 
 .statistics-summary-card small,
 .statistics-summary-card strong {
+  font-family: var(--data-font);
   display: block;
 }
 
 .statistics-summary-card small {
-  margin-top: 15px;
-  color: #7b8993;
-  font-size: 10px;
+  margin-top: 12px;
+  color: var(--muted);
+  font-size: 12px;
   font-weight: 630;
 }
 
@@ -2974,7 +3451,7 @@ select:focus-visible {
 
 .year-activity-grid .year-activity-day-active,
 .year-activity-legend .year-activity-day-active {
-  background: rgb(9 159 146 / calc(18% + var(--year-activity-intensity) * 82%));
+  background: rgb(var(--heatmap-rgb) / calc(18% + var(--year-activity-intensity) * 82%));
 }
 
 .year-activity-grid .year-activity-day-active:hover {
@@ -3164,7 +3641,7 @@ select:focus-visible {
   height: var(--bar-height);
   min-height: 2px;
   border-radius: 7px 7px 3px 3px;
-  background: linear-gradient(180deg, #17c7b5 0%, #0ca194 100%);
+  background: var(--chart-line);
   box-shadow: 0 6px 14px rgb(18 164 151 / 13%);
 }
 
@@ -3274,19 +3751,16 @@ select:focus-visible {
   overflow-y: auto;
   place-items: center;
   padding: 36px;
-  background:
-    radial-gradient(circle at 50% 18%, rgb(18 199 181 / 11%), transparent 34%),
-    linear-gradient(145deg, #f2f5f6 0%, #e9eef0 100%);
+  background: var(--canvas);
 }
 
 .location-consent-card {
   width: min(100%, 610px);
   padding: 32px;
-  border-radius: 24px;
-  background: rgb(255 255 255 / 94%);
-  box-shadow: 0 22px 64px rgb(47 64 76 / 13%);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface);
   text-align: center;
-  backdrop-filter: blur(26px) saturate(1.08);
 }
 
 .location-consent-icon {
@@ -3767,10 +4241,14 @@ select:focus-visible {
 }
 
 .playback-panel {
-  right: clamp(26px, 6vw, 88px);
-  bottom: 28px;
-  left: clamp(26px, 6vw, 88px);
-  padding: 19px 22px 16px;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  height: var(--replay-height);
+  padding: 16px 24px;
+  border-top: 1px solid var(--line);
+  border-radius: 0;
+  box-shadow: none;
 }
 
 .play-button {
@@ -3870,17 +4348,17 @@ select:focus-visible {
   appearance: none;
   border-radius: 999px;
   outline: none;
-  background: linear-gradient(to right, #11bfae var(--progress), #d7dfe3 var(--progress));
+  background: linear-gradient(to right, var(--accent) var(--progress), var(--line) var(--progress));
 }
 
 .timeline-range::-webkit-slider-thumb {
   width: 16px;
   height: 16px;
   appearance: none;
-  border: 4px solid #ffffff;
+  border: 4px solid var(--accent-highlight);
   border-radius: 50%;
-  background: #11bfae;
-  box-shadow: 0 3px 8px rgb(15 146 135 / 28%);
+  background: var(--accent);
+  box-shadow: 0 3px 8px rgb(23 63 53 / 18%);
 }
 
 .login-sheet {
@@ -4447,17 +4925,118 @@ select:focus-visible {
   color: #83909a;
 }
 
+.metrics-panel .metric-label,
+.metrics-panel .text-slate-500,
+.metrics-panel .ride-day-context > span,
+.metrics-panel .ride-day-context small {
+  color: var(--panel-muted);
+}
+
+.metrics-panel .metric-reading,
+.metrics-panel .ride-day-context strong {
+  color: var(--panel-text);
+}
+
+.metrics-panel > .border-t,
+.metrics-panel .ride-energy-metrics,
+.metrics-panel .ride-day-context {
+  border-color: var(--panel-line);
+}
+
+.metrics-panel .metric-source-badge {
+  color: var(--panel-accent);
+  background: var(--panel-control-bg);
+}
+
+.metrics-panel .ride-export-trigger {
+  border-color: var(--panel-line);
+  color: var(--panel-accent);
+  background: transparent;
+}
+
+.metrics-panel .ride-export-trigger:hover {
+  background: var(--panel-control-bg);
+}
+
+.metrics-panel .ride-detail-refresh-state {
+  color: var(--panel-muted);
+}
+.metrics-panel .ride-detail-refresh-active {
+  color: var(--panel-accent);
+}
+.metrics-panel .ride-detail-source-warning {
+  color: var(--panel-warning);
+}
+.metrics-panel .ride-detail-refresh-error {
+  color: var(--panel-error);
+}
+.metrics-panel .ride-export-notice {
+  color: var(--panel-accent);
+}
+
+.vehicle-energy-card .device-card-heading,
+.vehicle-energy-card .device-metric-icon {
+  color: var(--panel-accent);
+}
+
+.vehicle-energy-card .device-card-heading strong,
+.vehicle-energy-card .device-metric strong {
+  color: var(--panel-text);
+}
+
+.vehicle-energy-card .device-card-heading span,
+.vehicle-energy-card .device-metric small,
+.vehicle-energy-card .device-metric i,
+.vehicle-energy-card .battery-orbit span,
+.vehicle-energy-card .battery-orbit small {
+  color: var(--panel-muted);
+}
+
+.vehicle-energy-card .battery-orbit .battery-orbit-source-warning {
+  color: var(--panel-warning);
+}
+.vehicle-energy-card .device-metric-icon {
+  background: var(--panel-control-bg);
+}
+.vehicle-energy-card .vehicle-energy-summary,
+.vehicle-energy-card .vehicle-battery-score {
+  border-color: var(--panel-line);
+}
+
+.statistics-summary-card:first-child {
+  border-radius: 13px 0 0 13px;
+  background: var(--panel-bg);
+}
+.statistics-summary-card:first-child > span,
+.statistics-summary-card:first-child strong {
+  color: var(--panel-number);
+}
+.statistics-summary-card:first-child small,
+.statistics-summary-card:first-child i {
+  color: var(--panel-muted);
+}
+
+.ride-row-active:hover {
+  background: var(--row-selected);
+}
+.navigation-rail button:focus-visible {
+  outline-color: var(--nav-focus);
+}
+.metrics-panel button:focus-visible {
+  outline-color: var(--panel-focus);
+}
+
 @media (max-width: 1180px) {
   .sidebar {
-    width: 270px;
-    min-width: 270px;
+    width: 260px;
+    min-width: 260px;
   }
   .metrics-panel {
     width: 300px;
   }
   .playback-panel {
-    right: 24px;
-    left: 24px;
+    right: 0;
+    left: 0;
   }
   .vehicle-dashboard {
     padding: 30px;
@@ -4500,10 +5079,25 @@ select:focus-visible {
   .vehicle-energy-card,
   .device-status-card,
   .battery-detail-card {
-    border-radius: 18px;
+    border-radius: 14px;
   }
   .statistics-summary-card strong {
-    font-size: 20px;
+    font-size: 23px;
+  }
+  .statistics-summary-card:first-child {
+    border-radius: 13px 0 0 0;
+  }
+  .statistics-summary-card:nth-child(3) {
+    border-radius: 0 13px 0 0;
+  }
+  .statistics-summary-card:nth-child(4) {
+    border-radius: 0 0 0 13px;
+  }
+  .statistics-summary-card:last-child {
+    border-radius: 0 0 13px 0;
+  }
+  .statistics-summary-card:nth-child(3) {
+    border-right: 0;
   }
   .statistics-summary-grid {
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -4574,10 +5168,9 @@ select:focus-visible {
 
 @media (max-height: 760px) {
   .month-picker {
-    position: absolute;
-    bottom: 76px;
-    left: 24px;
-    z-index: 30;
+    top: auto;
+    bottom: auto;
+    top: 100%;
     margin-top: 0;
     background: #ffffff;
   }

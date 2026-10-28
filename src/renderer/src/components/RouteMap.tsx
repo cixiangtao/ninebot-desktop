@@ -77,9 +77,9 @@ const fitRoute = (map: MapLibreMapInstance, bounds: TrackBounds, animated: boole
   const { clientHeight, clientWidth } = map.getContainer();
   map.fitBounds(bounds, {
     padding: {
-      top: 72,
-      right: Math.min(340, Math.round(clientWidth * 0.28)),
-      bottom: Math.min(230, Math.round(clientHeight * 0.3)),
+      top: 96,
+      right: Math.min(340, Math.round(clientWidth * 0.46)),
+      bottom: Math.min(80, Math.round(clientHeight * 0.2)),
       left: 56,
     },
     maxZoom: 16,
