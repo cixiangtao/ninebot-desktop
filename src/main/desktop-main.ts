@@ -17,7 +17,10 @@ export const startDesktopApp = (registerRuntime: (configDirectory: string) => Pr
   ]);
 
   const gotLock = app.requestSingleInstanceLock();
-  if (!gotLock) app.quit();
+  if (!gotLock) {
+    app.quit();
+    return;
+  }
 
   let mainWindow: BrowserWindow | null = null;
   let unresponsivePromptOpen = false;
@@ -92,14 +95,18 @@ export const startDesktopApp = (registerRuntime: (configDirectory: string) => Pr
           unresponsivePromptOpen = false;
         });
     });
-    mainWindow.once("ready-to-show", () => mainWindow?.show());
+    const window = mainWindow;
+    window.once("ready-to-show", () => window.show());
+    window.once("closed", () => {
+      if (mainWindow === window) mainWindow = null;
+    });
 
     const rendererUrl = process.env.ELECTRON_RENDERER_URL;
     if (rendererUrl) await mainWindow.loadURL(rendererUrl);
     else await mainWindow.loadURL(appProtocolEntryUrl);
   };
 
-  app.whenReady().then(async () => {
+  const startup = app.whenReady().then(async () => {
     Menu.setApplicationMenu(null);
     session.defaultSession.setPermissionRequestHandler((_webContents, _permission, callback) =>
       callback(false),
@@ -109,17 +116,27 @@ export const startDesktopApp = (registerRuntime: (configDirectory: string) => Pr
     const configDirectory = process.env.NINEBOT_CONFIG_DIR ?? join(userDataDirectory, "ninebot");
     await registerRuntime(configDirectory);
     await createWindow();
-
-    app.on("activate", () => {
-      if (BrowserWindow.getAllWindows().length === 0) void createWindow();
-    });
   });
 
-  app.on("second-instance", () => {
-    if (!mainWindow) return;
+  // macOS keeps the process alive after its last window closes. Both launch paths
+  // must recreate that window after runtime initialization has completed.
+  const showMainWindow = async () => {
+    await startup;
+    if (!mainWindow || mainWindow.isDestroyed()) {
+      await createWindow();
+      return;
+    }
     if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.show();
     mainWindow.focus();
-  });
+  };
+  const reopenMainWindow = () => {
+    void showMainWindow().catch((error) =>
+      console.error("Unable to reopen the main window", error),
+    );
+  };
+  app.on("activate", reopenMainWindow);
+  app.on("second-instance", reopenMainWindow);
 
   app.on("window-all-closed", () => {
     if (process.platform !== "darwin") app.quit();
