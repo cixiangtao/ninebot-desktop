@@ -1,7 +1,7 @@
 import {
   createNinebotNodeAuthSessionManager,
   type NinebotAuthSessionManager,
-} from "@jiuhao/ninebot-client";
+} from "@jiuhao/ninebot-client/node";
 import {
   createNinebotSdkAppClient,
   normalizeSdkAuthError,

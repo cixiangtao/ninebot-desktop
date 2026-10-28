@@ -1,14 +1,8 @@
+import type { NinebotDeviceContext } from "./device-context.ts";
+export type { NinebotDeviceContext, NinebotDeviceContextStore } from "./device-context.ts";
 import { randomUUID } from "node:crypto";
 import { chmod, mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-
-/** Non-secret device metadata used to shape Android-compatible requests. */
-export interface NinebotDeviceContext {
-  deviceId: string;
-  region: string;
-  osVersion: string;
-  osModel: string;
-}
 
 export interface FileNinebotDeviceContextStoreOptions {
   directory: string;
@@ -98,5 +92,3 @@ export const createFileNinebotDeviceContextStore = ({
     },
   };
 };
-
-export type NinebotDeviceContextStore = ReturnType<typeof createFileNinebotDeviceContextStore>;

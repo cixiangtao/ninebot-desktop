@@ -46,7 +46,8 @@
     "build:auth-keychain": "node scripts/build-auth-keychain.mjs",
     "build:desktop:sdk-only": "node scripts/build-sdk-only.ts",
     "package:sdk:mac:dir": "node scripts/package-sdk-only.ts --platform=darwin",
-    "package:sdk:win:dir": "node scripts/package-sdk-only.ts --platform=win32"
+    "package:sdk:win:dir": "node scripts/package-sdk-only.ts --platform=win32",
+    "qa:sdk-portability": "pnpm run build:sdk && node scripts/qa-sdk-portability.mjs"
   },
   "dependencies": {
     "@jiuhao/ninebot-client": "workspace:*",

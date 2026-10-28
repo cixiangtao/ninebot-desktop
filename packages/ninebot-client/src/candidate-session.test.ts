@@ -107,9 +107,11 @@ describe("candidate session client", () => {
 
   it("forwards a caller cancellation signal to the transport", async () => {
     const signals: Array<AbortSignal | undefined> = [];
+    const entered = deferred();
     const transport: NinebotTransport = {
       send: async (request) => {
         signals.push(request.signal);
+        entered.resolve();
         return await new Promise<never>((_resolve, reject) => {
           request.signal?.addEventListener("abort", () => reject(request.signal?.reason), {
             once: true,
@@ -125,6 +127,7 @@ describe("candidate session client", () => {
       serialNumber: "SN1234567890",
       signal: controller.signal,
     });
+    await entered.promise;
     controller.abort(new Error("caller cancelled"));
 
     await expect(pending).rejects.toThrow("caller cancelled");
@@ -224,3 +227,11 @@ describe("candidate session client", () => {
     ]);
   });
 });
+
+function deferred() {
+  let resolve: () => void;
+  const promise = new Promise<void>((complete) => {
+    resolve = complete;
+  });
+  return { promise, resolve: () => resolve() };
+}

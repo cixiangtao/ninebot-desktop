@@ -1,11 +1,11 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import type { NinebotAuthSession } from "@jiuhao/ninebot-client";
+import type { NinebotAuthSession } from "@jiuhao/ninebot-client/node";
 import type { NinebotCandidateSessionFields } from "@jiuhao/ninebot-client/candidate-session";
 import {
   createFileNinebotDeviceContextStore,
   createFileNinebotVehicleCacheStore,
-} from "@jiuhao/ninebot-client";
+} from "@jiuhao/ninebot-client/node";
 
 export type CandidateService = "ebike" | "motor";
 

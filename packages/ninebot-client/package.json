@@ -2,10 +2,12 @@
   "name": "@jiuhao/ninebot-client",
   "version": "0.0.0",
   "private": true,
+  "description": "Read-only Ninebot protocol SDK with portable core and explicit platform adapters",
   "files": [
     "dist"
   ],
   "type": "module",
+  "sideEffects": false,
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
@@ -124,6 +126,22 @@
     "./passport-country": {
       "types": "./dist/passport-country.d.ts",
       "import": "./dist/passport-country.js"
+    },
+    "./node": {
+      "types": "./dist/node.d.ts",
+      "import": "./dist/node.js"
+    },
+    "./platform-node": {
+      "types": "./dist/platform-node.d.ts",
+      "import": "./dist/platform-node.js"
+    },
+    "./platform-web": {
+      "types": "./dist/platform-web.d.ts",
+      "import": "./dist/platform-web.js"
+    },
+    "./track": {
+      "types": "./dist/track.d.ts",
+      "import": "./dist/track.js"
     }
   },
   "scripts": {

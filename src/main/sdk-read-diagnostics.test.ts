@@ -3,7 +3,7 @@ import {
   createMemoryNinebotAuthSessionStore,
   NinebotAuthSessionManager,
   PassportLoginBusinessError,
-} from "@jiuhao/ninebot-client";
+} from "@jiuhao/ninebot-client/node";
 import { ipcChannels, type BridgeResult } from "../shared/contracts.js";
 import { registerIpcHandlers } from "./ipc.js";
 import { createSdkDesktopRuntime } from "./sdk-desktop-runtime.js";

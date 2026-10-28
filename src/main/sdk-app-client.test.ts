@@ -7,8 +7,8 @@ import {
   NinebotHttpError,
   NinebotTelemetryBusinessError,
   NinebotAuthSessionUnavailableError,
-} from "@jiuhao/ninebot-client";
-import type { NinebotAuthProvider, NinebotAuthSession } from "@jiuhao/ninebot-client";
+} from "@jiuhao/ninebot-client/node";
+import type { NinebotAuthProvider, NinebotAuthSession } from "@jiuhao/ninebot-client/node";
 import type { RuntimeSecurityStatus } from "../shared/contracts.js";
 import { describe, expect, it, vi } from "vitest";
 import {

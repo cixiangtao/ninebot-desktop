@@ -1,3 +1,5 @@
+import type { TrackPoint } from "@jiuhao/ninebot-client/track";
+export type { TrackPoint } from "@jiuhao/ninebot-client/track";
 export const ipcChannels = {
   authStatus: "ninebot:auth:status",
   authProfile: "ninebot:auth:profile",
@@ -230,14 +232,6 @@ export interface RideMonth {
   /** Complete per-day mileage when the upstream exposes its monthly `detail` array. */
   days: RideDaySummary[];
   rides: RideSummary[];
-}
-
-export interface TrackPoint {
-  longitude: number;
-  latitude: number;
-  speed: number;
-  /** Estimated elapsed seconds because the upstream trail has no per-point timestamp. */
-  offsetSeconds: number;
 }
 
 export interface RideDetail extends RideSummary {

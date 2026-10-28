@@ -4,7 +4,7 @@ import { gunzipSync } from "node:zlib";
 import {
   parseNinebotEncryptedRequest,
   parseNinebotEncryptedResponse,
-} from "@jiuhao/ninebot-client";
+} from "@jiuhao/ninebot-client/node";
 
 const projectRoot = resolve(import.meta.dirname, "..");
 const captureRoot = resolve(projectRoot, ".ninebot-private/protocol-captures");

@@ -22,7 +22,7 @@ import {
   type NinebotPasswordCredentials,
   type NinebotTransport,
   type PassportRejectionKind,
-} from "@jiuhao/ninebot-client";
+} from "@jiuhao/ninebot-client/node";
 import { decodeGzipBody } from "@jiuhao/ninebot-client/response-node";
 
 type AuthClient = Pick<

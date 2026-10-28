@@ -1,3 +1,5 @@
+import { parseTrail } from "@jiuhao/ninebot-client/track";
+export { parseTrail } from "@jiuhao/ninebot-client/track";
 import type {
   AccountProfile,
   BatteryPackSummary,
@@ -5,7 +7,6 @@ import type {
   RideDetail,
   RideMonth,
   RideSummary,
-  TrackPoint,
   VehicleLocation,
   VehicleLocationRead,
   VehicleSnapshot,
@@ -157,31 +158,6 @@ export const parseAccountProfile = (payload: unknown): AccountProfile => {
     identifierKind: username ? "username" : "unknown",
     passwordConfigured: typeof profile.hasPassword === "boolean" ? profile.hasPassword : null,
   };
-};
-
-/** Converts a Ninebot trail string into renderer-safe numeric samples. */
-export const parseTrail = (value: unknown, durationSeconds: number): TrackPoint[] => {
-  if (typeof value !== "string") return [];
-
-  const rawPoints = value
-    .split(";")
-    .map((entry) => entry.split(","))
-    .filter((fields) => fields.length >= 3)
-    .map((fields) => ({
-      longitude: Number(fields[0]),
-      latitude: Number(fields[1]),
-      speed: Number(fields[2]),
-    }))
-    .filter(
-      ({ longitude, latitude, speed }) =>
-        Number.isFinite(longitude) && Number.isFinite(latitude) && Number.isFinite(speed),
-    );
-
-  const denominator = Math.max(1, rawPoints.length - 1);
-  return rawPoints.map((point, index) => ({
-    ...point,
-    offsetSeconds: Math.round((index / denominator) * durationSeconds),
-  }));
 };
 
 /** Extracts owned/shared vehicles without exposing unrelated account fields. */

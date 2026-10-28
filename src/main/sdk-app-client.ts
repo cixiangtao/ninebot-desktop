@@ -9,7 +9,7 @@ import {
   NinebotPassportRedirectError,
   NinebotHttpError,
   type NinebotAuthSessionManager,
-} from "@jiuhao/ninebot-client";
+} from "@jiuhao/ninebot-client/node";
 import type { RuntimeSecurityStatus } from "../shared/contracts.js";
 import { NinebotClientError, type NinebotAppClient } from "./app-client.js";
 import type { TravelReader } from "./travel-source.js";

@@ -1,7 +1,7 @@
 import { sanitizeProfileFailure, type ProfileFailure } from "./sdk-profile-failure.js";
 import { chmod, mkdir, rename, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import type { NinebotAuthDiagnosticEvent } from "@jiuhao/ninebot-client";
+import type { NinebotAuthDiagnosticEvent } from "@jiuhao/ninebot-client/node";
 
 export type ReadOperation = "vehicles" | "snapshot" | "ride-month" | "ride-detail";
 export type CacheOutcome =

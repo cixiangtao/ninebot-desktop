@@ -9,7 +9,7 @@ import {
   NinebotBusinessSessionError,
   PassportLoginBusinessError,
   type NinebotPassportAuthClient,
-} from "@jiuhao/ninebot-client";
+} from "@jiuhao/ninebot-client/node";
 import { ipcChannels, type BridgeResult } from "../shared/contracts.js";
 import { createSdkDesktopRuntime, resolveDesktopAuthSource } from "./sdk-desktop-runtime.js";
 import { registerIpcHandlers } from "./ipc.js";

@@ -96,7 +96,7 @@ describe("browser-compatible Ninebot transport", () => {
 
     await expect(
       transport.send({ service: "travel", method: "POST", path: "/missing", headers: {} }),
-    ).rejects.toThrow("Missing origin for Ninebot web service: travel");
+    ).rejects.toThrow("Missing origin for Ninebot service: travel");
     expect(fetchCalls).toBe(0);
   });
 });

@@ -4,7 +4,10 @@ import { join } from "node:path";
 import { createInterface } from "node:readline/promises";
 import { Writable } from "node:stream";
 import { pathToFileURL } from "node:url";
-import type { NinebotPasswordCredentials, NinebotCandidateService } from "@jiuhao/ninebot-client";
+import type {
+  NinebotPasswordCredentials,
+  NinebotCandidateService,
+} from "@jiuhao/ninebot-client/node";
 import { KeychainCredentialError, readKeychainCredentials } from "./auth-keychain.ts";
 import { runNinebotAuthAcceptance } from "./auth-acceptance-core.ts";
 

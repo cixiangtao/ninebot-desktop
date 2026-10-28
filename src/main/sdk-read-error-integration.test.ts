@@ -10,7 +10,7 @@ import {
   buildVehicleBatteryFields,
   NinebotHttpError,
   NinebotTelemetryBusinessError,
-} from "@jiuhao/ninebot-client";
+} from "@jiuhao/ninebot-client/node";
 import { createCandidateVehicleReader } from "./vehicle-source.js";
 import { createCandidateTelemetryReader } from "./telemetry-source.js";
 import { createCandidateTravelReader } from "./travel-source.js";

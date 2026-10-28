@@ -1,7 +1,7 @@
 import {
   createMemoryNinebotAuthSessionStore,
   NinebotAuthSessionManager,
-} from "@jiuhao/ninebot-client";
+} from "@jiuhao/ninebot-client/node";
 import { describe, expect, it } from "vitest";
 import { createSdkRuntimeDiagnostics } from "./sdk-runtime.js";
 

@@ -3,7 +3,7 @@ import {
   PassportLoginBusinessError,
   PassportLoginHttpError,
   NinebotAuthSessionUnavailableError,
-} from "@jiuhao/ninebot-client";
+} from "@jiuhao/ninebot-client/node";
 import { classifyProfileFailure, sanitizeProfileFailure } from "./sdk-profile-failure.js";
 
 describe("profile failure classification without request or response material", () => {

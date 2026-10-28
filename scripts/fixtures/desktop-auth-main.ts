@@ -7,7 +7,7 @@ import {
   NinebotAuthSessionManager,
   createFileNinebotAuthSessionStore,
   PassportLoginBusinessError,
-} from "@jiuhao/ninebot-client";
+} from "@jiuhao/ninebot-client/node";
 import { normalizeSdkAuthError } from "../../src/main/sdk-app-client.js";
 import { registerIpcHandlers } from "../../src/main/ipc.js";
 import { createSdkDesktopRuntime } from "../../src/main/sdk-desktop-runtime.js";

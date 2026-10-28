@@ -1,4 +1,4 @@
-import type { NinebotServiceName } from "./protocol-lab.ts";
+import type { NinebotServiceName } from "./service-endpoints.ts";
 
 export type NinebotHttpMethod = "DELETE" | "GET" | "PATCH" | "POST" | "PUT";
 

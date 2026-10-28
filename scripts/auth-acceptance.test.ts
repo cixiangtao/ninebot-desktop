@@ -1,4 +1,4 @@
-import * as sdk from "@jiuhao/ninebot-client";
+import * as sdk from "@jiuhao/ninebot-client/node";
 import { describe, expect, it, vi } from "vitest";
 import {
   createMemoryNinebotAuthSessionStore,
@@ -12,7 +12,7 @@ import {
   type NinebotAuthProvider,
   type NinebotCandidateSessionClient,
   type NinebotCandidateSessionFields,
-} from "@jiuhao/ninebot-client";
+} from "@jiuhao/ninebot-client/node";
 import {
   runNinebotAuthAcceptance,
   observeAcceptanceRefreshRequest,

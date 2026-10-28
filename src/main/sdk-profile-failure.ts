@@ -4,7 +4,7 @@ import {
   PassportLoginHttpError,
   PassportLoginBusinessError,
   NinebotPassportRedirectError,
-} from "@jiuhao/ninebot-client";
+} from "@jiuhao/ninebot-client/node";
 
 const kinds = [
   "runtime",

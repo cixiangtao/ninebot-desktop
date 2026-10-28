@@ -10,7 +10,8 @@
     "strict": true,
     "exactOptionalPropertyTypes": true,
     "verbatimModuleSyntax": true,
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "noUncheckedIndexedAccess": true
   },
   "include": [
     "src/candidate-contracts.ts",
@@ -25,6 +26,9 @@
     "src/transport-web.ts",
     "src/auth-result.ts",
     "src/auth-result-reference.ts",
-    "src/passport-country.ts"
+    "src/passport-country.ts",
+    "src/index.ts",
+    "src/platform-web.ts",
+    "src/track.ts"
   ]
 }

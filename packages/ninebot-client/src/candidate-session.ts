@@ -1,3 +1,5 @@
+import { createNinebotServiceClients } from "./services.ts";
+import { createNinebotNodeCryptoAdapter } from "./platform-node.ts";
 import { generateNinebotNonce } from "./crypto-node.ts";
 import {
   createNinebotCandidateSessionClientFromClients,
@@ -5,24 +7,12 @@ import {
   type NinebotCandidateSessionFields,
 } from "./candidate-session-core.ts";
 import {
-  createNinebotTelemetryCandidateClient,
-  type CreateNinebotTelemetryCandidateClientOptions,
-} from "./telemetry-node.ts";
-import {
-  createNinebotTravelCandidateClient,
-  type CreateNinebotTravelCandidateClientOptions,
-} from "./travel-node.ts";
-import {
-  createNinebotVehicleCandidateClient,
-  type CreateNinebotVehicleCandidateClientOptions,
-} from "./vehicle-node.ts";
-import {
   createFetchNinebotTransport,
   type FetchNinebotTransportOptions,
   type NinebotResponse,
   type NinebotTransport,
 } from "./transport.ts";
-import type { NinebotServiceName } from "./protocol-lab.ts";
+import type { NinebotServiceName } from "./service-endpoints.ts";
 
 export type {
   CandidateServiceRequestOptions,
@@ -108,18 +98,16 @@ export const createNinebotCandidateSessionClient = ({
   ...options
 }: CreateNinebotCandidateSessionClientOptions): NinebotCandidateSessionClient => {
   const sharedOptions = protocolOptions(options);
-  const telemetry = createNinebotTelemetryCandidateClient(
-    sharedOptions as CreateNinebotTelemetryCandidateClientOptions,
-  );
-  const travel = createNinebotTravelCandidateClient(
-    sharedOptions as CreateNinebotTravelCandidateClientOptions,
-  );
-  const vehicles = createNinebotVehicleCandidateClient(
-    sharedOptions as CreateNinebotVehicleCandidateClientOptions,
-  );
+  const clients = createNinebotServiceClients({
+    transport: sharedOptions.transport,
+    crypto: createNinebotNodeCryptoAdapter(sharedOptions),
+    ...(sharedOptions.responseBodyDecoder === undefined
+      ? {}
+      : { responseBodyDecoder: sharedOptions.responseBodyDecoder }),
+  });
   return createNinebotCandidateSessionClientFromClients({
     session,
-    clients: { telemetry, travel, vehicles },
+    clients,
     clock,
     nonceFactory,
     requestIdFactory,

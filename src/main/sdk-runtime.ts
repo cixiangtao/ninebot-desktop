@@ -1,5 +1,5 @@
 import { basename } from "node:path";
-import type { NinebotAuthSessionManager } from "@jiuhao/ninebot-client";
+import type { NinebotAuthSessionManager } from "@jiuhao/ninebot-client/node";
 import { candidateRequestTimeoutMs } from "./candidate-client.js";
 import type { RuntimeSecurityStatus } from "../shared/contracts.js";
 

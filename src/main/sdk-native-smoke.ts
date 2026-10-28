@@ -1,4 +1,4 @@
-import { createNinebotPassportLoginClient } from "@jiuhao/ninebot-client";
+import { createNinebotPassportLoginClient } from "@jiuhao/ninebot-client/node";
 import { classifyProfileFailure, type ProfileFailure } from "./sdk-profile-failure.js";
 import { existsSync, readFileSync, readdirSync, renameSync, writeFileSync } from "node:fs";
 import { basename, join, resolve } from "node:path";

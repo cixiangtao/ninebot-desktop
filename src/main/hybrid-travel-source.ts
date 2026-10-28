@@ -1,6 +1,6 @@
 import { parseRideMonth } from "./parsers.js";
 import { NinebotClientError } from "./app-client.js";
-import { NinebotHttpError } from "@jiuhao/ninebot-client";
+import { NinebotHttpError } from "@jiuhao/ninebot-client/node";
 import type { TravelReader } from "./travel-source.js";
 
 /**

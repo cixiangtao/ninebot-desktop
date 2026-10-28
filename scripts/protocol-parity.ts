@@ -9,7 +9,7 @@ import {
   createFileNinebotDeviceContextStore,
   createFileNinebotVehicleCacheStore,
   NinebotTelemetryBusinessError,
-} from "@jiuhao/ninebot-client";
+} from "@jiuhao/ninebot-client/node";
 
 const execFileAsync = promisify(execFile);
 const projectRoot = resolve(import.meta.dirname, "..");

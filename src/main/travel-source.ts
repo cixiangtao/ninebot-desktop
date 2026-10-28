@@ -1,4 +1,4 @@
-import type { NinebotAuthSession } from "@jiuhao/ninebot-client";
+import type { NinebotAuthSession } from "@jiuhao/ninebot-client/node";
 import type { NinebotCandidateSessionFields } from "@jiuhao/ninebot-client/candidate-session";
 import {
   assertCandidateRequestActive,

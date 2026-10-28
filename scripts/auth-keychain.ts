@@ -3,7 +3,7 @@ import { closeSync, openSync } from "node:fs";
 import { ReadStream, WriteStream } from "node:tty";
 import { createInterface } from "node:readline/promises";
 import { fileURLToPath } from "node:url";
-import type { NinebotPasswordCredentials } from "@jiuhao/ninebot-client";
+import type { NinebotPasswordCredentials } from "@jiuhao/ninebot-client/node";
 
 type Common = { store: "login"; account: string; areaCode: string };
 export type KeychainSelector = Common &

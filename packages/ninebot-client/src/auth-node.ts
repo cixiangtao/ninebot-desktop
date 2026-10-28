@@ -1,12 +1,12 @@
-import { NinebotAuthSessionManager } from "./auth.ts";
-import { createNinebotBusinessSessionInitializer } from "./business-session-node.ts";
+import { createNinebotAuthSessionManager } from "./auth-client.ts";
+import { createNinebotNodeCryptoAdapter } from "./platform-node.ts";
+
 import {
   createFileNinebotDeviceContextStore,
   type NinebotDeviceContext,
 } from "./device-store-node.ts";
-import { createNinebotPassportAuthProvider } from "./passport-auth-provider.ts";
-import { createNinebotPassportLoginClient } from "./passport-login-client.ts";
-import { defaultNinebotServiceEndpoints, type NinebotServiceName } from "./protocol-lab.ts";
+
+import { defaultNinebotServiceEndpoints, type NinebotServiceName } from "./service-endpoints.ts";
 import { decodeGzipBody } from "./response-node.ts";
 import { createFileNinebotAuthSessionStore } from "./session-store-node.ts";
 import { createFetchNinebotTransport, type NinebotTransport } from "./transport.ts";
@@ -63,24 +63,18 @@ export const createNinebotNodeAuthSessionManager = ({
     directory,
     ...(deviceDefaults === undefined ? {} : { defaults: deviceDefaults }),
   });
-  const initializeBusinessSession = createNinebotBusinessSessionInitializer({
+  return createNinebotAuthSessionManager({
     transport,
-    deviceContext: () => device.load(),
-    ...(now === undefined ? {} : { now }),
-    ...(nonceFactory === undefined ? {} : { nonceFactory }),
-    ...(rsaPublicKey === undefined ? {} : { rsaPublicKey }),
-  });
-  const passport = createNinebotPassportLoginClient({
-    transport,
-    responseBodyDecoder: decodeGzipBody,
-    smsRegion: async () => (await device.load()).region,
-  });
-  return new NinebotAuthSessionManager({
-    provider: createNinebotPassportAuthProvider(passport, { initializeBusinessSession }),
-    store: createFileNinebotAuthSessionStore({
+    crypto: {
+      ...createNinebotNodeCryptoAdapter(rsaPublicKey === undefined ? {} : { rsaPublicKey }),
+      ...(nonceFactory === undefined ? {} : { nonce: nonceFactory }),
+    },
+    deviceStore: device,
+    sessionStore: createFileNinebotAuthSessionStore({
       directory,
       ...(legacySession === "ignore" ? { legacyFileName: false } : {}),
     }),
+    responseBodyDecoder: decodeGzipBody,
     ...(now === undefined ? {} : { now }),
   });
 };
