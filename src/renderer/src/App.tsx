@@ -377,6 +377,7 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [loginOpen, setLoginOpen] = useState(false);
   const [loginBusy, setLoginBusy] = useState(false);
+  const activeSmsRequest = useRef<string | null>(null);
   const [securityOpen, setSecurityOpen] = useState(false);
   const [securityBusy, setSecurityBusy] = useState(false);
   const [securityStatus, setSecurityStatus] = useState<RuntimeSecurityStatus | null>(null);
@@ -1050,18 +1051,35 @@ export default function App() {
     }
   };
 
+  const cancelSmsCode = useCallback((requestId: string) => {
+    if (activeSmsRequest.current === requestId) {
+      activeSmsRequest.current = null;
+      setLoginBusy(false);
+      setError(null);
+    }
+    // Cancellation is best-effort IPC; the request identity also guards late UI results.
+    void window.ninebot?.auth.cancelSmsCode({ requestId }).catch(() => {});
+  }, []);
+
   const requestSmsCode = async (input: SmsCodeRequestInput) => {
     if (!window.ninebot) return false;
+    const requestId = input.requestId ?? crypto.randomUUID();
+    if (activeSmsRequest.current) cancelSmsCode(activeSmsRequest.current);
+    activeSmsRequest.current = requestId;
     setLoginBusy(true);
     setError(null);
     try {
-      unwrap(await window.ninebot.auth.requestSmsCode(input));
-      return true;
+      const result = unwrap(await window.ninebot.auth.requestSmsCode({ ...input, requestId }));
+      return activeSmsRequest.current === requestId && result.sent;
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "无法发送短信验证码。");
+      if (activeSmsRequest.current === requestId)
+        setError(cause instanceof Error ? cause.message : "无法发送短信验证码。");
       return false;
     } finally {
-      setLoginBusy(false);
+      if (activeSmsRequest.current === requestId) {
+        activeSmsRequest.current = null;
+        setLoginBusy(false);
+      }
     }
   };
 
@@ -2143,6 +2161,7 @@ export default function App() {
           }}
           onPasswordSubmit={login}
           onRequestSmsCode={requestSmsCode}
+          onCancelSmsCode={cancelSmsCode}
           onSmsCodeSubmit={loginWithSmsCode}
           onClearError={() => setError(null)}
         />

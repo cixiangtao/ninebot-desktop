@@ -38,7 +38,14 @@ export const isNinebotHumanVerificationError = (error: unknown): boolean =>
  */
 export interface NinebotAppClient extends VehicleTelemetryReader, TravelReader, VehicleReader {
   login(user: string, areaCode: string, password: string): Promise<void>;
-  requestSmsCode(phone: string, areaCode: string): Promise<void>;
+  /** True when requestSmsCode accepts a completed human-verification result. */
+  supportsSmsVerification?: boolean;
+  requestSmsCode(
+    phone: string,
+    areaCode: string,
+    validate?: string,
+    signal?: AbortSignal,
+  ): Promise<void>;
   loginWithSmsCode(phone: string, areaCode: string, code: string): Promise<void>;
   logout(): Promise<void>;
   whoami(): Promise<unknown>;

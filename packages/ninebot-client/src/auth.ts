@@ -10,10 +10,16 @@ export interface NinebotPasswordCredentials {
 export interface NinebotSmsCodeRequest {
   areaCode: string;
   phone: string;
+  /** Opaque result from a user-completed human check; sent once, never persisted. */
+  validate?: string;
+  /** Cancels pending signing/transport and rejects late results; cannot recall an already sent SMS. */
+  signal?: AbortSignal;
 }
 
 /** Inputs for completing an SMS login attempt. */
-export interface NinebotSmsLoginInput extends NinebotSmsCodeRequest {
+export interface NinebotSmsLoginInput {
+  areaCode: string;
+  phone: string;
   code: string;
 }
 

@@ -286,3 +286,5 @@ export type {
 
 export { createNinebotNodeCryptoAdapter } from "./platform-node.ts";
 export { createNinebotSdk } from "./sdk.ts";
+
+export { ninebotSmsVerification } from "./sms-verification.ts";

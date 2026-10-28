@@ -1,6 +1,6 @@
 // Synthetic SMS UI regression; no messages, real credentials, original windows or account stores.
 import assert from "node:assert/strict";
-import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
+import { copyFile, mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve, join } from "node:path";
 import { build } from "vite";
@@ -20,6 +20,11 @@ let app;
 try {
   await mkdir(evidence, { recursive: true });
   await mkdir(join(root, "session"));
+  await mkdir(join(root, "preload"));
+  await copyFile(
+    join(project, "out/preload/sms-verification.cjs"),
+    join(root, "preload/sms-verification.cjs"),
+  );
   await build({
     configFile: false,
     root: project,
@@ -125,8 +130,107 @@ try {
   await window.locator('input[autocomplete="one-time-code"]').fill("123456");
   await window.getByRole("button", { name: "验证码登录", exact: true }).click();
   await window.getByText("离线验收车辆", { exact: true }).first().waitFor();
+  const ordinary = await qa("inspect");
+  assert.equal(ordinary.smsRequests, 1);
+  assert.equal(ordinary.smsLogins, 1);
+  assert.equal(ordinary.networkAttempts, 0);
+  await app.close();
+  app = undefined;
+  await rm(join(root, "session"), { recursive: true, force: true });
+  await mkdir(join(root, "session"));
+
+  window = await launch();
+  await openSms(window);
+  await qa("sms-challenge");
+  await window.locator('input[autocomplete="tel"]').fill("15500000001");
+  const challenge = async () => {
+    const opened = app.waitForEvent("window");
+    await window.getByRole("button", { name: "发送验证码", exact: true }).click();
+    const popup = await opened;
+    await popup.getByRole("button", { name: "完成合成验证", exact: true }).waitFor();
+    assert.equal(popup.url(), "ninebot-desktop://sms-verification/index.html");
+    assert.deepEqual(
+      await popup.evaluate(() => ({
+        applicationBridge: typeof window.ninebot,
+        nodeRequire: typeof window.require,
+        nodeProcess: typeof window.process,
+        verificationBridge: typeof window.smsVerification?.complete,
+      })),
+      {
+        applicationBridge: "undefined",
+        nodeRequire: "undefined",
+        nodeProcess: "undefined",
+        verificationBridge: "function",
+      },
+    );
+    return popup;
+  };
+
+  let popup = await challenge();
+  let closed = popup.waitForEvent("close");
+  await popup.getByRole("button", { name: "取消验证", exact: true }).click();
+  await closed;
+  await window.getByRole("button", { name: "发送验证码", exact: true }).waitFor();
+  assert.equal((await qa("inspect")).smsRequests, 0, "cancel must not retry the SMS send");
+  assert.equal(await window.getByText(sentText, { exact: true }).count(), 0);
+
+  popup = await challenge();
+  closed = popup.waitForEvent("close");
+  await app.evaluate(({ BrowserWindow }) => {
+    const verification = BrowserWindow.getAllWindows().find(
+      (candidate) =>
+        candidate.webContents.getURL() === "ninebot-desktop://sms-verification/index.html",
+    );
+    if (!verification) throw new Error("Synthetic verification window is missing");
+    verification.close();
+  });
+  await closed;
+  await window.getByRole("button", { name: "发送验证码", exact: true }).waitFor();
+  assert.equal(
+    (await qa("inspect")).smsRequests,
+    0,
+    "closing the window must not retry the SMS send",
+  );
+
+  popup = await challenge();
+  closed = popup.waitForEvent("close");
+  // Native modal focus prevents manual interaction with the parent; a programmatic
+  // value change exercises the renderer cancellation path while verification waits.
+  await window.locator('input[autocomplete="tel"]').fill("15500000002");
+  await closed;
+  await window.getByRole("button", { name: "发送验证码", exact: true }).waitFor();
+  assert.equal((await qa("inspect")).smsRequests, 0, "changed phone must not receive a late retry");
+  assert.equal(await window.getByText(sentText, { exact: true }).count(), 0);
+
+  await qa("verification-throw");
+  await window.getByRole("button", { name: "发送验证码", exact: true }).click();
+  await window
+    .getByText("验证组件加载失败，请检查网络后重新发送验证码。", { exact: true })
+    .first()
+    .waitFor({ timeout: 5000 });
+  assert.equal(
+    app.windows().length,
+    1,
+    "a throwing verification initializer must close its window",
+  );
+  assert.equal((await qa("inspect")).smsRequests, 0, "initialization failure must not send SMS");
+  assert.equal(await window.getByText("qa-private-provider-failure", { exact: false }).count(), 0);
+  assert.equal(await window.getByText(sentText, { exact: true }).count(), 0);
+  await qa("verification-normal");
+
+  popup = await challenge();
+  closed = popup.waitForEvent("close");
+  await popup.getByRole("button", { name: "完成合成验证", exact: true }).click();
+  await closed;
+  await window.getByText(sentText, { exact: true }).waitFor();
+  const sent = await qa("inspect");
+  assert.equal(sent.smsAttempts, 6, "five initial challenges and one validated retry");
+  assert.equal(sent.smsRequests, 1, "only successful user verification may send SMS");
+  assert.equal(sent.verificationScripts, 5);
+  await window.locator('input[autocomplete="one-time-code"]').fill("123456");
+  await window.getByRole("button", { name: "验证码登录", exact: true }).click();
+  await window.getByText("离线验收车辆", { exact: true }).first().waitFor();
   const final = await qa("inspect");
-  assert.equal(final.smsRequests, 1);
   assert.equal(final.smsLogins, 1);
   assert.equal(final.networkAttempts, 0);
   const result = {
@@ -138,6 +242,13 @@ try {
     phoneChangeClearsCode: true,
     staleCodeCannotSubmit: true,
     ordinarySmsLoginWorks: true,
+    verificationWindowIsolated: true,
+    verificationCancelDoesNotSend: true,
+    verificationCloseDoesNotSend: true,
+    changedPhoneClosesVerificationWithoutSend: true,
+    verificationInitFailureClosesWithoutSend: true,
+    verifiedSmsLoginWorks: true,
+    verificationScripts: final.verificationScripts,
     networkRequests: final.networkAttempts,
     originalInstanceAccessed: false,
   };

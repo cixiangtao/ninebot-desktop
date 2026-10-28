@@ -179,6 +179,10 @@ const isSuccessCode = (resultCode: number | string | null) =>
   resultCode === 90000 ||
   resultCode === "90000";
 
+const assertSmsActive = (signal?: AbortSignal) => {
+  if (signal?.aborted) throw signal.reason ?? new Error("Ninebot SMS request was cancelled");
+};
+
 /** Creates a transport-backed Passport password-login client. */
 export const createNinebotPassportLoginClient = ({
   transport,
@@ -201,14 +205,22 @@ export const createNinebotPassportLoginClient = ({
   const sendSmsRequest = async (
     input: NinebotSmsCodeRequest & { code?: string; region?: string },
   ) => {
+    const { signal, ...smsInput } = input;
+    assertSmsActive(signal);
     const request = await buildPassportSmsRequest({
-      ...input,
+      ...smsInput,
       signer: smsSigner ?? defaultSigners.sms,
     });
-    const response = await transport.send(request);
+    assertSmsActive(signal);
+    const response = await transport.send({
+      ...request,
+      ...(signal === undefined ? {} : { signal }),
+    });
+    assertSmsActive(signal);
     if (response.status < 200 || response.status >= 300)
       throw new PassportLoginHttpError(response.status);
     const raw = await responseBodyDecoder(response);
+    assertSmsActive(signal);
     const envelope = parseResponseEnvelope(raw);
     const record = JSON.parse(new TextDecoder().decode(raw)) as Record<string, unknown>;
     if (
@@ -227,7 +239,12 @@ export const createNinebotPassportLoginClient = ({
   };
   return {
     async requestSmsCode(input: NinebotSmsCodeRequest): Promise<void> {
-      await sendSmsRequest({ areaCode: input.areaCode, phone: input.phone });
+      await sendSmsRequest({
+        areaCode: input.areaCode,
+        phone: input.phone,
+        ...(input.validate === undefined ? {} : { validate: input.validate }),
+        ...(input.signal === undefined ? {} : { signal: input.signal }),
+      });
     },
     async loginWithSmsCode(
       input: NinebotSmsLoginInput & { region?: string },
@@ -236,7 +253,9 @@ export const createNinebotPassportLoginClient = ({
         throw new Error("Invalid Passport SMS input");
       return parsePassportLoginSession(
         await sendSmsRequest({
-          ...input,
+          areaCode: input.areaCode,
+          phone: input.phone,
+          code: input.code,
           region: input.region ?? (smsRegion ? await smsRegion() : "bj"),
         }),
       );

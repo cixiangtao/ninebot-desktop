@@ -5,6 +5,7 @@ export const ipcChannels = {
   authProfile: "ninebot:auth:profile",
   passwordLogin: "ninebot:auth:password-login",
   requestSmsCode: "ninebot:auth:request-sms-code",
+  cancelSmsCode: "ninebot:auth:cancel-sms-code",
   smsCodeLogin: "ninebot:auth:sms-code-login",
   authLogout: "ninebot:auth:logout",
   runtimeSecurity: "ninebot:runtime:security",
@@ -54,15 +55,19 @@ export interface PasswordLoginInput {
 export interface SmsCodeRequestInput {
   areaCode: string;
   phone: string;
+  /** Identifies this form attempt so stale verification can be cancelled. */
+  requestId?: string;
+}
+
+export interface SmsCodeCancelInput {
+  requestId: string;
 }
 
 export interface SmsCodeLoginInput extends SmsCodeRequestInput {
   code: string;
 }
 
-export interface SmsCodeRequestStatus {
-  sent: true;
-}
+export type SmsCodeRequestStatus = { sent: true } | { sent: false; cancelled: true };
 
 export interface RuntimeSecurityStatus {
   version: string;
@@ -332,6 +337,7 @@ export interface NinebotBridge {
     profile: () => Promise<BridgeResult<AccountProfile>>;
     passwordLogin: (input: PasswordLoginInput) => Promise<BridgeResult<AuthStatus>>;
     requestSmsCode: (input: SmsCodeRequestInput) => Promise<BridgeResult<SmsCodeRequestStatus>>;
+    cancelSmsCode: (input: SmsCodeCancelInput) => Promise<BridgeResult<{ cancelled: true }>>;
     smsCodeLogin: (input: SmsCodeLoginInput) => Promise<BridgeResult<AuthStatus>>;
     logout: () => Promise<BridgeResult<AuthStatus>>;
   };

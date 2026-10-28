@@ -97,6 +97,7 @@ for (const requiredFile of [
   "/out/main/index.js",
   "/node_modules/@jiuhao/ninebot-client/dist/candidate-session.js",
   "/out/preload/index.cjs",
+  "/out/preload/sms-verification.cjs",
   "/out/renderer/index.html",
   "/out/renderer/recovery.html",
   "/out/renderer/recovery.js",

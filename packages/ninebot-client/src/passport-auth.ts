@@ -13,6 +13,8 @@ export interface PassportRequest {
     | "/v6/user/phoneCodeLogin";
   headers: Readonly<Record<string, string>>;
   body: Uint8Array;
+  /** Host cancellation only; never serialized into the signed request. */
+  signal?: AbortSignal;
 }
 
 export interface PassportSigningInput {
@@ -390,6 +392,8 @@ export type PassportSmsRequestSigner = (input: PassportSmsSigningInput) => strin
 export interface BuildPassportSmsRequestOptions {
   areaCode: string;
   phone: string;
+  /** User-completed verification result for sending SMS, not consuming its code. */
+  validate?: string;
   code?: string;
   region?: string;
   timestampMs?: number;
@@ -400,6 +404,7 @@ export interface BuildPassportSmsRequestOptions {
 export const buildPassportSmsRequest = async ({
   areaCode,
   phone,
+  validate,
   code,
   region = "bj",
   timestampMs = Date.now(),
@@ -408,7 +413,12 @@ export const buildPassportSmsRequest = async ({
   if (
     !/^\d{1,4}$/.test(areaCode) ||
     !/^\d{5,20}$/.test(phone) ||
-    (code !== undefined && !/^\d{4,8}$/.test(code))
+    (code !== undefined && !/^\d{4,8}$/.test(code)) ||
+    (validate !== undefined &&
+      (typeof validate !== "string" ||
+        !validate.trim() ||
+        validate.length > 4096 ||
+        code !== undefined))
   ) {
     throw new Error("Invalid Passport SMS input");
   }
@@ -416,7 +426,12 @@ export const buildPassportSmsRequest = async ({
   const body = textEncoder.encode(
     JSON.stringify(
       code === undefined
-        ? { account: phone, areaCode, rawTemplate: "login" }
+        ? {
+            account: phone,
+            areaCode,
+            rawTemplate: "login",
+            ...(validate === undefined ? {} : { validate }),
+          }
         : { areaCode, code, device: "ANDROID", phone, region },
     ),
   );

@@ -31,13 +31,13 @@ export const normalizeSdkAuthError = (error: unknown): NinebotClientError => {
     return new NinebotClientError("请先连接九号账号。", "auth");
   if (error instanceof NinebotHumanVerificationRequiredError)
     return new NinebotClientError(
-      "九号要求先完成人机验证；请在官方客户端完成验证后再重试。",
+      "九号要求先完成人机验证，请完成验证后继续发送短信。",
       "verification",
     );
   if (error instanceof PassportLoginBusinessError) {
     if (error.rejection === "human-verification")
       return new NinebotClientError(
-        "九号要求先完成人机验证；请在官方客户端完成验证后再重试。",
+        "九号要求先完成人机验证，请完成验证后继续发送短信。",
         "verification",
       );
     if (error.rejection === "invalid-credentials")
@@ -120,6 +120,7 @@ export const createNinebotSdkAppClient = ({
   diagnostics,
   onProfileFailure,
 }: NinebotSdkAppClientOptions): NinebotAppClient => ({
+  supportsSmsVerification: true,
   async login(user, areaCode, password) {
     try {
       await auth.loginWithPassword({ user, areaCode, password });
@@ -127,9 +128,14 @@ export const createNinebotSdkAppClient = ({
       throw normalizeSdkAuthError(error);
     }
   },
-  async requestSmsCode(phone, areaCode) {
+  async requestSmsCode(phone, areaCode, validate, signal) {
     try {
-      await auth.requestSmsCode({ phone, areaCode });
+      await auth.requestSmsCode({
+        phone,
+        areaCode,
+        ...(validate === undefined ? {} : { validate }),
+        ...(signal === undefined ? {} : { signal }),
+      });
     } catch (error) {
       throw normalizeSdkAuthError(error);
     }

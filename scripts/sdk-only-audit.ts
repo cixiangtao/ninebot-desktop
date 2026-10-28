@@ -24,6 +24,7 @@ export const assertSdkOnlyArchive = (
     "/THIRD_PARTY_NOTICES.md",
     "/out/main/index.js",
     "/out/preload/index.cjs",
+    "/out/preload/sms-verification.cjs",
     "/out/renderer/index.html",
     "/out/renderer/recovery.html",
     "/out/renderer/recovery.js",

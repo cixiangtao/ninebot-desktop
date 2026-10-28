@@ -1,6 +1,13 @@
 import { writeFile } from "node:fs/promises";
 import { basename } from "node:path";
-import { BrowserWindow, dialog, ipcMain, type FileFilter, type SaveDialogOptions } from "electron";
+import {
+  BrowserWindow,
+  dialog,
+  ipcMain,
+  type FileFilter,
+  type SaveDialogOptions,
+  type WebContents,
+} from "electron";
 import { z } from "zod";
 import {
   ipcChannels,
@@ -35,6 +42,8 @@ import {
   type ReadOperation,
   type RuntimeDiagnosticObserver,
 } from "./runtime-diagnostics.js";
+import { SmsCodeFlow } from "./sms-verification.js";
+import { presentSmsVerification } from "./sms-verification-window.js";
 import { SessionReadCache } from "./session-read-cache.js";
 import { loadVehicleSnapshot, type VehicleTelemetryReader } from "./vehicle-snapshot.js";
 import { type TravelReader } from "./travel-source.js";
@@ -54,12 +63,15 @@ const passwordLoginSchema = z.object({
 });
 
 const smsCodeRequestSchema = z.object({
+  requestId: z.string().uuid().optional(),
   areaCode: z.string().regex(/^\d{1,4}$/),
   phone: z
     .string()
     .trim()
     .regex(/^\d{5,20}$/),
 });
+
+const smsCodeCancelSchema = z.object({ requestId: z.string().uuid() });
 
 const smsCodeLoginSchema = smsCodeRequestSchema.extend({
   code: z
@@ -277,8 +289,19 @@ export const registerIpcHandlers = (
   telemetryReader: VehicleTelemetryReader = client,
   travelReader: TravelReader = client,
   vehicleReader: VehicleReader = client,
-  diagnostics: { onDiagnostic?: RuntimeDiagnosticObserver; now?: () => number } = {},
+  diagnostics: {
+    onDiagnostic?: RuntimeDiagnosticObserver;
+    now?: () => number;
+    smsVerificationPresenter?: (owner: WebContents, signal: AbortSignal) => Promise<string | null>;
+  } = {},
 ) => {
+  const smsFlow = new SmsCodeFlow({
+    requestCode: (phone, areaCode, validate, signal) =>
+      client.requestSmsCode(phone, areaCode, validate, signal),
+    canVerify: client.supportsSmsVerification === true,
+  });
+  const verificationOwners = new WeakSet<WebContents>();
+  const presentVerification = diagnostics.smsVerificationPresenter ?? presentSmsVerification;
   const emit = (event: Parameters<RuntimeDiagnosticObserver>[0]) =>
     emitRuntimeDiagnostic(diagnostics.onDiagnostic, event);
   const handleRead = <T>(
@@ -381,6 +404,7 @@ export const registerIpcHandlers = (
     async (_event, input: unknown): Promise<BridgeResult<AuthStatus>> => {
       try {
         const { areaCode, user, password } = passwordLoginSchema.parse(input);
+        smsFlow.cancelAll();
         await client.login(user, areaCode, password);
         clearSessionState(true);
         return ok({ connected: true });
@@ -392,11 +416,36 @@ export const registerIpcHandlers = (
 
   ipcMain.handle(
     ipcChannels.requestSmsCode,
-    async (_event, input: unknown): Promise<BridgeResult<SmsCodeRequestStatus>> => {
+    async (event, input: unknown): Promise<BridgeResult<SmsCodeRequestStatus>> => {
       try {
-        const { areaCode, phone } = smsCodeRequestSchema.parse(input);
-        await client.requestSmsCode(phone, areaCode);
-        return ok({ sent: true });
+        const { phone, areaCode, requestId } = smsCodeRequestSchema.parse(input);
+        const request = { phone, areaCode, ...(requestId === undefined ? {} : { requestId }) };
+        const owner = event.sender;
+        const ownerId = owner.id;
+        if (!verificationOwners.has(owner)) {
+          verificationOwners.add(owner);
+          owner.once("destroyed", () => smsFlow.cancel(ownerId));
+          owner.on("render-process-gone", () => smsFlow.cancel(ownerId));
+          owner.on("did-start-navigation", (_event, _url, isInPlace, isMainFrame) => {
+            if (isMainFrame && !isInPlace) smsFlow.cancel(ownerId);
+          });
+        }
+        return ok(
+          await smsFlow.request(ownerId, request, (signal) => presentVerification(owner, signal)),
+        );
+      } catch (error) {
+        return handleError(error);
+      }
+    },
+  );
+
+  ipcMain.handle(
+    ipcChannels.cancelSmsCode,
+    async (event, input: unknown): Promise<BridgeResult<{ cancelled: true }>> => {
+      try {
+        const { requestId } = smsCodeCancelSchema.parse(input);
+        smsFlow.cancel(event.sender.id, requestId);
+        return ok({ cancelled: true });
       } catch (error) {
         return handleError(error);
       }
@@ -408,6 +457,7 @@ export const registerIpcHandlers = (
     async (_event, input: unknown): Promise<BridgeResult<AuthStatus>> => {
       try {
         const { areaCode, phone, code } = smsCodeLoginSchema.parse(input);
+        smsFlow.cancelAll();
         await client.loginWithSmsCode(phone, areaCode, code);
         clearSessionState(true);
         return ok({ connected: true });
@@ -419,6 +469,7 @@ export const registerIpcHandlers = (
 
   ipcMain.handle(ipcChannels.authLogout, async (): Promise<BridgeResult<AuthStatus>> => {
     try {
+      smsFlow.cancelAll();
       await client.logout();
       clearSessionState(true);
       return ok({ connected: false });

@@ -33,8 +33,12 @@ let vehiclePresent = true;
 let refreshes = 0;
 let networkAttempts = 0;
 let smsEnabled = false;
+let smsChallenge = false;
+let smsAttempts = 0;
 let smsRequests = 0;
 let smsLogins = 0;
+let verificationScripts = 0;
+let verificationThrows = false;
 let holdSms = false;
 let releaseSms: (() => void) | undefined;
 globalThis.fetch = async () => {
@@ -60,8 +64,11 @@ const auth = new NinebotAuthSessionManager({
         throw new PassportLoginBusinessError(90016, "synthetic only");
       return fresh();
     },
-    requestSmsCode: async () => {
+    requestSmsCode: async ({ validate }) => {
       if (!smsEnabled) throw new Error("SMS disabled in QA");
+      smsAttempts += 1;
+      if (smsChallenge && validate !== "qa-validate")
+        throw new PassportLoginBusinessError(90202, "send code need verify");
       smsRequests += 1;
       if (holdSms)
         await new Promise<void>((done) => {
@@ -89,6 +96,38 @@ const ensure = async () => {
   }
 };
 app.whenReady().then(async () => {
+  // Only QA sessions receive this synthetic provider script. No real challenge
+  // is fetched or solved; the product presenter and preload still run unchanged.
+  app.on("session-created", (created) => {
+    created.protocol.handle("https", (request) => {
+      if (request.url !== "https://cstaticdun.126.net/load.min.js") {
+        networkAttempts += 1;
+        return new Response("QA network blocked", { status: 403 });
+      }
+      verificationScripts += 1;
+      if (verificationThrows)
+        return new Response(
+          "window.initNECaptcha = () => { throw new Error('qa-private-provider-failure'); };",
+          { headers: { "Content-Type": "application/javascript" } },
+        );
+      return new Response(
+        `window.initNECaptcha = (options, loaded) => {
+          const button = document.createElement('button');
+          button.textContent = '完成合成验证';
+          button.onclick = () => options.onVerify(null, { validate: 'qa-validate' });
+          loaded({ verify: () => {
+            document.querySelector(options.element).appendChild(button);
+            options.onReady();
+          } });
+        };`,
+        { headers: { "Content-Type": "application/javascript" } },
+      );
+    });
+    created.protocol.handle("http", () => {
+      networkAttempts += 1;
+      return new Response("QA network blocked", { status: 403 });
+    });
+  });
   session.defaultSession.webRequest.onBeforeRequest(
     { urls: ["http://*/*", "https://*/*"] },
     (_details, callback) => {
@@ -150,6 +189,12 @@ app.whenReady().then(async () => {
       ) as unknown;
     }
     if (command === "sms-allow") smsEnabled = true;
+    if (command === "sms-challenge") {
+      smsEnabled = true;
+      smsChallenge = true;
+    }
+    if (command === "verification-throw") verificationThrows = true;
+    if (command === "verification-normal") verificationThrows = false;
     if (command === "sms-hold") holdSms = true;
     if (command === "sms-release") {
       holdSms = false;
@@ -163,7 +208,7 @@ app.whenReady().then(async () => {
     }
     if (command === "allow-login") rejectRefresh = false;
     if (command === "empty-vehicles") vehiclePresent = false;
-    return { refreshes, networkAttempts, smsRequests, smsLogins };
+    return { refreshes, networkAttempts, smsAttempts, smsRequests, smsLogins, verificationScripts };
   });
   const window = new BrowserWindow({
     show: false,

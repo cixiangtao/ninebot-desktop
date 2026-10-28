@@ -23,8 +23,12 @@ export default defineConfig({
     build: {
       outDir: `${outputRoot}/preload`,
       rollupOptions: {
+        input: {
+          index: resolve("src/preload/index.ts"),
+          "sms-verification": resolve("src/preload/sms-verification.ts"),
+        },
         output: {
-          entryFileNames: "index.cjs",
+          entryFileNames: "[name].cjs",
           format: "cjs",
         },
       },

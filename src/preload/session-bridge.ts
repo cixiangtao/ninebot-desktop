@@ -32,6 +32,7 @@ export const createDesktopBridge = (
       profile: () => read(ipcChannels.authProfile),
       passwordLogin: (input) => change(ipcChannels.passwordLogin, input),
       requestSmsCode: (input) => call(ipcChannels.requestSmsCode, input),
+      cancelSmsCode: (input) => call(ipcChannels.cancelSmsCode, input),
       smsCodeLogin: (input) => change(ipcChannels.smsCodeLogin, input),
       logout: () => change(ipcChannels.authLogout),
     },

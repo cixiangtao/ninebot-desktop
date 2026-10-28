@@ -17,6 +17,13 @@ const data = {
   uuid: session.uuid,
 };
 const input = { areaCode: "86", phone: "15500000000" };
+const deferred = <T>() => {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((done) => {
+    resolve = done;
+  });
+  return { promise, resolve };
+};
 
 describe("Passport SMS implementation (no network)", () => {
   it("reproduces the saved original send-code request/signature fixture", async () => {
@@ -48,6 +55,182 @@ describe("Passport SMS implementation (no network)", () => {
     expect(new TextDecoder().decode(request.body)).toBe(
       '{"areaCode":"86","code":"123456","device":"ANDROID","phone":"15500000000","region":"bj"}',
     );
+  });
+
+  it("signs the user-completed verification result in the actual SMS send body", async () => {
+    const request = await buildPassportSmsRequest({
+      ...input,
+      validate: "synthetic-check-result",
+      timestampMs: 1792380909679,
+      signer: createNinebotPassportWebSigner().sms,
+    });
+    expect(request.path).toBe("/v4/code/phone");
+    expect(new TextDecoder().decode(request.body)).toBe(
+      '{"account":"15500000000","areaCode":"86","rawTemplate":"login","validate":"synthetic-check-result"}',
+    );
+    // Independently calculated with Python hashlib from the literal sorted wire fields.
+    expect(request.headers.sign).toBe(
+      "12bb17b16e01d391e56aa55d08c3154e1490fb7ee1c2c8fc01f414c75ec39135",
+    );
+  });
+
+  it.each(["", "  ", "x".repeat(4097), null, 123])(
+    "rejects malformed verification results before signing or sending (%#)",
+    async (validate) => {
+      const send = vi.fn();
+      const smsSigner = vi.fn();
+      const client = createNinebotPassportLoginClient({ transport: { send }, smsSigner });
+      await expect(
+        client.requestSmsCode({ ...input, validate } as unknown as Parameters<
+          typeof client.requestSmsCode
+        >[0]),
+      ).rejects.toThrow("Invalid Passport SMS input");
+      expect(send).not.toHaveBeenCalled();
+      expect(smsSigner).not.toHaveBeenCalled();
+    },
+  );
+
+  it("does not accept a verification result in a consume-code request", async () => {
+    const signer = vi.fn();
+    await expect(
+      buildPassportSmsRequest({
+        ...input,
+        code: "123456",
+        validate: "synthetic-check-result",
+        signer,
+      }),
+    ).rejects.toThrow("Invalid Passport SMS input");
+    expect(signer).not.toHaveBeenCalled();
+  });
+
+  it("rejects an already cancelled SMS request without signing or sending", async () => {
+    const controller = new AbortController();
+    const reason = new Error("synthetic cancellation");
+    controller.abort(reason);
+    const send = vi.fn();
+    const smsSigner = vi.fn();
+    const client = createNinebotPassportLoginClient({ transport: { send }, smsSigner });
+    await expect(client.requestSmsCode({ ...input, signal: controller.signal })).rejects.toBe(
+      reason,
+    );
+    expect(smsSigner).not.toHaveBeenCalled();
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it("does not send a validated retry cancelled while asynchronous signing is pending", async () => {
+    const controller = new AbortController();
+    const signing = deferred<string>();
+    const signingStarted = deferred<void>();
+    const send = vi.fn();
+    const client = createNinebotPassportLoginClient({
+      transport: { send },
+      smsSigner: async () => {
+        signingStarted.resolve();
+        return signing.promise;
+      },
+    });
+    const pending = client.requestSmsCode({
+      ...input,
+      validate: "synthetic-check-result",
+      signal: controller.signal,
+    });
+    await signingStarted.promise;
+    const reason = new Error("synthetic form closed");
+    controller.abort(reason);
+    signing.resolve("synthetic-signature");
+    await expect(pending).rejects.toBe(reason);
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it("passes the same cancellation signal to transport and rejects a late success", async () => {
+    const controller = new AbortController();
+    const response = deferred<{
+      status: number;
+      headers: Record<string, string>;
+      body: Uint8Array;
+    }>();
+    const sending = deferred<void>();
+    const send = vi.fn(async (_request: PassportRequest) => {
+      sending.resolve();
+      return response.promise;
+    });
+    const responseBodyDecoder = vi.fn((result: { body: Uint8Array }) => result.body);
+    const client = createNinebotPassportLoginClient({
+      transport: { send },
+      smsSigner: async () => "synthetic-signature",
+      responseBodyDecoder,
+    });
+    const pending = client.requestSmsCode({ ...input, signal: controller.signal });
+    await sending.promise;
+    expect(send.mock.calls[0]?.[0].signal).toBe(controller.signal);
+    expect(JSON.parse(new TextDecoder().decode(send.mock.calls[0]?.[0].body))).not.toHaveProperty(
+      "signal",
+    );
+    const reason = new Error("synthetic cancellation after send");
+    controller.abort(reason);
+    response.resolve({ status: 200, headers: {}, body: encode({ resultCode: 90000 }) });
+    await expect(pending).rejects.toBe(reason);
+    expect(responseBodyDecoder).not.toHaveBeenCalled();
+  });
+
+  it("rejects cancellation while decoding an otherwise successful SMS response", async () => {
+    const controller = new AbortController();
+    const decoded = deferred<Uint8Array>();
+    const decoding = deferred<void>();
+    const client = createNinebotPassportLoginClient({
+      transport: { send: async () => ({ status: 200, headers: {}, body: new Uint8Array() }) },
+      smsSigner: async () => "synthetic-signature",
+      responseBodyDecoder: async () => {
+        decoding.resolve();
+        return decoded.promise;
+      },
+    });
+    const pending = client.requestSmsCode({ ...input, signal: controller.signal });
+    await decoding.promise;
+    const reason = new Error("synthetic cancellation during decode");
+    controller.abort(reason);
+    decoded.resolve(encode({ resultCode: 90000 }));
+    await expect(pending).rejects.toBe(reason);
+  });
+
+  it("passes verification through the auth manager only for an explicit retry without storing it", async () => {
+    const send = vi
+      .fn(async (_request: PassportRequest) => ({
+        status: 200,
+        headers: {},
+        body: encode({ resultCode: 90000, data: {} }),
+      }))
+      .mockResolvedValueOnce({
+        status: 200,
+        headers: {},
+        body: encode({ resultCode: 90202 }),
+      });
+    const store = { load: vi.fn(async () => null), save: vi.fn(), clear: vi.fn() };
+    const initializeBusinessSession = vi.fn();
+    const auth = new NinebotAuthSessionManager({
+      provider: createNinebotPassportAuthProvider(
+        createNinebotPassportLoginClient({ transport: { send } }),
+        { initializeBusinessSession },
+      ),
+      store,
+    });
+    await expect(auth.requestSmsCode(input)).rejects.toMatchObject({
+      rejection: "human-verification",
+    });
+    expect(send).toHaveBeenCalledOnce();
+    await auth.requestSmsCode({ ...input, validate: "synthetic-check-result" });
+    expect(JSON.parse(new TextDecoder().decode(send.mock.calls[1]?.[0]?.body))).toEqual({
+      account: input.phone,
+      areaCode: input.areaCode,
+      rawTemplate: "login",
+      validate: "synthetic-check-result",
+    });
+    await auth.requestSmsCode(input);
+    expect(JSON.parse(new TextDecoder().decode(send.mock.calls[2]?.[0]?.body))).not.toHaveProperty(
+      "validate",
+    );
+    expect(store.save).not.toHaveBeenCalled();
+    expect(initializeBusinessSession).not.toHaveBeenCalled();
   });
 
   it("constructs consume-code with the configured region and ANDROID device", async () => {

@@ -15,6 +15,7 @@ interface LoginSheetProps {
   onClose: () => void;
   onPasswordSubmit: (input: PasswordLoginInput) => Promise<void>;
   onRequestSmsCode: (input: SmsCodeRequestInput) => Promise<boolean>;
+  onCancelSmsCode: (requestId: string) => void;
   onSmsCodeSubmit: (input: SmsCodeLoginInput) => Promise<void>;
   onClearError: () => void;
 }
@@ -27,6 +28,7 @@ export const LoginSheet = ({
   onClose,
   onPasswordSubmit,
   onRequestSmsCode,
+  onCancelSmsCode,
   onSmsCodeSubmit,
   onClearError,
 }: LoginSheetProps) => {
@@ -39,17 +41,25 @@ export const LoginSheet = ({
   const [codeSent, setCodeSent] = useState(false);
   const [cooldownSeconds, setCooldownSeconds] = useState(0);
   const smsRequestGeneration = useRef(0);
+  const activeSmsRequest = useRef<string | null>(null);
+  const cancelSms = useCallback(() => {
+    const requestId = activeSmsRequest.current;
+    activeSmsRequest.current = null;
+    if (requestId) onCancelSmsCode(requestId);
+  }, [onCancelSmsCode]);
   const invalidateSms = useCallback(() => {
     smsRequestGeneration.current += 1;
+    cancelSms();
     setCodeSent(false);
     setCode("");
-  }, []);
+  }, [cancelSms]);
 
   useEffect(
     () => () => {
       smsRequestGeneration.current += 1;
+      cancelSms();
     },
-    [],
+    [cancelSms],
   );
 
   useEffect(() => {
@@ -75,8 +85,12 @@ export const LoginSheet = ({
   };
 
   const requestCode = async () => {
+    cancelSms();
     const generation = ++smsRequestGeneration.current;
-    const sent = await onRequestSmsCode({ areaCode, phone });
+    const requestId = crypto.randomUUID();
+    activeSmsRequest.current = requestId;
+    const sent = await onRequestSmsCode({ areaCode, phone, requestId });
+    if (activeSmsRequest.current === requestId) activeSmsRequest.current = null;
     // A result belongs only to the same still-active form and SMS destination.
     if (!sent || generation !== smsRequestGeneration.current) return;
     setCodeSent(true);

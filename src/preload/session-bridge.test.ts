@@ -26,6 +26,9 @@ describe("desktop session bridge", () => {
     bridge.auth.onSessionExpired(listener);
     await bridge.auth.passwordLogin({ user: "fake", password: "fake", areaCode: "86" });
     await bridge.auth.requestSmsCode({ phone: "15500000000", areaCode: "86" });
+    const requestId = "59d949d8-79cd-4922-b320-92f609bf85b6";
+    await bridge.auth.cancelSmsCode({ requestId });
+    expect(invoke).toHaveBeenCalledWith(ipcChannels.cancelSmsCode, { requestId });
     invoke.mockResolvedValueOnce({ ok: false, error: { code: "UPSTREAM_ERROR", message: "网络" } });
     await bridge.vehicles.list();
     expect(listener).not.toHaveBeenCalled();

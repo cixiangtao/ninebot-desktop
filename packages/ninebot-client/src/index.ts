@@ -32,3 +32,5 @@ export type {
 } from "./transport.ts";
 export { defaultNinebotServiceEndpoints, ninebotServiceNames } from "./service-endpoints.ts";
 export type { NinebotServiceName } from "./service-endpoints.ts";
+
+export { ninebotSmsVerification } from "./sms-verification.ts";

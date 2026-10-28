@@ -6,6 +6,7 @@ const files = [
   "/THIRD_PARTY_NOTICES.md",
   "/out/main/index.js",
   "/out/preload/index.cjs",
+  "/out/preload/sms-verification.cjs",
   "/out/renderer/index.html",
   "/out/renderer/recovery.html",
   "/out/renderer/recovery.js",
@@ -38,5 +39,12 @@ describe("SDK-only ASAR audit rejects contaminated or incorrectly selected artif
     ).toThrow();
     expect(() => assertSdkOnlyArchive(files, metadata, "legacy entry")).toThrow();
     expect(() => assertSdkOnlyArchive(files.slice(0, -1), metadata, main)).toThrow();
+    expect(() =>
+      assertSdkOnlyArchive(
+        files.filter((file) => !file.endsWith("sms-verification.cjs")),
+        metadata,
+        main,
+      ),
+    ).toThrow("sms-verification.cjs");
   });
 });

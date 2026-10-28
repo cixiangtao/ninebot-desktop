@@ -110,6 +110,9 @@ describe("createNinebotSdkAppClient", () => {
 
     await client.login("user", "86", "password");
     await client.requestSmsCode("13800138000", "86");
+    const smsAbort = new AbortController();
+    await client.requestSmsCode("13800138000", "86", "synthetic-validation", smsAbort.signal);
+    expect(client.supportsSmsVerification).toBe(true);
     await client.loginWithSmsCode("13800138000", "86", "123456");
     expect(await client.whoami()).toEqual({ uid: "uid" });
     expect(await client.vehicles()).toEqual([{ wnumber: "SN-1" }]);
@@ -127,6 +130,12 @@ describe("createNinebotSdkAppClient", () => {
       password: "password",
     });
     expect(provider.requestSmsCode).toHaveBeenCalledWith({ phone: "13800138000", areaCode: "86" });
+    expect(provider.requestSmsCode).toHaveBeenCalledWith({
+      phone: "13800138000",
+      areaCode: "86",
+      validate: "synthetic-validation",
+      signal: smsAbort.signal,
+    });
     expect(vehicleReader.clear).toHaveBeenCalledOnce();
     expect(telemetryReader.clear).toHaveBeenCalledOnce();
     expect(travelReader.clear).toHaveBeenCalledOnce();
