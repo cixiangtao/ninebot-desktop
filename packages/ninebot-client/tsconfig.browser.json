@@ -1,0 +1,34 @@
+{
+  "compilerOptions": {
+    "target": "ES2023",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "types": [],
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+    "strict": true,
+    "exactOptionalPropertyTypes": true,
+    "verbatimModuleSyntax": true,
+    "skipLibCheck": true,
+    "noUncheckedIndexedAccess": true
+  },
+  "include": [
+    "src/candidate-contracts.ts",
+    "src/candidate-session-core.ts",
+    "src/auth.ts",
+    "src/passport-auth.ts",
+    "src/passport-signer.ts",
+    "src/passport-login-client.ts",
+    "src/passport-auth-provider.ts",
+    "src/crypto-web.ts",
+    "src/crypto-web-codec.ts",
+    "src/transport-web.ts",
+    "src/auth-result.ts",
+    "src/auth-result-reference.ts",
+    "src/passport-country.ts",
+    "src/index.ts",
+    "src/platform-web.ts",
+    "src/track.ts"
+  ]
+}

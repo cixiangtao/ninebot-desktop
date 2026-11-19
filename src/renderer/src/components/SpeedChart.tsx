@@ -106,8 +106,8 @@ export const SpeedChart = ({ track, playbackPosition, onSeek }: SpeedChartProps)
       >
         <defs>
           <linearGradient id="speed-fill" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stopColor="#12c7b5" stopOpacity="0.26" />
-            <stop offset="1" stopColor="#12c7b5" stopOpacity="0" />
+            <stop offset="0" stopColor="var(--chart-fill, #b9d85b)" stopOpacity="0.38" />
+            <stop offset="1" stopColor="var(--chart-fill, #b9d85b)" stopOpacity="0" />
           </linearGradient>
         </defs>
         {[16, 60, 104].map((y) => (
@@ -118,7 +118,7 @@ export const SpeedChart = ({ track, playbackPosition, onSeek }: SpeedChartProps)
           <path
             d={path}
             fill="none"
-            stroke="#11bfae"
+            stroke="var(--chart-line, #28765a)"
             strokeWidth="2.5"
             vectorEffect="non-scaling-stroke"
           />
@@ -130,7 +130,7 @@ export const SpeedChart = ({ track, playbackPosition, onSeek }: SpeedChartProps)
               y1="6"
               x2={active.x}
               y2="104"
-              stroke="#0fae9f"
+              stroke="var(--chart-line, #28765a)"
               strokeDasharray="3 4"
             />
             <circle
@@ -138,7 +138,7 @@ export const SpeedChart = ({ track, playbackPosition, onSeek }: SpeedChartProps)
               cy={active.y}
               r="7"
               fill="#ffffff"
-              stroke="#10bfae"
+              stroke="var(--chart-line, #28765a)"
               strokeWidth="4"
             />
           </>

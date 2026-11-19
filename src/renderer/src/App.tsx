@@ -25,6 +25,8 @@ import {
 } from "react";
 import type {
   AccountProfile,
+  SavedAccountsState,
+  BridgeError,
   BridgeResult,
   MonthSummaryExportFormat,
   PasswordLoginInput,
@@ -44,6 +46,8 @@ import type {
   YearSummaryExportFormat,
   YearSummaryExportMonth,
 } from "../../shared/contracts";
+import { RidePeakQueue, type RidePeakQueueState } from "./lib/ride-peak-queue";
+import { ThemePicker } from "./components/ThemePicker";
 import { LoginSheet } from "./components/LoginSheet";
 import { LocationDashboard } from "./components/LocationDashboard";
 import { MonthSummaryExportSheet } from "./components/MonthSummaryExportSheet";
@@ -52,7 +56,7 @@ import { PlaybackRateControl } from "./components/PlaybackRateControl";
 import { RideComparisonDashboard } from "./components/RideComparisonDashboard";
 import { RideActivityCalendar } from "./components/RideActivityCalendar";
 import { RideExportSheet } from "./components/RideExportSheet";
-import { RideSpeedReading } from "./components/RideSpeedReading";
+import { RideHistoryList } from "./components/RideHistoryList";
 import { RideSpeedVerificationPanel } from "./components/RideSpeedVerificationPanel";
 import { RouteMap } from "./components/RouteMap";
 import { SecuritySheet } from "./components/SecuritySheet";
@@ -66,11 +70,9 @@ import {
   createDemoDetail,
   demoDetail,
   demoRides,
-  demoVehicle,
   demoVehicleLocations,
   demoVehicleLocationPermissions,
   demoVehicleSnapshot,
-  demoVehicles,
   demoVehicleSnapshots,
 } from "./data/demo";
 import {
@@ -80,10 +82,8 @@ import {
   formatDuration,
   formatLongDuration,
   formatMonth,
-  formatRideDate,
   getMonthYear,
   getMonthFromUnixSeconds,
-  isLikelyCappedMaxSpeedDeclaration,
   resolveDisplayedMaxSpeed,
 } from "./lib/format";
 import type { CoordinateDisplayMode } from "./lib/coordinate";
@@ -110,7 +110,7 @@ import {
   type YearRideStatistics,
 } from "./lib/statistics";
 
-type DataMode = "demo" | "live";
+type DataMode = "unauthenticated" | "demo" | "live";
 type AppView = "device" | "map" | "rides" | "statistics" | "comparison";
 
 interface LiveDataOptions {
@@ -129,12 +129,6 @@ type DetailRefreshState =
   | { status: "success" }
   | { status: "error"; message: string };
 
-type RideSpeedVerificationState =
-  | { status: "idle" }
-  | { status: "loading" }
-  | { status: "success"; failedRideCount: number }
-  | { status: "error"; message: string };
-
 const PLAYBACK_SEGMENT_DURATION_MS = 180;
 const MAX_FRAME_DELTA_MS = 50;
 const EMPTY_TRACK: RideDetail["track"] = [];
@@ -143,9 +137,53 @@ const demoHistoryStartTime = Math.floor(
   new Date(new Date().getFullYear() - 1, 0, 1).getTime() / 1000,
 );
 
+const unconnectedVehicle: VehicleSummary = {
+  id: "vehicle-empty",
+  name: "未连接九号账号",
+  model: "连接账号后加载车辆",
+  access: "owner",
+  activated: null,
+  activationTime: null,
+  authorizationTime: null,
+  smartServiceRemainingDays: null,
+};
+
 const unwrap = <T,>(result: BridgeResult<T>) => {
-  if (!result.ok) throw new Error(result.error.message);
+  if (!result.ok) {
+    const error = new Error(result.error.message) as Error & { code: BridgeError["code"] };
+    error.code = result.error.code;
+    throw error;
+  }
   return result.data;
+};
+
+const transientBridgeErrorCodes = new Set<BridgeError["code"]>(["UNKNOWN", "UPSTREAM_ERROR"]);
+const transientReadRetryDelaysMs = [500, 1_500, 3_000] as const;
+
+const delay = (milliseconds: number) =>
+  new Promise<void>((resolve) => {
+    window.setTimeout(resolve, milliseconds);
+  });
+
+const isTransientBridgeReadError = (cause: unknown) =>
+  cause instanceof Error &&
+  "code" in cause &&
+  transientBridgeErrorCodes.has(
+    (cause as { code?: BridgeError["code"] }).code as BridgeError["code"],
+  );
+
+const retryTransientBridgeRead = async <T,>(
+  read: () => Promise<T>,
+  retryDelays: readonly number[] = transientReadRetryDelaysMs,
+): Promise<T> => {
+  try {
+    return await read();
+  } catch (cause) {
+    const [nextDelay, ...remainingDelays] = retryDelays;
+    if (!isTransientBridgeReadError(cause) || nextDelay === undefined) throw cause;
+    await delay(nextDelay);
+    return retryTransientBridgeRead(read, remainingDelays);
+  }
 };
 
 const createRideSpeedVerification = (detail: RideDetail): RideSpeedVerification => ({
@@ -188,6 +226,47 @@ const createDemoMonthSummary = (month: string, rides: RideSummary[]): RideMonthS
     longestDayMileageKm: Math.max(0, ...days.map(({ mileageKm }) => mileageKm ?? 0)),
   };
 };
+
+const createEmptyMonthSummary = (month: string): RideMonthSummary => ({
+  month,
+  historyStartTime: null,
+  rideCount: 0,
+  mileageKm: 0,
+  durationSeconds: 0,
+  energyWh: null,
+  visibleRideCount: 0,
+  aggregateAvailable: false,
+  ridesTruncated: false,
+  activeDayCount: null,
+  longestDayMileageKm: null,
+});
+
+const UnauthenticatedPanel = ({
+  onConnect,
+  connected,
+}: {
+  onConnect: () => void;
+  connected: boolean;
+}) => (
+  <div className="unauthenticated-page">
+    <section className="unauthenticated-card">
+      <span className="unauthenticated-icon">
+        <CircleUserRound size={28} />
+      </span>
+      <p>九号账号</p>
+      <h1>{connected ? "账号已连接，暂无车辆数据" : "连接账号后查看真实数据"}</h1>
+      <span>
+        {connected
+          ? "认证已完成。可重新检查车辆，或在账号设置中查看连接状态。"
+          : "当前未连接九号账号。为了避免混淆，这里不会展示演示行程、车辆状态或虚构统计。"}
+      </span>
+      <button type="button" onClick={onConnect}>
+        <CircleUserRound size={17} />
+        {connected ? "重新检查车辆" : "连接九号账号"}
+      </button>
+    </section>
+  </div>
+);
 
 const createDemoStatisticsSourceMonth = (month: string): YearSummaryExportMonth => {
   const monthNumber = Number(month.slice(4));
@@ -241,14 +320,13 @@ const createDemoRollingStatistics = (referenceMonth: string): MonthRideStatistic
 };
 
 export default function App() {
-  const [mode, setMode] = useState<DataMode>("demo");
+  const [mode, setMode] = useState<DataMode>("unauthenticated");
+  const [accountConnected, setAccountConnected] = useState(false);
   const [view, setView] = useState<AppView>("rides");
-  const [vehicles, setVehicles] = useState<VehicleSummary[]>(demoVehicles);
-  const [vehicle, setVehicle] = useState<VehicleSummary>(demoVehicle);
+  const [vehicles, setVehicles] = useState<VehicleSummary[]>([]);
+  const [vehicle, setVehicle] = useState<VehicleSummary>(unconnectedVehicle);
   const [vehiclePickerOpen, setVehiclePickerOpen] = useState(false);
-  const [vehicleSnapshot, setVehicleSnapshot] = useState<VehicleSnapshot | null>(
-    demoVehicleSnapshot,
-  );
+  const [vehicleSnapshot, setVehicleSnapshot] = useState<VehicleSnapshot | null>(null);
   const [snapshotLoading, setSnapshotLoading] = useState(false);
   const [snapshotError, setSnapshotError] = useState<string | null>(null);
   const [snapshotUpdatedAt, setSnapshotUpdatedAt] = useState<number | null>(null);
@@ -267,39 +345,55 @@ export default function App() {
   const [locationUpdatedAt, setLocationUpdatedAt] = useState<number | null>(null);
   const [coordinateDisplayMode, setCoordinateDisplayMode] =
     useState<CoordinateDisplayMode>("source");
-  const [rides, setRides] = useState<RideSummary[]>(demoRides);
-  const [rideDays, setRideDays] = useState<RideDaySummary[]>(() =>
-    createDemoRideDays(currentMonth(), demoRides),
-  );
+  const [rides, setRides] = useState<RideSummary[]>([]);
+  const [rideDays, setRideDays] = useState<RideDaySummary[]>([]);
   const [selectedRideDay, setSelectedRideDay] = useState<number | null>(null);
   const [rideMonthSummary, setRideMonthSummary] = useState<RideMonthSummary>(() =>
-    createDemoMonthSummary(currentMonth(), demoRides),
+    createEmptyMonthSummary(currentMonth()),
   );
-  const [historyStartTime, setHistoryStartTime] = useState<number | null>(demoHistoryStartTime);
-  const [detail, setDetail] = useState<RideDetail | null>(demoDetail);
-  const [selectedRideId, setSelectedRideId] = useState<string | null>(demoDetail.id);
+  const [historyStartTime, setHistoryStartTime] = useState<number | null>(null);
+  const [detail, setDetail] = useState<RideDetail | null>(null);
+  const [selectedRideId, setSelectedRideId] = useState<string | null>(null);
   const [detailRefreshState, setDetailRefreshState] = useState<DetailRefreshState>({
     status: "idle",
   });
   const [rideSpeedVerifications, setRideSpeedVerifications] = useState<
     Record<string, RideSpeedVerification>
-  >(() => ({ [demoDetail.id]: createRideSpeedVerification(demoDetail) }));
-  const [rideSpeedVerificationState, setRideSpeedVerificationState] =
-    useState<RideSpeedVerificationState>({ status: "idle" });
+  >({});
+  const [rideSpeedVerificationState, setRideSpeedVerificationState] = useState<RidePeakQueueState>({
+    loading: false,
+    failedCount: 0,
+    error: null,
+  });
+  const [visibleRideIds, setVisibleRideIds] = useState<string[]>([]);
+  const [ridePeakQueue] = useState(
+    () =>
+      new RidePeakQueue(
+        (reading) =>
+          setRideSpeedVerifications((current) =>
+            current[reading.id] ? current : { ...current, [reading.id]: reading },
+          ),
+        setRideSpeedVerificationState,
+      ),
+  );
   const [comparisonDetail, setComparisonDetail] = useState<RideDetail | null>(null);
   const [comparisonRideId, setComparisonRideId] = useState<string | null>(null);
   const [comparisonLoading, setComparisonLoading] = useState(false);
   const [comparisonError, setComparisonError] = useState<string | null>(null);
-  const [playbackPosition, setPlaybackPosition] = useState(38);
+  const [playbackPosition, setPlaybackPosition] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [playbackRate, setPlaybackRate] = useState<PlaybackRate>(1);
   const [loading, setLoading] = useState(false);
+  const [rideDetailLoading, setRideDetailLoading] = useState(false);
   const [loginOpen, setLoginOpen] = useState(false);
   const [loginBusy, setLoginBusy] = useState(false);
+  const activeSmsRequest = useRef<string | null>(null);
   const [securityOpen, setSecurityOpen] = useState(false);
   const [securityBusy, setSecurityBusy] = useState(false);
   const [securityStatus, setSecurityStatus] = useState<RuntimeSecurityStatus | null>(null);
   const [securityError, setSecurityError] = useState<string | null>(null);
+  const settingsRequest = useRef(0);
+  const [savedAccounts, setSavedAccounts] = useState<SavedAccountsState | null>(null);
   const [accountProfile, setAccountProfile] = useState<AccountProfile | null>(null);
   const [accountProfileError, setAccountProfileError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -316,17 +410,13 @@ export default function App() {
   const thisMonth = useMemo(() => currentMonth(), []);
   const currentYear = useMemo(() => Number(thisMonth.slice(0, 4)), [thisMonth]);
   const [statisticsYear, setStatisticsYear] = useState(currentYear);
-  const [statistics, setStatistics] = useState<YearRideStatistics | null>(() =>
-    createDemoYearStatistics(currentYear, thisMonth),
-  );
-  const [rollingStatisticsMonths, setRollingStatisticsMonths] = useState<MonthRideStatistics[]>(
-    () => createDemoRollingStatistics(thisMonth),
-  );
+  const [statistics, setStatistics] = useState<YearRideStatistics | null>(null);
+  const [rollingStatisticsMonths, setRollingStatisticsMonths] = useState<MonthRideStatistics[]>([]);
   const [statisticsLoading, setStatisticsLoading] = useState(false);
   const [statisticsProgress, setStatisticsProgress] = useState({ loaded: 0, total: 0 });
   const [statisticsError, setStatisticsError] = useState<string | null>(null);
   const [statisticsSourceMonths, setStatisticsSourceMonths] = useState<YearSummaryExportMonth[]>(
-    () => createDemoYearMonths(currentYear, thisMonth),
+    [],
   );
   const [yearExportOpen, setYearExportOpen] = useState(false);
   const [yearExportBusy, setYearExportBusy] = useState(false);
@@ -341,15 +431,14 @@ export default function App() {
   const liveRequestRef = useRef(0);
   const snapshotRequestRef = useRef(0);
   const snapshotLoadingRef = useRef(false);
-  const vehicleSnapshotRef = useRef<VehicleSnapshot | null>(demoVehicleSnapshot);
+  const vehicleSnapshotRef = useRef<VehicleSnapshot | null>(null);
   const locationRequestRef = useRef(0);
   const statisticsRequestRef = useRef(0);
   const comparisonRequestRef = useRef(0);
-  const rideSpeedVerificationRequestRef = useRef(0);
   const viewRef = useRef<AppView>(view);
   const vehicleRef = useRef(vehicle);
   const statisticsYearRef = useRef(statisticsYear);
-  const historyStartTimeRef = useRef<number | null>(demoHistoryStartTime);
+  const historyStartTimeRef = useRef<number | null>(null);
   const rideDetailDeferredRef = useRef(false);
   const historyStartMonth = useMemo(
     () => (historyStartTime === null ? null : getMonthFromUnixSeconds(historyStartTime)),
@@ -364,13 +453,19 @@ export default function App() {
     setComparisonError(null);
   }, []);
 
-  const resetRideSpeedVerification = useCallback((initialDetail: RideDetail | null = null) => {
-    ++rideSpeedVerificationRequestRef.current;
-    setRideSpeedVerifications(
-      initialDetail ? { [initialDetail.id]: createRideSpeedVerification(initialDetail) } : {},
-    );
-    setRideSpeedVerificationState({ status: "idle" });
-  }, []);
+  const resetRideSpeedVerification = useCallback(
+    (initialDetail: RideDetail | null = null, preserveReadings = false) => {
+      ridePeakQueue.reset();
+      setVisibleRideIds([]);
+      setRideSpeedVerifications((current) => ({
+        ...(preserveReadings ? current : {}),
+        ...(initialDetail
+          ? { [initialDetail.id]: createRideSpeedVerification(initialDetail) }
+          : {}),
+      }));
+    },
+    [ridePeakQueue],
+  );
 
   const rememberRideSpeedVerification = useCallback((nextDetail: RideDetail) => {
     setRideSpeedVerifications((current) => ({
@@ -383,6 +478,87 @@ export default function App() {
     playbackPositionRef.current = position;
     setPlaybackPosition(position);
   }, []);
+
+  const resetAuthenticatedView = useCallback(
+    (reconnect = false) => {
+      ++settingsRequest.current;
+      ++liveRequestRef.current;
+      ++snapshotRequestRef.current;
+      ++locationRequestRef.current;
+      ++statisticsRequestRef.current;
+      resetComparison();
+      resetRideSpeedVerification();
+      setAccountConnected(false);
+      setSavedAccounts(null);
+      setSecurityStatus(null);
+      setLoading(false);
+      setRideDetailLoading(false);
+      setLoginBusy(false);
+      setSecurityOpen(false);
+      setLoginOpen(reconnect);
+      setError(reconnect ? "登录状态已失效，请重新连接九号账号。" : null);
+      setAccountProfile(null);
+      setAccountProfileError(null);
+      setMode("unauthenticated");
+      historyStartTimeRef.current = null;
+      setHistoryStartTime(null);
+      setVehicles([]);
+      setMonth(thisMonth);
+      setMonthPickerYear(getMonthYear(thisMonth));
+      setMonthPickerOpen(false);
+      setVehicle(unconnectedVehicle);
+      vehicleRef.current = unconnectedVehicle;
+      setVehiclePickerOpen(false);
+      vehicleSnapshotRef.current = null;
+      setVehicleSnapshot(null);
+      setSnapshotUpdatedAt(null);
+      setSnapshotError(null);
+      snapshotLoadingRef.current = false;
+      dispatchSnapshotMonitor({ type: "reset" });
+      setVehicleLocation(null);
+      setLocationPermission("unknown");
+      setLocationAuthorized(false);
+      setLocationLoading(false);
+      setLocationError(null);
+      setLocationUpdatedAt(null);
+      setStatisticsYear(currentYear);
+      statisticsYearRef.current = currentYear;
+      setStatistics(null);
+      setRollingStatisticsMonths([]);
+      setStatisticsSourceMonths([]);
+      setStatisticsLoading(false);
+      setStatisticsProgress({ loaded: 0, total: 0 });
+      setStatisticsError(null);
+      setYearExportOpen(false);
+      setYearExportError(null);
+      setYearExportNotice(null);
+      setExportOpen(false);
+      setExportError(null);
+      setExportNotice(null);
+      setMonthExportOpen(false);
+      setMonthExportError(null);
+      setMonthExportNotice(null);
+      setRides([]);
+      setRideDays([]);
+      setSelectedRideDay(null);
+      setRideMonthSummary(createEmptyMonthSummary(thisMonth));
+      setDetail(null);
+      setSelectedRideId(null);
+      setDetailRefreshState({ status: "idle" });
+      if (viewRef.current === "comparison") {
+        viewRef.current = "rides";
+        setView("rides");
+      }
+      setIsPlaying(false);
+      seekPlayback(0);
+    },
+    [currentYear, thisMonth, resetComparison, resetRideSpeedVerification, seekPlayback],
+  );
+
+  useEffect(
+    () => window.ninebot?.auth.onSessionExpired?.(() => resetAuthenticatedView(true)),
+    [resetAuthenticatedView],
+  );
 
   const loadVehicleSnapshot = useCallback(
     async (
@@ -497,7 +673,7 @@ export default function App() {
       try {
         for (let index = 0; index < requestMonthKeys.length; index += STATISTICS_BATCH_SIZE) {
           const batch = requestMonthKeys.slice(index, index + STATISTICS_BATCH_SIZE);
-          // Keep at most three ninecli processes active to avoid hammering the private upstream API.
+          // Keep at most three SDK requests active to avoid hammering the private upstream API.
           // oxlint-disable-next-line no-await-in-loop
           const results = await Promise.all(
             batch.map(async (monthKey) => ({
@@ -550,27 +726,35 @@ export default function App() {
       knownVehicle?: VehicleSummary,
       { refresh = false, loadFirstRideDetail }: LiveDataOptions = {},
     ) => {
-      if (!window.ninebot) return;
+      const bridge = window.ninebot;
+      if (!bridge) return;
       setDetailRefreshState({ status: "idle" });
       if (loadFirstRideDetail !== undefined) {
         rideDetailDeferredRef.current = !loadFirstRideDetail;
       }
       const shouldLoadFirstRideDetail = !rideDetailDeferredRef.current;
       const requestId = ++liveRequestRef.current;
+      setRideDetailLoading(false);
       setLoading(true);
       setError(null);
       setIsPlaying(false);
       resetComparison();
-      resetRideSpeedVerification();
+      resetRideSpeedVerification(null, Boolean(knownVehicle) && !refresh);
       if (viewRef.current === "comparison") {
         viewRef.current = "rides";
         setView("rides");
       }
       try {
-        const nextVehicles = knownVehicle ? null : unwrap(await window.ninebot.vehicles.list());
+        const nextVehicles = knownVehicle
+          ? null
+          : await retryTransientBridgeRead(() => bridge.vehicles.list().then(unwrap));
         const nextVehicle = knownVehicle ?? nextVehicles?.[0];
-        if (!nextVehicle) throw new Error("当前账号没有可读取的车辆。");
         if (requestId !== liveRequestRef.current) return;
+        if (!nextVehicle) {
+          resetAuthenticatedView();
+          setAccountConnected(true);
+          return;
+        }
         if (nextVehicles) setVehicles(nextVehicles);
         vehicleRef.current = nextVehicle;
         setVehicle(nextVehicle);
@@ -595,16 +779,18 @@ export default function App() {
         setRides([]);
         setRideDays([]);
         setSelectedRideDay(null);
-        setRideMonthSummary(createDemoMonthSummary(targetMonth, []));
+        setRideMonthSummary(createEmptyMonthSummary(targetMonth));
         setDetail(null);
         setSelectedRideId(null);
         seekPlayback(0);
-        const nextRideMonth = unwrap(
-          await window.ninebot.rides.list({
-            vehicleId: nextVehicle.id,
-            month: targetMonth,
-            refresh,
-          }),
+        const nextRideMonth = await retryTransientBridgeRead(() =>
+          bridge.rides
+            .list({
+              vehicleId: nextVehicle.id,
+              month: targetMonth,
+              refresh,
+            })
+            .then(unwrap),
         );
         if (requestId !== liveRequestRef.current) return;
         const nextRides = nextRideMonth.rides;
@@ -619,9 +805,11 @@ export default function App() {
         if (viewRef.current === "statistics") {
           void loadYearStatistics(statisticsYearRef.current, nextVehicle);
         }
+        setLoading(false);
         if (!firstRide || !shouldLoadFirstRideDetail) return nextVehicle;
-        const nextDetail = unwrap(
-          await window.ninebot.rides.detail({ vehicleId: nextVehicle.id, rideId: firstRide.id }),
+        setRideDetailLoading(true);
+        const nextDetail = await retryTransientBridgeRead(() =>
+          bridge.rides.detail({ vehicleId: nextVehicle.id, rideId: firstRide.id }).then(unwrap),
         );
         if (requestId !== liveRequestRef.current) return;
         rideDetailDeferredRef.current = false;
@@ -635,13 +823,17 @@ export default function App() {
           setError(cause instanceof Error ? cause.message : "读取九号数据失败。");
         }
       } finally {
-        if (requestId === liveRequestRef.current) setLoading(false);
+        if (requestId === liveRequestRef.current) {
+          setLoading(false);
+          setRideDetailLoading(false);
+        }
       }
     },
     [
       loadVehicleSnapshot,
       loadYearStatistics,
       rememberRideSpeedVerification,
+      resetAuthenticatedView,
       resetComparison,
       resetRideSpeedVerification,
       seekPlayback,
@@ -650,9 +842,15 @@ export default function App() {
 
   useEffect(() => {
     if (!window.ninebot) return;
-    void window.ninebot.auth.status().then((result) => {
-      if (result.ok && result.data.connected) void loadLiveData(thisMonth);
-    });
+    void window.ninebot.auth
+      .status()
+      .then((result) => {
+        if (result.ok && result.data.connected) {
+          setAccountConnected(true);
+          void loadLiveData(thisMonth);
+        } else if (!result.ok) setError(result.error.message);
+      })
+      .catch(() => setError("无法检查登录状态，请稍后重试。"));
   }, [loadLiveData, thisMonth]);
 
   useEffect(() => {
@@ -724,12 +922,14 @@ export default function App() {
     if (!preservePlayback) seekPlayback(0);
     setDetailRefreshState(refresh ? { status: "loading" } : { status: "idle" });
     if (mode === "demo" || !window.ninebot) {
+      setRideDetailLoading(false);
       setDetail(createDemoDetail(ride));
       setDetailRefreshState({ status: "idle" });
       return;
     }
     const requestId = ++liveRequestRef.current;
-    if (!refresh) setLoading(true);
+    if (!refresh) setDetail(null);
+    setRideDetailLoading(!refresh);
     setError(null);
     try {
       const nextDetail = unwrap(
@@ -756,7 +956,7 @@ export default function App() {
         else setError(message);
       }
     } finally {
-      if (requestId === liveRequestRef.current && !refresh) setLoading(false);
+      if (requestId === liveRequestRef.current && !refresh) setRideDetailLoading(false);
     }
   };
 
@@ -773,6 +973,7 @@ export default function App() {
     }
     ++liveRequestRef.current;
     setLoading(false);
+    setRideDetailLoading(false);
     setIsPlaying(false);
     setDetail(null);
     setSelectedRideId(null);
@@ -780,39 +981,41 @@ export default function App() {
     seekPlayback(0);
   };
 
-  const verifyMonthRideSpeeds = async () => {
-    if (rides.length === 0 || rideSpeedVerificationState.status === "loading") return;
-    const requestId = ++rideSpeedVerificationRequestRef.current;
-    setRideSpeedVerificationState({ status: "loading" });
-    try {
-      const result =
-        mode === "demo" || !window.ninebot
-          ? {
-              rides: rides.map((ride) => createRideSpeedVerification(createDemoDetail(ride))),
-              failedRideCount: 0,
-            }
-          : unwrap(
-              await window.ninebot.rides.verifySpeeds({
-                vehicleId: vehicle.id,
-                rideIds: rides.map(({ id }) => id),
-              }),
-            );
-      if (requestId !== rideSpeedVerificationRequestRef.current) return;
-      setRideSpeedVerifications(
-        Object.fromEntries(result.rides.map((verification) => [verification.id, verification])),
-      );
-      setRideSpeedVerificationState({
-        status: "success",
-        failedRideCount: result.failedRideCount,
-      });
-    } catch (cause) {
-      if (requestId === rideSpeedVerificationRequestRef.current) {
-        setRideSpeedVerificationState({
-          status: "error",
-          message: cause instanceof Error ? cause.message : "无法校验本月极速。",
-        });
+  useEffect(() => {
+    const bridge = window.ninebot;
+    const readPeak = async (id: string): Promise<RideSpeedVerification> => {
+      if (mode === "demo" || !bridge) {
+        const ride = rides.find((candidate) => candidate.id === id);
+        if (!ride) throw new Error("行程已失效。");
+        return createRideSpeedVerification(createDemoDetail(ride));
       }
-    }
+      const result = unwrap(
+        await bridge.rides.verifySpeeds({ vehicleId: vehicle.id, rideIds: [id] }),
+      );
+      const reading = result.rides.find((candidate) => candidate.id === id);
+      if (!reading) throw new Error("轨迹读取失败，可重试。");
+      return reading;
+    };
+    ridePeakQueue.update(
+      visibleRideIds.filter((id) => rides.some((ride) => ride.id === id)),
+      rideSpeedVerifications,
+      !loading && view === "rides" && mode !== "unauthenticated" ? readPeak : null,
+    );
+  }, [
+    ridePeakQueue,
+    visibleRideIds,
+    rideSpeedVerifications,
+    loading,
+    view,
+    mode,
+    vehicle.id,
+    rides,
+  ]);
+
+  useEffect(() => () => ridePeakQueue.reset(false), [ridePeakQueue]);
+
+  const verifyMonthRideSpeeds = () => {
+    ridePeakQueue.requestAll(rides.map(({ id }) => id));
   };
 
   const loadComparisonRide = async (ride: RideSummary) => {
@@ -867,11 +1070,11 @@ export default function App() {
     setError(null);
     try {
       unwrap(await window.ninebot.auth.passwordLogin(input));
+      resetAuthenticatedView();
       setSecurityStatus(null);
-      setAccountProfile(null);
-      setAccountProfileError(null);
-      setLoginOpen(false);
-      await loadLiveData(month);
+      setSavedAccounts(null);
+      setAccountConnected(true);
+      await loadLiveData(thisMonth);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "连接账号失败。");
     } finally {
@@ -879,18 +1082,35 @@ export default function App() {
     }
   };
 
+  const cancelSmsCode = useCallback((requestId: string) => {
+    if (activeSmsRequest.current === requestId) {
+      activeSmsRequest.current = null;
+      setLoginBusy(false);
+      setError(null);
+    }
+    // Cancellation is best-effort IPC; the request identity also guards late UI results.
+    void window.ninebot?.auth.cancelSmsCode({ requestId }).catch(() => {});
+  }, []);
+
   const requestSmsCode = async (input: SmsCodeRequestInput) => {
     if (!window.ninebot) return false;
+    const requestId = input.requestId ?? crypto.randomUUID();
+    if (activeSmsRequest.current) cancelSmsCode(activeSmsRequest.current);
+    activeSmsRequest.current = requestId;
     setLoginBusy(true);
     setError(null);
     try {
-      unwrap(await window.ninebot.auth.requestSmsCode(input));
-      return true;
+      const result = unwrap(await window.ninebot.auth.requestSmsCode({ ...input, requestId }));
+      return activeSmsRequest.current === requestId && result.sent;
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "无法发送短信验证码。");
+      if (activeSmsRequest.current === requestId)
+        setError(cause instanceof Error ? cause.message : "无法发送短信验证码。");
       return false;
     } finally {
-      setLoginBusy(false);
+      if (activeSmsRequest.current === requestId) {
+        activeSmsRequest.current = null;
+        setLoginBusy(false);
+      }
     }
   };
 
@@ -900,11 +1120,11 @@ export default function App() {
     setError(null);
     try {
       unwrap(await window.ninebot.auth.smsCodeLogin(input));
+      resetAuthenticatedView();
       setSecurityStatus(null);
-      setAccountProfile(null);
-      setAccountProfileError(null);
-      setLoginOpen(false);
-      await loadLiveData(month);
+      setSavedAccounts(null);
+      setAccountConnected(true);
+      await loadLiveData(thisMonth);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "验证码登录失败。");
     } finally {
@@ -989,15 +1209,36 @@ export default function App() {
 
   const loadSecurityStatus = useCallback(async () => {
     if (!window.ninebot) return;
+    const requestId = ++settingsRequest.current;
     setSecurityBusy(true);
     setSecurityError(null);
     setAccountProfileError(null);
     try {
-      const [securityResult, profileResult] = await Promise.all([
+      const [securityResult, profileResult, accountsResult] = await Promise.all([
         window.ninebot.runtime.security(),
-        window.ninebot.auth.profile(),
+        window.ninebot.auth.profile({ passive: true }),
+        window.ninebot.accounts.list(),
       ]);
-      setSecurityStatus(unwrap(securityResult));
+      if (requestId !== settingsRequest.current) return;
+      const nextAccounts = unwrap(accountsResult);
+      const nextStatus = unwrap(securityResult);
+      const expired = !profileResult.ok && profileResult.error.code === "AUTH_REQUIRED";
+      if (expired && nextStatus.storage.tokensPresent) {
+        resetAuthenticatedView();
+        setSecurityOpen(true);
+        setSecurityBusy(false);
+      }
+      setSavedAccounts(
+        expired
+          ? {
+              ...nextAccounts,
+              accounts: nextAccounts.accounts.map((account) =>
+                account.id === nextAccounts.activeId ? { ...account, needsLogin: true } : account,
+              ),
+            }
+          : nextAccounts,
+      );
+      setSecurityStatus(nextStatus);
       if (profileResult.ok) {
         setAccountProfile(profileResult.data);
       } else {
@@ -1007,83 +1248,67 @@ export default function App() {
         }
       }
     } catch (cause) {
-      setSecurityError(cause instanceof Error ? cause.message : "无法读取运行时安全状态。");
+      if (requestId === settingsRequest.current)
+        setSecurityError(cause instanceof Error ? cause.message : "无法读取设置。");
     } finally {
-      setSecurityBusy(false);
+      if (requestId === settingsRequest.current) setSecurityBusy(false);
     }
-  }, []);
+  }, [resetAuthenticatedView]);
 
   const openSecurity = () => {
     setSecurityOpen(true);
     void loadSecurityStatus();
   };
 
+  const switchAccount = async (id: string) => {
+    if (!window.ninebot) return;
+    // Invalidate every view/read before switching, including map position consent and playback.
+    resetAuthenticatedView();
+    setSecurityBusy(true);
+    setSavedAccounts(null);
+    setSecurityStatus(null);
+    try {
+      setSavedAccounts(unwrap(await window.ninebot.accounts.switch({ id })));
+      setAccountConnected(true);
+      await loadLiveData(thisMonth);
+    } catch (cause) {
+      await loadLiveData(thisMonth);
+      setError(cause instanceof Error ? cause.message : "无法切换账号。");
+    } finally {
+      setSecurityBusy(false);
+    }
+  };
+
+  const removeAccount = async (id: string) => {
+    if (!window.ninebot) return;
+    const wasActive = savedAccounts?.activeId === id;
+    setSecurityBusy(true);
+    setSecurityError(null);
+    try {
+      const next = unwrap(await window.ninebot.accounts.remove({ id }));
+      if (wasActive) resetAuthenticatedView();
+      setSavedAccounts(next);
+    } catch (cause) {
+      setSecurityError(cause instanceof Error ? cause.message : "无法移除账号。");
+    } finally {
+      setSecurityBusy(false);
+    }
+  };
+
   const logout = async () => {
     if (!window.ninebot) return;
     ++liveRequestRef.current;
+    setRideDetailLoading(false);
     ++snapshotRequestRef.current;
     ++locationRequestRef.current;
     ++statisticsRequestRef.current;
     resetComparison();
-    resetRideSpeedVerification(demoDetail);
+    resetRideSpeedVerification();
     setSecurityBusy(true);
     setSecurityError(null);
     try {
       unwrap(await window.ninebot.auth.logout());
-      setAccountProfile(null);
-      setAccountProfileError(null);
-      setMode("demo");
-      historyStartTimeRef.current = demoHistoryStartTime;
-      setHistoryStartTime(demoHistoryStartTime);
-      setVehicles(demoVehicles);
-      setMonth(thisMonth);
-      setMonthPickerYear(getMonthYear(thisMonth));
-      setMonthPickerOpen(false);
-      setVehicle(demoVehicle);
-      vehicleRef.current = demoVehicle;
-      setVehiclePickerOpen(false);
-      vehicleSnapshotRef.current = demoVehicleSnapshot;
-      setVehicleSnapshot(demoVehicleSnapshot);
-      setSnapshotUpdatedAt(null);
-      setSnapshotError(null);
-      snapshotLoadingRef.current = false;
-      dispatchSnapshotMonitor({ type: "reset" });
-      setVehicleLocation(null);
-      setLocationPermission("unknown");
-      setLocationAuthorized(false);
-      setLocationLoading(false);
-      setLocationError(null);
-      setLocationUpdatedAt(null);
-      setStatisticsYear(currentYear);
-      statisticsYearRef.current = currentYear;
-      setStatistics(createDemoYearStatistics(currentYear, thisMonth));
-      setRollingStatisticsMonths(createDemoRollingStatistics(thisMonth));
-      setStatisticsSourceMonths(createDemoYearMonths(currentYear, thisMonth));
-      setStatisticsLoading(false);
-      setStatisticsProgress({ loaded: 0, total: 0 });
-      setStatisticsError(null);
-      setYearExportOpen(false);
-      setYearExportError(null);
-      setYearExportNotice(null);
-      setExportOpen(false);
-      setExportError(null);
-      setExportNotice(null);
-      setMonthExportOpen(false);
-      setMonthExportError(null);
-      setMonthExportNotice(null);
-      setRides(demoRides);
-      setRideDays(createDemoRideDays(thisMonth, demoRides));
-      setSelectedRideDay(null);
-      setRideMonthSummary(createDemoMonthSummary(thisMonth, demoRides));
-      setDetail(demoDetail);
-      setSelectedRideId(demoDetail.id);
-      setDetailRefreshState({ status: "idle" });
-      if (viewRef.current === "comparison") {
-        viewRef.current = "rides";
-        setView("rides");
-      }
-      setIsPlaying(false);
-      seekPlayback(38);
+      resetAuthenticatedView();
       setSecurityStatus(unwrap(await window.ninebot.runtime.security()));
     } catch (cause) {
       setSecurityError(cause instanceof Error ? cause.message : "无法清除本地登录令牌。");
@@ -1103,7 +1328,7 @@ export default function App() {
     setMonthExportError(null);
     setMonthExportNotice(null);
     resetComparison();
-    resetRideSpeedVerification();
+    resetRideSpeedVerification(null, true);
     setMonth(nextMonth);
     setMonthPickerYear(getMonthYear(nextMonth));
     setMonthPickerOpen(false);
@@ -1333,36 +1558,22 @@ export default function App() {
   const activePoint = interpolateTrackPoint(track, playbackPosition);
   const elapsedSeconds = activePoint?.offsetSeconds ?? 0;
   const progress = track.length <= 1 ? 0 : (playbackPosition / (track.length - 1)) * 100;
-  const maxSpeed = detail
-    ? resolveDisplayedMaxSpeed(detail.sampledMaxSpeed, detail.declaredMaxSpeed)
-    : 0;
+  const maxSpeed = detail ? resolveDisplayedMaxSpeed(detail.sampledMaxSpeed) : null;
   const rideEnergyEfficiency = detail
     ? calculateRideEnergyEfficiency(detail.energyWh, detail.mileageKm)
     : null;
   const rideDayShare = detail ? calculateRideDayShare(detail.mileageKm, detail.dayMileageKm) : null;
-  const declaredMaxSpeedLikelyCapped = detail
-    ? isLikelyCappedMaxSpeedDeclaration(detail.sampledMaxSpeed, detail.declaredMaxSpeed)
-    : false;
+  const rideDataLoading = loading || rideDetailLoading;
   const detailRefreshing = detailRefreshState.status === "loading";
-  const speedVerificationLoading = rideSpeedVerificationState.status === "loading";
+  const speedVerificationLoading = rideSpeedVerificationState.loading;
   const verifiedSpeedCount = rides.filter(({ id }) => rideSpeedVerifications[id]).length;
-  const correctedSpeedCount = rides.filter(({ id }) => {
+  const unavailableSpeedCount = rides.filter(({ id }) => {
     const verification = rideSpeedVerifications[id];
     return (
-      verification !== undefined &&
-      isLikelyCappedMaxSpeedDeclaration(verification.sampledMaxSpeed, verification.declaredMaxSpeed)
+      verification !== undefined && resolveDisplayedMaxSpeed(verification.sampledMaxSpeed) === null
     );
   }).length;
-  const unresolvedSpeedPlaceholderCount = rides.filter((ride) => {
-    const verification = rideSpeedVerifications[ride.id];
-    const sampledMaxSpeed = verification?.sampledMaxSpeed ?? null;
-    const declaredMaxSpeed = verification?.declaredMaxSpeed ?? ride.declaredMaxSpeed;
-    return sampledMaxSpeed === null && declaredMaxSpeed === 25;
-  }).length;
-  const failedSpeedVerificationCount =
-    rideSpeedVerificationState.status === "success"
-      ? rideSpeedVerificationState.failedRideCount
-      : 0;
+  const failedSpeedVerificationCount = rideSpeedVerificationState.failedCount;
 
   const refreshCurrentRide = () => {
     if (mode !== "live" || !currentRide || detailRefreshing) return;
@@ -1382,233 +1593,58 @@ export default function App() {
 
   return (
     <div className="app-shell">
-      <aside className="sidebar">
-        <div className="sidebar-scroll">
-          <div className="brand-row">
-            <div className="brand-mark">
-              <Route size={21} strokeWidth={2.5} />
-            </div>
-            <strong>韭号出行</strong>
-          </div>
-
-          <section className="mt-8">
-            <p className="sidebar-label">我的车辆</p>
-            <VehicleSwitcher
-              vehicles={vehicles}
-              selectedVehicle={vehicle}
-              live={mode === "live"}
-              open={vehiclePickerOpen}
-              disabled={loading || snapshotLoading || vehicles.length === 0}
-              onToggle={() => setVehiclePickerOpen((open) => !open)}
-              onSelect={selectVehicle}
-            />
-          </section>
-
-          <nav className="mt-5 space-y-1" aria-label="主导航">
-            <NavItem
-              icon={<Bike size={18} />}
-              label="设备"
-              active={view === "device"}
-              onClick={showDevice}
-            />
-            <NavItem
-              icon={<MapIcon size={18} />}
-              label="地图"
-              active={view === "map"}
-              onClick={showMap}
-            />
-            <NavItem
-              icon={<Route size={18} />}
-              label="轨迹"
-              active={view === "rides" || view === "comparison"}
-              onClick={showRides}
-            />
-            <NavItem
-              icon={<ChartNoAxesCombined size={18} />}
-              label="统计"
-              active={view === "statistics"}
-              onClick={showStatistics}
-            />
-            <NavItem icon={<Settings size={18} />} label="设置" onClick={openSecurity} />
-          </nav>
-
-          {view === "rides" ? (
-            <div className="mt-7 flex items-start justify-between gap-2 px-2">
-              <MonthNavigator
-                month={month}
-                visibleYear={monthPickerYear}
-                open={monthPickerOpen}
-                disabled={loading}
-                minimumMonth={historyStartMonth}
-                onToggle={() => {
-                  setMonthPickerYear(getMonthYear(month));
-                  setMonthPickerOpen((open) => !open);
-                }}
-                onVisibleYearChange={setMonthPickerYear}
-                onSelect={selectMonth}
-              />
-              <div className="flex flex-none items-center gap-1.5">
-                <button
-                  className="icon-button"
-                  type="button"
-                  onClick={() => {
-                    setMonthExportError(null);
-                    setMonthExportOpen(true);
-                  }}
-                  aria-label="导出本月清单"
-                  disabled={loading}
-                >
-                  <Download size={16} />
-                </button>
-                <button
-                  className="icon-button"
-                  type="button"
-                  onClick={() =>
-                    void (mode === "live"
-                      ? loadLiveData(month, vehicle, { refresh: true })
-                      : Promise.resolve())
-                  }
-                  aria-label="刷新行程"
-                  disabled={loading || mode === "demo"}
-                >
-                  <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
-                </button>
-              </div>
-            </div>
-          ) : null}
-
-          {view === "rides" ? (
-            <div className="ride-month-summary" aria-label="月度行程汇总">
-              <div>
-                <strong>{rideMonthSummary.rideCount} 次</strong>
-                <span>{rideMonthSummary.mileageKm.toFixed(1)} km</span>
-                {rideMonthSummary.energyWh !== null ? (
-                  <span>{(rideMonthSummary.energyWh / 1000).toFixed(2)} kWh</span>
-                ) : null}
-              </div>
-              <small>
-                {loading
-                  ? "正在读取整月汇总…"
-                  : rideMonthSummary.ridesTruncated
-                    ? `可选择 ${rideMonthSummary.visibleRideCount} / ${rideMonthSummary.rideCount} 次行程`
-                    : rideMonthSummary.aggregateAvailable
-                      ? "整月汇总 · 明细完整"
-                      : "按当前可见明细汇总"}
-              </small>
-              {monthExportNotice ? (
-                <p className="month-export-notice" role="status">
-                  {monthExportNotice}
-                </p>
-              ) : null}
-            </div>
-          ) : null}
-
-          {view === "rides" ? (
-            <RideSpeedVerificationPanel
-              totalCount={rides.length}
-              verifiedCount={verifiedSpeedCount}
-              correctedCount={correctedSpeedCount}
-              failedCount={failedSpeedVerificationCount}
-              placeholderCount={unresolvedSpeedPlaceholderCount}
-              loading={speedVerificationLoading}
-              error={
-                rideSpeedVerificationState.status === "error"
-                  ? rideSpeedVerificationState.message
-                  : null
-              }
-              disabled={loading || rides.length === 0}
-              onVerify={() => void verifyMonthRideSpeeds()}
-            />
-          ) : null}
-
-          {view === "rides" ? (
-            <RideActivityCalendar
-              month={month}
-              days={rideDays}
-              rides={rides}
-              selectedDay={selectedRideDay}
-              disabled={loading}
-              onSelectDay={selectRideDay}
-            />
-          ) : null}
-
-          {view === "rides" ? (
-            <div className="mt-3 space-y-1.5" aria-label="骑行记录">
-              {selectedRideDay !== null ? (
-                <p className="ride-day-filter-note">
-                  <span>{selectedRideDay} 日的可选行程</span>
-                  <button type="button" onClick={() => selectRideDay(null)}>
-                    显示全部
-                  </button>
-                </p>
-              ) : null}
-              {displayedRides.map((ride) => (
-                <button
-                  key={ride.id}
-                  type="button"
-                  onClick={() => void selectRide(ride)}
-                  className={`ride-row ${selectedRideId === ride.id ? "ride-row-active" : ""}`}
-                >
-                  <span className="route-thumb" aria-hidden="true">
-                    <i />
-                    <i />
-                    <i />
-                    <i />
-                  </span>
-                  <span className="min-w-0 flex-1 text-left">
-                    <strong className="block text-[14px] font-[650] text-[#283645]">
-                      {formatRideDate(ride.startTime)}
-                    </strong>
-                    <span className="mt-1 block truncate text-xs font-medium text-slate-500">
-                      {ride.mileageKm.toFixed(1)} km · {formatDuration(ride.durationSeconds)}
-                      {ride.energyWh !== null ? ` · ${ride.energyWh.toFixed(0)} Wh` : ""}
-                    </span>
-                  </span>
-                  <RideSpeedReading
-                    ride={ride}
-                    verification={rideSpeedVerifications[ride.id] ?? null}
-                  />
-                </button>
-              ))}
-              {!loading && displayedRides.length === 0 ? (
-                <p className="ride-list-empty">
-                  {selectedRideDay !== null &&
-                  (rideDays.find(({ day }) => day === selectedRideDay)?.mileageKm ?? 0) > 0
-                    ? `${selectedRideDay} 日的里程已计入整月汇总，但不在九号返回的可选明细中`
-                    : `${formatMonth(month)}暂无骑行记录`}
-                </p>
-              ) : null}
-            </div>
-          ) : null}
+      <aside className="navigation-rail" aria-label="应用导航">
+        <div className="rail-brand" title="韭号出行">
+          <span className="brand-mark">
+            <Route size={23} strokeWidth={2.2} />
+          </span>
+          <strong>韭号出行</strong>
         </div>
-
-        <div className="border-t border-slate-200/80 p-4">
-          <button
-            className="secondary-button w-full"
-            type="button"
-            onClick={() => setLoginOpen(true)}
-          >
-            <CircleUserRound size={17} />
-            {mode === "live" ? "重新连接账号" : "连接九号账号"}
-          </button>
+        <nav className="primary-navigation" aria-label="主导航">
+          <NavItem
+            icon={<Bike size={18} />}
+            label="设备"
+            active={view === "device"}
+            onClick={showDevice}
+          />
+          <NavItem
+            icon={<MapIcon size={18} />}
+            label="地图"
+            active={view === "map"}
+            onClick={showMap}
+          />
+          <NavItem
+            icon={<Route size={18} />}
+            label="轨迹"
+            active={view === "rides" || view === "comparison"}
+            onClick={showRides}
+          />
+          <NavItem
+            icon={<ChartNoAxesCombined size={18} />}
+            label="统计"
+            active={view === "statistics"}
+            onClick={showStatistics}
+          />
+        </nav>
+        <div className="rail-footer">
+          <NavItem icon={<Settings size={20} />} label="设置" onClick={openSecurity} />
         </div>
       </aside>
-
-      <main className="main-stage">
+      <div className="workspace">
         <header className="titlebar">
-          <span className="text-sm font-[660] text-[#25313d]">
+          <span className="workspace-title">
             {view === "device"
-              ? "车辆"
+              ? "设备概览"
               : view === "map"
-                ? "地图"
+                ? "车辆位置"
                 : view === "statistics"
-                  ? "统计"
+                  ? "骑行统计"
                   : view === "comparison"
                     ? "行程对比"
-                    : "韭号出行"}
+                    : "轨迹回放"}
           </span>
-          <div className="no-drag absolute right-5 flex items-center gap-2">
-            {loading ||
+          <div className="workspace-status no-drag">
+            {rideDataLoading ||
             detailRefreshing ||
             speedVerificationLoading ||
             snapshotLoading ||
@@ -1654,345 +1690,530 @@ export default function App() {
               </button>
             ) : null}
           </div>
-        </header>
-
-        <div className="relative min-h-0 flex-1 overflow-hidden">
-          {view === "device" ? (
-            <VehicleDashboard
-              vehicle={vehicle}
-              snapshot={vehicleSnapshot}
-              live={mode === "live"}
-              loading={snapshotLoading}
-              error={snapshotError}
-              updatedAt={snapshotUpdatedAt}
-              autoRefreshEnabled={snapshotAutoRefreshEnabled}
-              monitorEvent={snapshotMonitorEvent}
-              onAutoRefreshChange={toggleSnapshotAutoRefresh}
-              onRefresh={() => void loadVehicleSnapshot(vehicle, true, "manual")}
-              onConnect={() => setLoginOpen(true)}
-            />
-          ) : view === "map" ? (
-            <LocationDashboard
-              vehicle={vehicle}
-              location={vehicleLocation}
-              permission={locationPermission}
-              authorized={locationAuthorized}
-              live={mode === "live"}
-              loading={locationLoading}
-              error={locationError}
-              updatedAt={locationUpdatedAt}
-              coordinateDisplayMode={coordinateDisplayMode}
-              onAuthorize={authorizeLocation}
-              onRefresh={() =>
-                void (mode === "live" ? loadVehicleLocation(vehicle) : authorizeLocation())
-              }
-              onClear={clearLocation}
-              onCoordinateDisplayModeChange={setCoordinateDisplayMode}
-            />
-          ) : view === "statistics" ? (
-            <StatisticsDashboard
-              vehicle={vehicle}
-              statistics={statistics}
-              rollingMonths={rollingStatisticsMonths}
-              year={statisticsYear}
-              currentMonth={thisMonth}
-              historyStartTime={historyStartTime}
-              live={mode === "live"}
-              loading={statisticsLoading}
-              progress={statisticsProgress}
-              error={statisticsError}
-              exportNotice={yearExportNotice}
-              activityMonths={statisticsSourceMonths}
-              onPreviousYear={() => selectStatisticsYear(statisticsYear - 1)}
-              onNextYear={() => selectStatisticsYear(statisticsYear + 1)}
-              onRefresh={() => void loadYearStatistics(statisticsYear, vehicle, true)}
-              onExport={() => {
-                setYearExportError(null);
-                setYearExportOpen(true);
-              }}
-              exportDisabled={statisticsLoading || statisticsSourceMonths.length === 0}
-              onSelectMonth={openStatisticsMonth}
-              onConnect={() => setLoginOpen(true)}
-            />
-          ) : view === "comparison" && detail ? (
-            <RideComparisonDashboard
-              vehicle={vehicle}
-              month={month}
-              base={detail}
-              comparison={comparisonDetail}
-              candidates={comparisonCandidates}
-              selectedRideId={comparisonRideId}
-              loading={comparisonLoading}
-              error={comparisonError}
-              onBack={closeComparison}
-              onSelect={(ride) => void loadComparisonRide(ride)}
-              onRetry={() => {
-                const selectedRide = comparisonCandidates.find(({ id }) => id === comparisonRideId);
-                if (selectedRide) void loadComparisonRide(selectedRide);
-              }}
-            />
-          ) : (
-            <>
-              <RouteMap
-                track={track}
-                playbackPosition={playbackPosition}
-                coordinateDisplayMode={coordinateDisplayMode}
-                onCoordinateDisplayModeChange={setCoordinateDisplayMode}
+          <ThemePicker />
+          <div className="workspace-vehicle no-drag">
+            {mode === "live" ? (
+              <VehicleSwitcher
+                vehicles={vehicles}
+                selectedVehicle={vehicle}
+                live
+                open={vehiclePickerOpen}
+                disabled={loading || snapshotLoading || vehicles.length === 0}
+                onToggle={() => setVehiclePickerOpen((open) => !open)}
+                onSelect={selectVehicle}
               />
-
-              {detail ? (
-                <>
-                  <section className="metrics-panel" aria-label="本次骑行指标">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <p className="flex items-center gap-2 text-xs font-semibold text-slate-500">
-                          最高速度
-                          <span className="metric-source-badge">
-                            {detail.sampledMaxSpeed !== null ? "轨迹采样" : "接口摘要"}
-                          </span>
-                        </p>
-                        <div className="mt-1 flex items-baseline gap-2">
-                          <strong className="metric-number">{Math.round(maxSpeed)}</strong>
-                          <span className="text-sm font-semibold text-slate-500">km/h</span>
-                        </div>
-                      </div>
-                      <div className="ride-metric-actions">
-                        <button
-                          className="ride-export-trigger ride-detail-refresh-trigger"
-                          type="button"
-                          onClick={refreshCurrentRide}
-                          disabled={
-                            mode !== "live" || currentRide === null || detailRefreshing || loading
-                          }
-                          aria-label="刷新当前行程"
-                          title={
-                            mode === "live"
-                              ? "绕过详情缓存，重新读取当前行程"
-                              : "连接九号账号后可刷新真实行程"
-                          }
-                        >
-                          {detailRefreshing ? (
-                            <LoaderCircle size={15} className="animate-spin" />
-                          ) : (
-                            <RefreshCw size={15} />
-                          )}
-                        </button>
-                        <button
-                          className="ride-export-trigger"
-                          type="button"
-                          onClick={openComparison}
-                          disabled={
-                            comparisonCandidates.length === 0 || loading || detailRefreshing
-                          }
-                          aria-label="对比当前行程"
-                        >
-                          <GitCompareArrows size={15} />
-                          对比
-                        </button>
-                        <button
-                          className="ride-export-trigger"
-                          type="button"
-                          onClick={() => {
-                            setExportError(null);
-                            setExportOpen(true);
-                          }}
-                          disabled={detail.track.length === 0 || detailRefreshing}
-                          aria-label="导出当前行程"
-                        >
-                          <Download size={15} />
-                          导出
-                        </button>
-                      </div>
-                    </div>
-                    <div className="mt-5 grid grid-cols-3 gap-4 border-t border-slate-200/80 pt-4">
-                      <Metric label="平均速度" value={detail.averageSpeed.toFixed(1)} unit="km/h" />
-                      <Metric label="里程" value={detail.mileageKm.toFixed(1)} unit="km" />
-                      <Metric label="用时" value={formatLongDuration(detail.durationSeconds)} />
-                    </div>
-                    {detail.energyWh !== null || detail.batteryUsedPercent !== null ? (
-                      <div className="ride-energy-metrics" aria-label="本次骑行能耗">
-                        <Metric
-                          label="本次能耗"
-                          value={detail.energyWh?.toFixed(0) ?? "—"}
-                          unit={detail.energyWh !== null ? "Wh" : undefined}
-                        />
-                        <Metric
-                          label="电量消耗"
-                          value={detail.batteryUsedPercent?.toFixed(1) ?? "—"}
-                          unit={detail.batteryUsedPercent !== null ? "%" : undefined}
-                        />
-                        <Metric
-                          label="平均能耗"
-                          value={rideEnergyEfficiency?.toFixed(1) ?? "—"}
-                          unit={rideEnergyEfficiency !== null ? "Wh/km" : undefined}
-                        />
-                      </div>
-                    ) : null}
-                    {detail.dayMileageKm !== null ? (
-                      <div className="ride-day-context" aria-label="骑行日背景">
-                        <span>骑行日累计</span>
-                        <strong>{detail.dayMileageKm.toFixed(1)} km</strong>
-                        <small>
-                          {rideDayShare === null
-                            ? "本次占比不可用"
-                            : `本次占当天 ${rideDayShare.toFixed(1)}%`}
-                        </small>
-                      </div>
-                    ) : null}
-                    <p
-                      className={`ride-detail-refresh-state ${
-                        detailRefreshState.status === "error"
-                          ? "ride-detail-refresh-error"
-                          : detailRefreshState.status === "loading" ||
-                              detailRefreshState.status === "success"
-                            ? "ride-detail-refresh-active"
-                            : declaredMaxSpeedLikelyCapped
-                              ? "ride-detail-source-warning"
-                              : ""
-                      }`}
-                      role={detailRefreshState.status === "error" ? "alert" : "status"}
-                      title={
-                        detailRefreshState.status === "error"
-                          ? detailRefreshState.message
-                          : undefined
-                      }
-                    >
-                      {detailRefreshState.status === "loading"
-                        ? "正在绕过缓存重新读取当前行程…"
-                        : detailRefreshState.status === "success"
-                          ? "当前行程已重新读取"
-                          : detailRefreshState.status === "error"
-                            ? "刷新失败，旧数据已保留，请再次刷新"
-                            : detail.sampledMaxSpeed !== null && detail.declaredMaxSpeed !== null
-                              ? declaredMaxSpeedLikelyCapped
-                                ? `旧记录摘要固定返回 25 km/h，已忽略；当前显示由 ${detail.track.length} 个轨迹点计算。`
-                                : `接口摘要 ${detail.declaredMaxSpeed.toFixed(0)} km/h · 轨迹采样 ${detail.sampledMaxSpeed.toFixed(0)} km/h`
-                              : "\u00a0"}
-                    </p>
-                    {exportNotice ? (
-                      <p className="ride-export-notice" role="status">
-                        {exportNotice}
-                      </p>
-                    ) : null}
-                  </section>
-
-                  <section
-                    className={`playback-panel ${detailRefreshing ? "playback-panel-refreshing" : ""}`}
-                    aria-label="轨迹回放控制"
-                    aria-busy={detailRefreshing}
-                    inert={detailRefreshing}
-                  >
-                    <div className="flex items-center gap-4 border-b border-slate-200/75 pb-4">
-                      <button
-                        className="play-button"
-                        type="button"
-                        onClick={togglePlayback}
-                        disabled={track.length <= 1 || detailRefreshing}
-                        aria-label={isPlaying ? "暂停回放" : "开始回放"}
-                      >
-                        {isPlaying ? (
-                          <Pause size={19} fill="currentColor" />
-                        ) : (
-                          <Play size={19} fill="currentColor" />
-                        )}
-                      </button>
-                      <span className="w-[94px] text-sm font-semibold tabular-nums text-slate-700">
-                        {formatDuration(elapsedSeconds)}{" "}
-                        <span className="text-slate-400">
-                          / {formatDuration(detail.durationSeconds)}
-                        </span>
-                      </span>
-                      <input
-                        className="timeline-range flex-1"
-                        aria-label="回放进度"
-                        type="range"
-                        min={0}
-                        max={Math.max(0, track.length - 1)}
-                        step={0.01}
-                        value={playbackPosition}
-                        disabled={detailRefreshing}
-                        aria-valuetext={`${formatDuration(elapsedSeconds)}，共 ${formatDuration(detail.durationSeconds)}`}
-                        style={{ "--progress": `${progress}%` } as CSSProperties}
-                        onChange={(event) => {
-                          setIsPlaying(false);
-                          seekPlayback(Number(event.target.value));
-                        }}
-                      />
-                      <PlaybackRateControl
-                        value={playbackRate}
-                        disabled={track.length <= 1 || detailRefreshing}
-                        onChange={setPlaybackRate}
-                      />
-                    </div>
-                    <div className="mt-4 flex items-end gap-6">
-                      <div className="w-[112px] pb-2">
-                        <p className="text-xs font-semibold text-slate-500">当前速度</p>
-                        <div className="mt-1 flex items-baseline gap-1">
-                          <strong className="text-[43px] leading-none font-[720] tracking-[-0.035em] text-[#172332]">
-                            {Math.round(activePoint?.speed ?? 0)}
-                          </strong>
-                          <span className="text-xs font-semibold text-slate-500">km/h</span>
-                        </div>
-                      </div>
-                      <SpeedChart
-                        track={track}
-                        playbackPosition={playbackPosition}
-                        onSeek={(position) => {
-                          setIsPlaying(false);
-                          seekPlayback(position);
-                        }}
-                      />
-                    </div>
-                    <SpeedZoneDistribution
-                      track={track}
-                      activeSpeed={activePoint?.speed ?? 0}
-                      onSeek={(position) => {
-                        setIsPlaying(false);
-                        seekPlayback(position);
+            ) : (
+              <button
+                className="account-connect-card"
+                type="button"
+                onClick={() => (accountConnected ? openSecurity() : setLoginOpen(true))}
+              >
+                <CircleUserRound size={21} />
+                <span>
+                  <strong>{accountConnected ? "账号已连接" : "尚未连接账号"}</strong>
+                  <small>{accountConnected ? "当前暂无车辆数据" : "连接后加载你的车辆"}</small>
+                </span>
+              </button>
+            )}
+          </div>
+        </header>
+        <div className="workspace-body">
+          {view === "rides" && mode !== "unauthenticated" ? (
+            <aside className="sidebar" aria-label="行程浏览">
+              <div className="sidebar-content">
+                <div className="ride-library-heading">
+                  <h2>骑行记录</h2>
+                  <span>按月浏览</span>
+                </div>
+                {mode === "live" && view === "rides" ? (
+                  <div className="ride-month-toolbar">
+                    <MonthNavigator
+                      month={month}
+                      visibleYear={monthPickerYear}
+                      open={monthPickerOpen}
+                      disabled={loading}
+                      minimumMonth={historyStartMonth}
+                      onToggle={() => {
+                        setMonthPickerYear(getMonthYear(month));
+                        setMonthPickerOpen((open) => !open);
                       }}
+                      onVisibleYearChange={setMonthPickerYear}
+                      onSelect={selectMonth}
                     />
-                  </section>
-                </>
-              ) : (
-                <section className="empty-month-panel" aria-live="polite">
-                  {loading ? (
-                    <LoaderCircle size={22} className="animate-spin text-[#0a9f92]" />
-                  ) : (
-                    <CalendarDays size={22} />
-                  )}
-                  <div>
-                    <strong>
-                      {loading
-                        ? `正在读取${formatMonth(month)}`
-                        : rides.length > 0
-                          ? "选择一条行程查看轨迹"
-                          : `${formatMonth(month)}没有行程`}
-                    </strong>
-                    <p>
-                      {loading
-                        ? "正在从九号账号读取这个月的骑行记录。"
-                        : error
-                          ? "读取失败，请检查网络后重新尝试。"
-                          : rides.length > 0
-                            ? "当前只加载了月度列表；选择左侧具体行程后才会读取 GPS 轨迹。"
-                            : "可以从左侧选择其他年份和月份继续查看。"}
-                    </p>
+                    <div className="flex flex-none items-center gap-1.5">
+                      <button
+                        className="icon-button"
+                        type="button"
+                        onClick={() => {
+                          setMonthExportError(null);
+                          setMonthExportOpen(true);
+                        }}
+                        aria-label="导出本月清单"
+                        disabled={loading}
+                      >
+                        <Download size={16} />
+                      </button>
+                      <button
+                        className="icon-button"
+                        type="button"
+                        onClick={() =>
+                          void (mode === "live"
+                            ? loadLiveData(month, vehicle, { refresh: true })
+                            : Promise.resolve())
+                        }
+                        aria-label="刷新行程"
+                        disabled={loading}
+                      >
+                        <RefreshCw size={16} className={loading ? "animate-spin" : ""} />
+                      </button>
+                    </div>
                   </div>
-                  {!loading && error && mode === "live" ? (
-                    <button
-                      type="button"
-                      onClick={() => void loadLiveData(month, vehicle, { refresh: true })}
-                    >
-                      <RefreshCw size={14} />
-                      重新读取
-                    </button>
-                  ) : null}
-                </section>
+                ) : null}
+
+                {view === "rides" ? (
+                  <div className="ride-list">
+                    <div className="ride-month-summary" aria-label="月度行程汇总">
+                      <div>
+                        <strong>{rideMonthSummary.rideCount} 次</strong>
+                        <span>{rideMonthSummary.mileageKm.toFixed(1)} km</span>
+                        {rideMonthSummary.energyWh !== null ? (
+                          <span>{(rideMonthSummary.energyWh / 1000).toFixed(2)} kWh</span>
+                        ) : null}
+                      </div>
+                      {loading ||
+                      rideMonthSummary.ridesTruncated ||
+                      !rideMonthSummary.aggregateAvailable ? (
+                        <small>
+                          {loading
+                            ? "正在读取整月汇总…"
+                            : rideMonthSummary.ridesTruncated
+                              ? `可选择 ${rideMonthSummary.visibleRideCount} / ${rideMonthSummary.rideCount} 次行程`
+                              : "按当前可见明细汇总"}
+                        </small>
+                      ) : null}
+                      {monthExportNotice ? (
+                        <p className="month-export-notice" role="status">
+                          {monthExportNotice}
+                        </p>
+                      ) : null}
+                    </div>
+
+                    <RideSpeedVerificationPanel
+                      totalCount={rides.length}
+                      verifiedCount={verifiedSpeedCount}
+                      failedCount={failedSpeedVerificationCount}
+                      unavailableCount={unavailableSpeedCount}
+                      loading={speedVerificationLoading}
+                      error={rideSpeedVerificationState.error}
+                      disabled={loading || rides.length === 0}
+                      onVerify={() => void verifyMonthRideSpeeds()}
+                    />
+
+                    <RideActivityCalendar
+                      month={month}
+                      days={rideDays}
+                      rides={rides}
+                      selectedDay={selectedRideDay}
+                      disabled={loading}
+                      onSelectDay={selectRideDay}
+                    />
+
+                    <div className="mt-3 space-y-1.5" aria-label="骑行记录">
+                      {selectedRideDay !== null ? (
+                        <p className="ride-day-filter-note">
+                          <span>{selectedRideDay} 日的可选行程</span>
+                          <button type="button" onClick={() => selectRideDay(null)}>
+                            显示全部
+                          </button>
+                        </p>
+                      ) : null}
+                      <RideHistoryList
+                        rides={displayedRides}
+                        selectedRideId={selectedRideId}
+                        verifications={rideSpeedVerifications}
+                        truncated={rideMonthSummary.ridesTruncated}
+                        onSelect={(ride) => void selectRide(ride)}
+                        onVisibleRidesChange={setVisibleRideIds}
+                      />
+                      {!loading && displayedRides.length === 0 ? (
+                        <p className="ride-list-empty">
+                          {selectedRideDay !== null &&
+                          (rideDays.find(({ day }) => day === selectedRideDay)?.mileageKm ?? 0) > 0
+                            ? `${selectedRideDay} 日的里程已计入整月汇总，但不在九号返回的可选明细中`
+                            : `${formatMonth(month)}暂无骑行记录`}
+                        </p>
+                      ) : null}
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            </aside>
+          ) : null}
+          <main className="main-stage">
+            <div
+              className={`view-content relative min-h-0 flex-1 overflow-hidden ${view === "rides" && detail ? "view-content-replay" : ""}`}
+            >
+              {mode === "unauthenticated" ? (
+                <UnauthenticatedPanel
+                  connected={accountConnected}
+                  onConnect={() =>
+                    accountConnected ? void loadLiveData(month) : setLoginOpen(true)
+                  }
+                />
+              ) : view === "device" ? (
+                <VehicleDashboard
+                  vehicle={vehicle}
+                  snapshot={vehicleSnapshot}
+                  live={mode === "live"}
+                  loading={snapshotLoading}
+                  error={snapshotError}
+                  updatedAt={snapshotUpdatedAt}
+                  autoRefreshEnabled={snapshotAutoRefreshEnabled}
+                  monitorEvent={snapshotMonitorEvent}
+                  onAutoRefreshChange={toggleSnapshotAutoRefresh}
+                  onRefresh={() => void loadVehicleSnapshot(vehicle, true, "manual")}
+                  onConnect={() => setLoginOpen(true)}
+                />
+              ) : view === "map" ? (
+                <LocationDashboard
+                  vehicle={vehicle}
+                  location={vehicleLocation}
+                  permission={locationPermission}
+                  authorized={locationAuthorized}
+                  live={mode === "live"}
+                  loading={locationLoading}
+                  error={locationError}
+                  updatedAt={locationUpdatedAt}
+                  coordinateDisplayMode={coordinateDisplayMode}
+                  onAuthorize={authorizeLocation}
+                  onRefresh={() =>
+                    void (mode === "live" ? loadVehicleLocation(vehicle) : authorizeLocation())
+                  }
+                  onClear={clearLocation}
+                  onCoordinateDisplayModeChange={setCoordinateDisplayMode}
+                />
+              ) : view === "statistics" ? (
+                <StatisticsDashboard
+                  vehicle={vehicle}
+                  statistics={statistics}
+                  rollingMonths={rollingStatisticsMonths}
+                  year={statisticsYear}
+                  currentMonth={thisMonth}
+                  historyStartTime={historyStartTime}
+                  live={mode === "live"}
+                  loading={statisticsLoading}
+                  progress={statisticsProgress}
+                  error={statisticsError}
+                  exportNotice={yearExportNotice}
+                  activityMonths={statisticsSourceMonths}
+                  onPreviousYear={() => selectStatisticsYear(statisticsYear - 1)}
+                  onNextYear={() => selectStatisticsYear(statisticsYear + 1)}
+                  onRefresh={() => void loadYearStatistics(statisticsYear, vehicle, true)}
+                  onExport={() => {
+                    setYearExportError(null);
+                    setYearExportOpen(true);
+                  }}
+                  exportDisabled={statisticsLoading || statisticsSourceMonths.length === 0}
+                  onSelectMonth={openStatisticsMonth}
+                  onConnect={() => setLoginOpen(true)}
+                />
+              ) : view === "comparison" && detail ? (
+                <RideComparisonDashboard
+                  vehicle={vehicle}
+                  month={month}
+                  base={detail}
+                  comparison={comparisonDetail}
+                  candidates={comparisonCandidates}
+                  selectedRideId={comparisonRideId}
+                  loading={comparisonLoading}
+                  error={comparisonError}
+                  onBack={closeComparison}
+                  onSelect={(ride) => void loadComparisonRide(ride)}
+                  onRetry={() => {
+                    const selectedRide = comparisonCandidates.find(
+                      ({ id }) => id === comparisonRideId,
+                    );
+                    if (selectedRide) void loadComparisonRide(selectedRide);
+                  }}
+                />
+              ) : (
+                <>
+                  <RouteMap
+                    track={track}
+                    playbackPosition={playbackPosition}
+                    coordinateDisplayMode={coordinateDisplayMode}
+                    onCoordinateDisplayModeChange={setCoordinateDisplayMode}
+                  />
+
+                  {detail ? (
+                    <>
+                      <section className="metrics-panel" aria-label="本次骑行指标">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="flex items-center gap-2 text-xs font-semibold text-slate-500">
+                              轨迹峰值
+                            </p>
+                            <div className="mt-1 flex items-baseline gap-2">
+                              <strong className="metric-number">
+                                {maxSpeed === null ? "—" : Math.round(maxSpeed)}
+                              </strong>
+                              <span className="text-sm font-semibold text-slate-500">km/h</span>
+                            </div>
+                          </div>
+                          <div className="ride-metric-actions">
+                            <button
+                              className="ride-export-trigger ride-detail-refresh-trigger"
+                              type="button"
+                              onClick={refreshCurrentRide}
+                              disabled={
+                                mode !== "live" ||
+                                currentRide === null ||
+                                detailRefreshing ||
+                                rideDataLoading
+                              }
+                              aria-label="刷新当前行程"
+                              title={
+                                mode === "live"
+                                  ? "绕过详情缓存，重新读取当前行程"
+                                  : "连接九号账号后可刷新真实行程"
+                              }
+                            >
+                              {detailRefreshing ? (
+                                <LoaderCircle size={15} className="animate-spin" />
+                              ) : (
+                                <RefreshCw size={15} />
+                              )}
+                            </button>
+                            <button
+                              className="ride-export-trigger"
+                              type="button"
+                              onClick={openComparison}
+                              disabled={
+                                comparisonCandidates.length === 0 ||
+                                rideDataLoading ||
+                                detailRefreshing
+                              }
+                              aria-label="对比当前行程"
+                              title="对比当前行程"
+                            >
+                              <GitCompareArrows size={15} />
+                            </button>
+                            <button
+                              className="ride-export-trigger"
+                              type="button"
+                              onClick={() => {
+                                setExportError(null);
+                                setExportOpen(true);
+                              }}
+                              disabled={
+                                detail.track.length === 0 || rideDataLoading || detailRefreshing
+                              }
+                              aria-label="导出当前行程"
+                              title="导出当前行程"
+                            >
+                              <Download size={15} />
+                            </button>
+                          </div>
+                        </div>
+                        <div className="mt-5 grid grid-cols-3 gap-4 border-t border-slate-200/80 pt-4">
+                          <Metric
+                            label="平均速度"
+                            value={detail.averageSpeed.toFixed(1)}
+                            unit="km/h"
+                          />
+                          <Metric label="里程" value={detail.mileageKm.toFixed(1)} unit="km" />
+                          <Metric label="用时" value={formatLongDuration(detail.durationSeconds)} />
+                        </div>
+                        {detail.energyWh !== null || detail.batteryUsedPercent !== null ? (
+                          <div className="ride-energy-metrics" aria-label="本次骑行能耗">
+                            <Metric
+                              label="本次能耗"
+                              value={detail.energyWh?.toFixed(0) ?? "—"}
+                              unit={detail.energyWh !== null ? "Wh" : undefined}
+                            />
+                            <Metric
+                              label="电量消耗"
+                              value={detail.batteryUsedPercent?.toFixed(1) ?? "—"}
+                              unit={detail.batteryUsedPercent !== null ? "%" : undefined}
+                            />
+                            <Metric
+                              label="平均能耗"
+                              value={rideEnergyEfficiency?.toFixed(1) ?? "—"}
+                              unit={rideEnergyEfficiency !== null ? "Wh/km" : undefined}
+                            />
+                          </div>
+                        ) : null}
+                        {detail.dayMileageKm !== null ? (
+                          <div className="ride-day-context" aria-label="骑行日背景">
+                            <span>骑行日累计</span>
+                            <strong>{detail.dayMileageKm.toFixed(1)} km</strong>
+                            <small>
+                              {rideDayShare === null
+                                ? "本次占比不可用"
+                                : `本次占当天 ${rideDayShare.toFixed(1)}%`}
+                            </small>
+                          </div>
+                        ) : null}
+                        <p
+                          className={`ride-detail-refresh-state ${
+                            detailRefreshState.status === "error"
+                              ? "ride-detail-refresh-error"
+                              : detailRefreshState.status === "loading" ||
+                                  detailRefreshState.status === "success"
+                                ? "ride-detail-refresh-active"
+                                : ""
+                          }`}
+                          role={detailRefreshState.status === "error" ? "alert" : "status"}
+                          title={
+                            detailRefreshState.status === "error"
+                              ? detailRefreshState.message
+                              : undefined
+                          }
+                        >
+                          {detailRefreshState.status === "loading"
+                            ? "正在绕过缓存重新读取当前行程…"
+                            : detailRefreshState.status === "success"
+                              ? "当前行程已重新读取"
+                              : detailRefreshState.status === "error"
+                                ? "刷新失败，旧数据已保留，请再次刷新"
+                                : `接口极速 ${detail.declaredMaxSpeed === null ? "—" : `${detail.declaredMaxSpeed.toFixed(0)} km/h`} · 轨迹峰值 ${maxSpeed === null ? "不可用" : `${Math.round(maxSpeed)} km/h`}`}
+                        </p>
+                        {exportNotice ? (
+                          <p className="ride-export-notice" role="status">
+                            {exportNotice}
+                          </p>
+                        ) : null}
+                      </section>
+
+                      <section
+                        className={`playback-panel ${detailRefreshing ? "playback-panel-refreshing" : ""}`}
+                        aria-label="轨迹回放控制"
+                        aria-busy={detailRefreshing}
+                        inert={detailRefreshing}
+                      >
+                        <div className="flex items-center gap-4 border-b border-slate-200/75 pb-4">
+                          <button
+                            className="play-button"
+                            type="button"
+                            onClick={togglePlayback}
+                            disabled={track.length <= 1 || detailRefreshing}
+                            aria-label={isPlaying ? "暂停回放" : "开始回放"}
+                          >
+                            {isPlaying ? (
+                              <Pause size={19} fill="currentColor" />
+                            ) : (
+                              <Play size={19} fill="currentColor" />
+                            )}
+                          </button>
+                          <span className="w-[94px] text-sm font-semibold tabular-nums text-slate-700">
+                            {formatDuration(elapsedSeconds)}{" "}
+                            <span className="text-slate-400">
+                              / {formatDuration(detail.durationSeconds)}
+                            </span>
+                          </span>
+                          <input
+                            className="timeline-range flex-1"
+                            aria-label="回放进度"
+                            type="range"
+                            min={0}
+                            max={Math.max(0, track.length - 1)}
+                            step={0.01}
+                            value={playbackPosition}
+                            disabled={detailRefreshing}
+                            aria-valuetext={`${formatDuration(elapsedSeconds)}，共 ${formatDuration(detail.durationSeconds)}`}
+                            style={{ "--progress": `${progress}%` } as CSSProperties}
+                            onChange={(event) => {
+                              setIsPlaying(false);
+                              seekPlayback(Number(event.target.value));
+                            }}
+                          />
+                          <PlaybackRateControl
+                            value={playbackRate}
+                            disabled={track.length <= 1 || detailRefreshing}
+                            onChange={setPlaybackRate}
+                          />
+                        </div>
+                        <div className="mt-4 flex items-end gap-6">
+                          <div className="w-[112px] pb-2">
+                            <p className="text-xs font-semibold text-slate-500">当前速度</p>
+                            <div className="mt-1 flex items-baseline gap-1">
+                              <strong className="text-[43px] leading-none font-[720] tracking-[-0.035em] text-[#172332]">
+                                {Math.round(activePoint?.speed ?? 0)}
+                              </strong>
+                              <span className="text-xs font-semibold text-slate-500">km/h</span>
+                            </div>
+                          </div>
+                          <SpeedChart
+                            track={track}
+                            playbackPosition={playbackPosition}
+                            onSeek={(position) => {
+                              setIsPlaying(false);
+                              seekPlayback(position);
+                            }}
+                          />
+                        </div>
+                        <SpeedZoneDistribution
+                          track={track}
+                          activeSpeed={activePoint?.speed ?? 0}
+                          onSeek={(position) => {
+                            setIsPlaying(false);
+                            seekPlayback(position);
+                          }}
+                        />
+                      </section>
+                    </>
+                  ) : (
+                    <section className="empty-month-panel" aria-live="polite">
+                      {rideDataLoading ? (
+                        <LoaderCircle size={22} className="animate-spin text-[#0a9f92]" />
+                      ) : (
+                        <CalendarDays size={22} />
+                      )}
+                      <div>
+                        <strong>
+                          {rideDataLoading
+                            ? rideDetailLoading
+                              ? "正在读取骑行轨迹"
+                              : `正在读取${formatMonth(month)}`
+                            : error
+                              ? "轨迹读取失败"
+                              : rides.length > 0
+                                ? "选择一条行程查看轨迹"
+                                : `${formatMonth(month)}没有行程`}
+                        </strong>
+                        <p>
+                          {rideDataLoading
+                            ? rideDetailLoading
+                              ? "正在读取所选行程的轨迹详情。"
+                              : "正在从九号账号读取这个月的骑行记录。"
+                            : error
+                              ? "读取失败，请检查网络后重新尝试。"
+                              : rides.length > 0
+                                ? "当前只加载了月度列表；选择左侧具体行程后才会读取 GPS 轨迹。"
+                                : "可以从左侧选择其他年份和月份继续查看。"}
+                        </p>
+                      </div>
+                      {!rideDataLoading && error && mode === "live" ? (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            void (currentRide
+                              ? selectRide(currentRide)
+                              : loadLiveData(month, vehicle, { refresh: true }))
+                          }
+                        >
+                          <RefreshCw size={14} />
+                          重新读取
+                        </button>
+                      ) : null}
+                    </section>
+                  )}
+                </>
               )}
-            </>
-          )}
+            </div>
+          </main>
         </div>
-      </main>
+      </div>
 
       {loginOpen ? (
         <LoginSheet
@@ -2005,6 +2226,7 @@ export default function App() {
           }}
           onPasswordSubmit={login}
           onRequestSmsCode={requestSmsCode}
+          onCancelSmsCode={cancelSmsCode}
           onSmsCodeSubmit={loginWithSmsCode}
           onClearError={() => setError(null)}
         />
@@ -2034,7 +2256,7 @@ export default function App() {
         rideCount={rideMonthSummary.rideCount}
         visibleRideCount={rideMonthSummary.visibleRideCount}
         verifiedSpeedCount={verifiedSpeedCount}
-        unresolvedCappedSpeedCount={unresolvedSpeedPlaceholderCount}
+        unreadSpeedCount={rides.length - verifiedSpeedCount}
         ridesTruncated={rideMonthSummary.ridesTruncated}
         onClose={() => {
           setMonthExportOpen(false);
@@ -2056,21 +2278,33 @@ export default function App() {
         }}
         onExport={exportYearSummary}
       />
-      <SecuritySheet
-        open={securityOpen}
-        busy={securityBusy}
-        error={securityError}
-        status={securityStatus}
-        profile={accountProfile}
-        profileError={accountProfileError}
-        onClose={() => {
-          setSecurityOpen(false);
-          setSecurityError(null);
-          setAccountProfileError(null);
-        }}
-        onRefresh={loadSecurityStatus}
-        onLogout={logout}
-      />
+      {securityOpen ? (
+        <SecuritySheet
+          open={securityOpen}
+          busy={securityBusy}
+          error={securityError}
+          status={securityStatus}
+          profile={accountProfile}
+          profileError={accountProfileError}
+          onClose={() => {
+            ++settingsRequest.current;
+            setSecurityBusy(false);
+            setSecurityOpen(false);
+            setSecurityError(null);
+            setAccountProfileError(null);
+          }}
+          onRefresh={loadSecurityStatus}
+          onLogout={logout}
+          accounts={savedAccounts}
+          onAddAccount={() => {
+            setSecurityOpen(false);
+            setError(null);
+            setLoginOpen(true);
+          }}
+          onSwitchAccount={switchAccount}
+          onRemoveAccount={removeAccount}
+        />
+      ) : null}
     </div>
   );
 }
@@ -2121,8 +2355,8 @@ interface MetricProps {
 
 const Metric = ({ label, value, unit }: MetricProps) => (
   <div className="min-w-0">
-    <p className="text-[11px] font-semibold text-slate-500">{label}</p>
-    <p className="mt-1 truncate text-[14px] font-[680] tabular-nums text-[#283645]">
+    <p className="metric-label text-[11px] font-semibold text-slate-500">{label}</p>
+    <p className="metric-reading mt-1 truncate text-[14px] font-[680] tabular-nums text-[#283645]">
       {value}
       {unit ? <span className="ml-1 text-[10px] font-semibold text-slate-500">{unit}</span> : null}
     </p>

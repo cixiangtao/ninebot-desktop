@@ -1,6 +1,13 @@
 import { writeFile } from "node:fs/promises";
 import { basename } from "node:path";
-import { BrowserWindow, dialog, ipcMain, type FileFilter, type SaveDialogOptions } from "electron";
+import {
+  BrowserWindow,
+  dialog,
+  ipcMain,
+  type FileFilter,
+  type SaveDialogOptions,
+  type WebContents,
+} from "electron";
 import { z } from "zod";
 import {
   ipcChannels,
@@ -16,18 +23,32 @@ import {
   type RideSpeedVerificationResult,
   type RuntimeSecurityStatus,
   type SmsCodeRequestStatus,
+  type SavedAccountsState,
   type VehicleLocationRead,
   type VehicleSnapshot,
   type VehicleSummary,
   type YearSummaryExportFormat,
 } from "../shared/contracts.js";
-import { NineCliClient, NineCliError } from "./ninecli.js";
+import {
+  isNinebotHumanVerificationError,
+  NinebotClientError,
+  type NinebotAppClient,
+} from "./app-client.js";
 import { createMonthSummaryExportDocument } from "./month-summary-export.js";
 import { createRideExportDocument } from "./ride-export.js";
 import { loadRideSpeedVerifications } from "./ride-speed-verification.js";
 import { createYearSummaryExportDocument } from "./year-summary-export.js";
+import {
+  emitRuntimeDiagnostic,
+  type ReadOperation,
+  type RuntimeDiagnosticObserver,
+} from "./runtime-diagnostics.js";
+import { SmsCodeFlow } from "./sms-verification.js";
+import { presentSmsVerification } from "./sms-verification-window.js";
 import { SessionReadCache } from "./session-read-cache.js";
-import { loadVehicleSnapshot } from "./vehicle-snapshot.js";
+import { loadVehicleSnapshot, type VehicleTelemetryReader } from "./vehicle-snapshot.js";
+import { type TravelReader } from "./travel-source.js";
+import { type VehicleReader } from "./vehicle-source.js";
 import {
   parseAccountProfile,
   parseRideDetail,
@@ -43,12 +64,15 @@ const passwordLoginSchema = z.object({
 });
 
 const smsCodeRequestSchema = z.object({
+  requestId: z.string().uuid().optional(),
   areaCode: z.string().regex(/^\d{1,4}$/),
   phone: z
     .string()
     .trim()
     .regex(/^\d{5,20}$/),
 });
+
+const smsCodeCancelSchema = z.object({ requestId: z.string().uuid() });
 
 const smsCodeLoginSchema = smsCodeRequestSchema.extend({
   code: z
@@ -83,7 +107,7 @@ const rideSpeedVerificationSchema = z.object({
   rideIds: z
     .array(z.string().regex(/^ride-\d+$/))
     .min(1)
-    .max(20)
+    .max(10_000)
     .refine((rideIds) => new Set(rideIds).size === rideIds.length),
 });
 
@@ -161,7 +185,9 @@ const monthSummaryExportSchema = z.object({
       mileageKm: z.number().finite().nonnegative(),
       durationSeconds: z.number().finite().nonnegative(),
       energyWh: z.number().finite().nonnegative().nullable(),
-      visibleRideCount: z.number().int().min(0).max(20),
+      // The upstream endpoint is paginated in batches of 20, but a month may contain
+      // many pages. Keep a generous safety bound while allowing the SDK to return all rows.
+      visibleRideCount: z.number().int().min(0).max(10_000),
       aggregateAvailable: z.boolean(),
       ridesTruncated: z.boolean(),
       activeDayCount: z.number().int().min(0).max(31).nullable(),
@@ -189,7 +215,7 @@ const monthSummaryExportSchema = z.object({
           dayMileageKm: z.number().finite().nonnegative().nullable(),
         }),
       )
-      .max(20)
+      .max(10_000)
       .refine((rides) => new Set(rides.map(({ id }) => id)).size === rides.length),
   }),
   speedVerifications: z
@@ -200,7 +226,7 @@ const monthSummaryExportSchema = z.object({
         sampledMaxSpeed: z.number().finite().nonnegative().nullable(),
       }),
     )
-    .max(20)
+    .max(10_000)
     .refine(
       (verifications) => new Set(verifications.map(({ id }) => id)).size === verifications.length,
     ),
@@ -234,7 +260,13 @@ const handleError = <T>(error: unknown): BridgeResult<T> => {
   if (error instanceof z.ZodError) {
     return fail({ code: "INVALID_INPUT", message: "输入内容格式不正确。" });
   }
-  if (error instanceof NineCliError) {
+  if (isNinebotHumanVerificationError(error)) {
+    return fail({
+      code: "HUMAN_VERIFICATION_REQUIRED",
+      message: "九号要求先完成人机验证；请在官方客户端完成验证后再重试。",
+    });
+  }
+  if (error instanceof NinebotClientError) {
     const code =
       error.kind === "missing"
         ? "NINECLI_MISSING"
@@ -253,7 +285,43 @@ const handleError = <T>(error: unknown): BridgeResult<T> => {
 };
 
 /** Registers the complete renderer-facing domain bridge. */
-export const registerIpcHandlers = (client: NineCliClient) => {
+export const registerIpcHandlers = (
+  client: NinebotAppClient,
+  telemetryReader: VehicleTelemetryReader = client,
+  travelReader: TravelReader = client,
+  vehicleReader: VehicleReader = client,
+  diagnostics: {
+    onDiagnostic?: RuntimeDiagnosticObserver;
+    now?: () => number;
+    smsVerificationPresenter?: (owner: WebContents, signal: AbortSignal) => Promise<string | null>;
+  } = {},
+) => {
+  const smsFlow = new SmsCodeFlow({
+    requestCode: (phone, areaCode, validate, signal) =>
+      client.requestSmsCode(phone, areaCode, validate, signal),
+    canVerify: client.supportsSmsVerification === true,
+  });
+  const verificationOwners = new WeakSet<WebContents>();
+  const presentVerification = diagnostics.smsVerificationPresenter ?? presentSmsVerification;
+  const emit = (event: Parameters<RuntimeDiagnosticObserver>[0]) =>
+    emitRuntimeDiagnostic(diagnostics.onDiagnostic, event);
+  const handleRead = <T>(
+    channel: string,
+    operation: ReadOperation,
+    handler: (...args: unknown[]) => Promise<BridgeResult<T>>,
+  ) => {
+    ipcMain.handle(channel, async (...args) => {
+      emit({ category: "read", operation, outcome: "started" });
+      try {
+        const result = await handler(...args);
+        emit({ category: "read", operation, outcome: result.ok ? "completed" : "failed" });
+        return result;
+      } catch (error) {
+        emit({ category: "read", operation, outcome: "failed" });
+        throw error;
+      }
+    });
+  };
   const serialNumbers = new Map<string, string>();
   const travelIds = new Map<
     string,
@@ -261,9 +329,15 @@ export const registerIpcHandlers = (client: NineCliClient) => {
   >();
   const rideIdsByUpstream = new Map<string, string>();
   let rideSequence = 0;
-  const snapshotCache = new SessionReadCache<VehicleSnapshot>();
-  const rideMonthCache = new SessionReadCache<RideMonth>();
-  const rideDetailCache = new SessionReadCache<RideDetail>();
+  const snapshotCache = new SessionReadCache<VehicleSnapshot>(diagnostics.now, (outcome) =>
+    emit({ category: "cache", operation: "snapshot", outcome }),
+  );
+  const rideMonthCache = new SessionReadCache<RideMonth>(diagnostics.now, (outcome) =>
+    emit({ category: "cache", operation: "ride-month", outcome }),
+  );
+  const rideDetailCache = new SessionReadCache<RideDetail>(diagnostics.now, (outcome) =>
+    emit({ category: "cache", operation: "ride-detail", outcome }),
+  );
   const readRideDetail = (
     vehicleId: string,
     rideId: string,
@@ -276,7 +350,11 @@ export const registerIpcHandlers = (client: NineCliClient) => {
       `${vehicleId}\0${rideId}`,
       rideDetailCacheTtlMs,
       async () =>
-        parseRideDetail(await client.rideDetail(serialNumber, travelId), rideId, dayMileageKm),
+        parseRideDetail(
+          await travelReader.rideDetail(serialNumber, travelId),
+          rideId,
+          dayMileageKm,
+        ),
       refresh,
     );
   const clearReadCaches = () => {
@@ -284,13 +362,70 @@ export const registerIpcHandlers = (client: NineCliClient) => {
     rideMonthCache.clear();
     rideDetailCache.clear();
   };
+  let accountGeneration = 0;
+  const clearSessionState = (resetRideSequence = false) => {
+    if (resetRideSequence) accountGeneration += 1;
+    telemetryReader.clear?.();
+    travelReader.clear?.();
+    vehicleReader.clear?.();
+    serialNumbers.clear();
+    travelIds.clear();
+    rideIdsByUpstream.clear();
+    clearReadCaches();
+    if (resetRideSequence) rideSequence = 0;
+  };
+
+  const handleSessionReadError = <T>(error: unknown): BridgeResult<T> => {
+    const result = handleError<T>(error);
+    if (!result.ok && result.error.code === "AUTH_REQUIRED") clearSessionState(true);
+    return result;
+  };
+
+  ipcMain.handle(ipcChannels.accountsList, async (): Promise<BridgeResult<SavedAccountsState>> => {
+    try {
+      return ok(
+        client.accounts
+          ? await client.accounts.list()
+          : { supported: false, activeId: null, accounts: [] },
+      );
+    } catch (error) {
+      return handleError(error);
+    }
+  });
+  for (const [channel, operation] of [
+    [ipcChannels.accountsSwitch, "switch"],
+    [ipcChannels.accountsRemove, "remove"],
+  ] as const) {
+    ipcMain.handle(
+      channel,
+      async (_event, input: unknown): Promise<BridgeResult<SavedAccountsState>> => {
+        try {
+          const { id } = z.object({ id: z.string().uuid() }).parse(input);
+          if (!client.accounts)
+            throw new NinebotClientError("当前运行版本暂不支持多账号。", "unsupported");
+          smsFlow.cancelAll();
+          const before = await client.accounts.list();
+          if (operation === "switch" || before.activeId === id) clearSessionState(true);
+          const result = await client.accounts[operation](id);
+          if (before.activeId !== result.activeId || operation === "switch")
+            clearSessionState(true);
+          return ok(result);
+        } catch (error) {
+          return handleError(error);
+        }
+      },
+    );
+  }
 
   ipcMain.handle(ipcChannels.authStatus, async (): Promise<BridgeResult<AuthStatus>> => {
     try {
       await client.whoami();
       return ok({ connected: true });
     } catch (error) {
-      if (error instanceof NineCliError && error.kind === "auth") return ok({ connected: false });
+      if (error instanceof NinebotClientError && error.kind === "auth") {
+        clearSessionState(true);
+        return ok({ connected: false });
+      }
       return handleError(error);
     }
   });
@@ -299,7 +434,7 @@ export const registerIpcHandlers = (client: NineCliClient) => {
     try {
       return ok(parseAccountProfile(await client.whoami()));
     } catch (error) {
-      return handleError(error);
+      return handleSessionReadError(error);
     }
   });
 
@@ -308,7 +443,9 @@ export const registerIpcHandlers = (client: NineCliClient) => {
     async (_event, input: unknown): Promise<BridgeResult<AuthStatus>> => {
       try {
         const { areaCode, user, password } = passwordLoginSchema.parse(input);
+        smsFlow.cancelAll();
         await client.login(user, areaCode, password);
+        clearSessionState(true);
         return ok({ connected: true });
       } catch (error) {
         return handleError(error);
@@ -318,11 +455,36 @@ export const registerIpcHandlers = (client: NineCliClient) => {
 
   ipcMain.handle(
     ipcChannels.requestSmsCode,
-    async (_event, input: unknown): Promise<BridgeResult<SmsCodeRequestStatus>> => {
+    async (event, input: unknown): Promise<BridgeResult<SmsCodeRequestStatus>> => {
       try {
-        const { areaCode, phone } = smsCodeRequestSchema.parse(input);
-        await client.requestSmsCode(phone, areaCode);
-        return ok({ sent: true });
+        const { phone, areaCode, requestId } = smsCodeRequestSchema.parse(input);
+        const request = { phone, areaCode, ...(requestId === undefined ? {} : { requestId }) };
+        const owner = event.sender;
+        const ownerId = owner.id;
+        if (!verificationOwners.has(owner)) {
+          verificationOwners.add(owner);
+          owner.once("destroyed", () => smsFlow.cancel(ownerId));
+          owner.on("render-process-gone", () => smsFlow.cancel(ownerId));
+          owner.on("did-start-navigation", (_event, _url, isInPlace, isMainFrame) => {
+            if (isMainFrame && !isInPlace) smsFlow.cancel(ownerId);
+          });
+        }
+        return ok(
+          await smsFlow.request(ownerId, request, (signal) => presentVerification(owner, signal)),
+        );
+      } catch (error) {
+        return handleError(error);
+      }
+    },
+  );
+
+  ipcMain.handle(
+    ipcChannels.cancelSmsCode,
+    async (event, input: unknown): Promise<BridgeResult<{ cancelled: true }>> => {
+      try {
+        const { requestId } = smsCodeCancelSchema.parse(input);
+        smsFlow.cancel(event.sender.id, requestId);
+        return ok({ cancelled: true });
       } catch (error) {
         return handleError(error);
       }
@@ -334,7 +496,9 @@ export const registerIpcHandlers = (client: NineCliClient) => {
     async (_event, input: unknown): Promise<BridgeResult<AuthStatus>> => {
       try {
         const { areaCode, phone, code } = smsCodeLoginSchema.parse(input);
+        smsFlow.cancelAll();
         await client.loginWithSmsCode(phone, areaCode, code);
+        clearSessionState(true);
         return ok({ connected: true });
       } catch (error) {
         return handleError(error);
@@ -344,11 +508,9 @@ export const registerIpcHandlers = (client: NineCliClient) => {
 
   ipcMain.handle(ipcChannels.authLogout, async (): Promise<BridgeResult<AuthStatus>> => {
     try {
+      smsFlow.cancelAll();
       await client.logout();
-      serialNumbers.clear();
-      travelIds.clear();
-      rideIdsByUpstream.clear();
-      clearReadCaches();
+      clearSessionState(true);
       return ok({ connected: false });
     } catch (error) {
       return handleError(error);
@@ -366,26 +528,28 @@ export const registerIpcHandlers = (client: NineCliClient) => {
     },
   );
 
-  ipcMain.handle(ipcChannels.listVehicles, async (): Promise<BridgeResult<VehicleSummary[]>> => {
-    try {
-      const vehicles = parseVehicles(await client.vehicles());
-      serialNumbers.clear();
-      travelIds.clear();
-      rideIdsByUpstream.clear();
-      clearReadCaches();
-      const summaries = vehicles.map(({ serialNumber, ...vehicle }, index) => {
-        const id = `vehicle-${index + 1}`;
-        serialNumbers.set(id, serialNumber);
-        return { id, ...vehicle };
-      });
-      return ok(summaries);
-    } catch (error) {
-      return handleError(error);
-    }
-  });
+  handleRead(
+    ipcChannels.listVehicles,
+    "vehicles",
+    async (): Promise<BridgeResult<VehicleSummary[]>> => {
+      try {
+        const vehicles = parseVehicles(await vehicleReader.vehicles());
+        clearSessionState();
+        const summaries = vehicles.map(({ serialNumber, ...vehicle }, index) => {
+          const id = `vehicle-${index + 1}`;
+          serialNumbers.set(id, serialNumber);
+          return { id, ...vehicle };
+        });
+        return ok(summaries);
+      } catch (error) {
+        return handleSessionReadError(error);
+      }
+    },
+  );
 
-  ipcMain.handle(
+  handleRead(
     ipcChannels.getVehicleSnapshot,
+    "snapshot",
     async (_event, input: unknown): Promise<BridgeResult<VehicleSnapshot>> => {
       try {
         const { vehicleId, refresh } = vehicleSnapshotSchema.parse(input);
@@ -397,12 +561,12 @@ export const registerIpcHandlers = (client: NineCliClient) => {
           await snapshotCache.read(
             vehicleId,
             snapshotCacheTtlMs,
-            () => loadVehicleSnapshot(client, serialNumber),
+            () => loadVehicleSnapshot(telemetryReader, serialNumber),
             refresh,
           ),
         );
       } catch (error) {
-        return handleError(error);
+        return handleSessionReadError(error);
       }
     },
   );
@@ -416,15 +580,16 @@ export const registerIpcHandlers = (client: NineCliClient) => {
         if (!serialNumber) {
           return fail({ code: "INVALID_INPUT", message: "车辆已失效，请刷新车辆列表。" });
         }
-        return ok(parseVehicleLocationRead(await client.vehicleStatus(serialNumber)));
+        return ok(parseVehicleLocationRead(await telemetryReader.vehicleStatus(serialNumber)));
       } catch (error) {
-        return handleError(error);
+        return handleSessionReadError(error);
       }
     },
   );
 
-  ipcMain.handle(
+  handleRead(
     ipcChannels.listRides,
+    "ride-month",
     async (_event, input: unknown): Promise<BridgeResult<RideMonth>> => {
       try {
         const { vehicleId, month, refresh } = rideListSchema.parse(input);
@@ -436,7 +601,10 @@ export const registerIpcHandlers = (client: NineCliClient) => {
             `${vehicleId}\0${month}`,
             rideMonthCacheTtlMs,
             async () => {
-              const parsedMonth = parseRideMonth(await client.rides(serialNumber, month), month);
+              const parsedMonth = parseRideMonth(
+                await travelReader.rides(serialNumber, month),
+                month,
+              );
               const summaries = parsedMonth.rides.map(({ travelId, ...ride }) => {
                 const upstreamKey = `${serialNumber}\0${travelId}`;
                 const existingId = rideIdsByUpstream.get(upstreamKey);
@@ -453,13 +621,14 @@ export const registerIpcHandlers = (client: NineCliClient) => {
           ),
         );
       } catch (error) {
-        return handleError(error);
+        return handleSessionReadError(error);
       }
     },
   );
 
-  ipcMain.handle(
+  handleRead(
     ipcChannels.getRideDetail,
+    "ride-detail",
     async (_event, input: unknown): Promise<BridgeResult<RideDetail>> => {
       try {
         const { vehicleId, rideId, refresh } = rideDetailInputSchema.parse(input);
@@ -479,7 +648,7 @@ export const registerIpcHandlers = (client: NineCliClient) => {
           ),
         );
       } catch (error) {
-        return handleError(error);
+        return handleSessionReadError(error);
       }
     },
   );
@@ -497,21 +666,26 @@ export const registerIpcHandlers = (client: NineCliClient) => {
         if (rides.some(({ ride }) => !ride || ride.serialNumber !== serialNumber)) {
           return fail({ code: "INVALID_INPUT", message: "行程已失效，请重新选择月份。" });
         }
+        const generation = accountGeneration;
         const batch = await loadRideSpeedVerifications(rideIds, async (rideId) => {
+          if (generation !== accountGeneration)
+            throw new NinebotClientError("账号已切换，请重新读取数据。", "upstream");
           const ride = travelIds.get(rideId);
           if (!ride || ride.serialNumber !== serialNumber) {
             throw new Error("Ride mapping changed during speed verification");
           }
           return readRideDetail(vehicleId, rideId, serialNumber, ride.travelId, ride.dayMileageKm);
         });
+        if (generation !== accountGeneration)
+          throw new NinebotClientError("账号已切换，请重新读取数据。", "upstream");
         const fatalFailure = batch.failures.find(
-          ({ error }) => error instanceof NineCliError && error.kind !== "upstream",
+          ({ error }) => error instanceof NinebotClientError && error.kind !== "upstream",
         );
         if (fatalFailure) throw fatalFailure.error;
         if (batch.rides.length === 0 && batch.failures[0]) throw batch.failures[0].error;
         return ok({ rides: batch.rides, failedRideCount: batch.failures.length });
       } catch (error) {
-        return handleError(error);
+        return handleSessionReadError(error);
       }
     },
   );
@@ -536,7 +710,7 @@ export const registerIpcHandlers = (client: NineCliClient) => {
         await writeFile(selection.filePath, document.content, { encoding: "utf8", mode: 0o600 });
         return ok({ saved: true, fileName: basename(selection.filePath) });
       } catch (error) {
-        return handleError(error);
+        return handleSessionReadError(error);
       }
     },
   );
@@ -569,7 +743,7 @@ export const registerIpcHandlers = (client: NineCliClient) => {
         await writeFile(selection.filePath, document.content, { encoding: "utf8", mode: 0o600 });
         return ok({ saved: true, fileName: basename(selection.filePath) });
       } catch (error) {
-        return handleError(error);
+        return handleSessionReadError(error);
       }
     },
   );
@@ -594,7 +768,7 @@ export const registerIpcHandlers = (client: NineCliClient) => {
         await writeFile(selection.filePath, document.content, { encoding: "utf8", mode: 0o600 });
         return ok({ saved: true, fileName: basename(selection.filePath) });
       } catch (error) {
-        return handleError(error);
+        return handleSessionReadError(error);
       }
     },
   );

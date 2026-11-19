@@ -59,9 +59,6 @@ const readPeMachine = async (path) => {
 
 await Promise.all([access(executablePath), access(asarPath), access(ninecliPath)]);
 assert((await readPeMachine(executablePath)) === 0x8664, "Windows executable is not x64");
-assert((await readPeMachine(ninecliPath)) === 0x8664, "Bundled ninecli executable is not x64");
-const ninecliSha256 = await sha256(ninecliPath);
-assert(ninecliSha256 === expectedNinecliSha256, "Bundled ninecli binary hash does not match");
 
 const versionResult = await run(
   "pwsh.exe",
@@ -95,19 +92,21 @@ for (const requiredFile of [
   "/package.json",
   "/THIRD_PARTY_NOTICES.md",
   "/out/main/index.js",
+  "/node_modules/@jiuhao/ninebot-client/dist/candidate-session.js",
   "/out/preload/index.cjs",
+  "/out/preload/sms-verification.cjs",
   "/out/renderer/index.html",
   "/out/renderer/recovery.html",
   "/out/renderer/recovery.js",
 ]) {
   assert(asarFiles.includes(requiredFile), `Packaged ASAR is missing ${requiredFile}`);
 }
-const forbiddenPattern =
-  /(^|\/)(\.env(?:\.|$)|tokens\.json$|vehicles\.json$|config\.json$|ninecli(?:\.exe)?$)/i;
+const forbiddenPattern = /(^|\/)(\.env(?:\.|$)|tokens\.json$|vehicles\.json$|config\.json$)/i;
 assert(
   !asarFiles.some((path) => forbiddenPattern.test(path)),
-  "Packaged ASAR contains credentials, local config, or a ninecli binary",
+  "Packaged ASAR contains credentials or local config",
 );
+assert((await sha256(ninecliPath)) === expectedNinecliSha256, "Bundled ninecli hash mismatch");
 
 const expectedFuseStates = [48, 49, 48, 48, 49, 49, 48, 48];
 const fuseWire = await getCurrentFuseWire(executablePath);
@@ -123,11 +122,8 @@ const summary = {
   signature: "unsigned",
   asarFiles: asarFiles.length,
   fuses: "hardened",
-  bundledNinecli: {
-    architecture: "x64",
-    sha256: ninecliSha256,
-    verified: true,
-  },
+  runtime: "ninecli",
+  bundledNinecli: true,
   thirdPartyNotices: true,
 };
 

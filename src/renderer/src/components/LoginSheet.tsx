@@ -1,5 +1,5 @@
 import { LoaderCircle, LockKeyhole, MessageSquareText, X } from "lucide-react";
-import { useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import type {
   PasswordLoginInput,
   SmsCodeLoginInput,
@@ -15,11 +15,12 @@ interface LoginSheetProps {
   onClose: () => void;
   onPasswordSubmit: (input: PasswordLoginInput) => Promise<void>;
   onRequestSmsCode: (input: SmsCodeRequestInput) => Promise<boolean>;
+  onCancelSmsCode: (requestId: string) => void;
   onSmsCodeSubmit: (input: SmsCodeLoginInput) => Promise<void>;
   onClearError: () => void;
 }
 
-/** Provides password login and the non-bypassing two-step ninecli SMS flow. */
+/** Provides password login and the non-bypassing two-step SMS flow. */
 export const LoginSheet = ({
   open,
   busy,
@@ -27,6 +28,7 @@ export const LoginSheet = ({
   onClose,
   onPasswordSubmit,
   onRequestSmsCode,
+  onCancelSmsCode,
   onSmsCodeSubmit,
   onClearError,
 }: LoginSheetProps) => {
@@ -38,6 +40,27 @@ export const LoginSheet = ({
   const [code, setCode] = useState("");
   const [codeSent, setCodeSent] = useState(false);
   const [cooldownSeconds, setCooldownSeconds] = useState(0);
+  const smsRequestGeneration = useRef(0);
+  const activeSmsRequest = useRef<string | null>(null);
+  const cancelSms = useCallback(() => {
+    const requestId = activeSmsRequest.current;
+    activeSmsRequest.current = null;
+    if (requestId) onCancelSmsCode(requestId);
+  }, [onCancelSmsCode]);
+  const invalidateSms = useCallback(() => {
+    smsRequestGeneration.current += 1;
+    cancelSms();
+    setCodeSent(false);
+    setCode("");
+  }, [cancelSms]);
+
+  useEffect(
+    () => () => {
+      smsRequestGeneration.current += 1;
+      cancelSms();
+    },
+    [cancelSms],
+  );
 
   useEffect(() => {
     if (!open || cooldownSeconds <= 0) return;
@@ -48,6 +71,9 @@ export const LoginSheet = ({
   if (!open) return null;
 
   const changeMode = (nextMode: LoginMode) => {
+    if (nextMode === mode) return;
+    invalidateSms();
+    setPassword("");
     setMode(nextMode);
     onClearError();
   };
@@ -59,8 +85,14 @@ export const LoginSheet = ({
   };
 
   const requestCode = async () => {
-    const sent = await onRequestSmsCode({ areaCode, phone });
-    if (!sent) return;
+    cancelSms();
+    const generation = ++smsRequestGeneration.current;
+    const requestId = crypto.randomUUID();
+    activeSmsRequest.current = requestId;
+    const sent = await onRequestSmsCode({ areaCode, phone, requestId });
+    if (activeSmsRequest.current === requestId) activeSmsRequest.current = null;
+    // A result belongs only to the same still-active form and SMS destination.
+    if (!sent || generation !== smsRequestGeneration.current) return;
     setCodeSent(true);
     setCooldownSeconds(60);
   };
@@ -101,11 +133,20 @@ export const LoginSheet = ({
               连接九号账号
             </h2>
             <p className="mt-2 max-w-[42ch] text-sm leading-6 text-slate-600">
-              凭据只传给本机固定版本且通过哈希校验的
-              ninecli。客户端仅查询车辆状态、电池信息和骑行记录，不包含车辆控制能力。
+              凭据通过加密连接提交给九号。认证成功后，本机会保存登录令牌以便下次恢复连接。
+              客户端不包含车辆控制能力。
             </p>
           </div>
-          <button className="icon-button" type="button" onClick={onClose} aria-label="关闭登录">
+          <button
+            className="icon-button"
+            type="button"
+            onClick={() => {
+              invalidateSms();
+              setPassword("");
+              onClose();
+            }}
+            aria-label="关闭登录"
+          >
             <X size={18} />
           </button>
         </div>
@@ -156,7 +197,13 @@ export const LoginSheet = ({
                 required
               />
             </label>
-            <CountryCodeField areaCode={areaCode} onChange={setAreaCode} />
+            <CountryCodeField
+              areaCode={areaCode}
+              onChange={(value) => {
+                setAreaCode(value);
+                invalidateSms();
+              }}
+            />
             <LoginError message={error} />
             <button className="primary-button mt-2 w-full" type="submit" disabled={busy}>
               {busy ? <LoaderCircle size={18} className="animate-spin" /> : null}
@@ -174,7 +221,7 @@ export const LoginSheet = ({
                   value={phone}
                   onChange={(event) => {
                     setPhone(event.target.value.replace(/\D/g, ""));
-                    setCodeSent(false);
+                    invalidateSms();
                   }}
                   autoComplete="tel"
                   inputMode="tel"
@@ -215,13 +262,12 @@ export const LoginSheet = ({
               areaCode={areaCode}
               onChange={(nextAreaCode) => {
                 setAreaCode(nextAreaCode);
-                setCodeSent(false);
-                setCode("");
+                invalidateSms();
               }}
             />
             {codeSent && !error ? (
               <p className="login-sms-success" role="status">
-                验证码请求已发送，请查看短信。验证码只会提交给本机 ninecli。
+                验证码请求已发送，请查看短信。验证码将提交给九号完成认证。
               </p>
             ) : null}
             <LoginError message={error} />
@@ -238,9 +284,8 @@ export const LoginSheet = ({
 
         <p className="login-warning mt-4 text-xs leading-5 text-slate-500">
           {mode === "password"
-            ? "注意：密码会在登录瞬间作为本地子进程参数传递，但不会写入本项目或渲染层日志。"
-            : "短信发送可能触发网易易盾人机验证；ninecli 0.1.7 无法完成该挑战，客户端不会尝试绕过，并会提示改用密码登录。"}{" "}
-          ninecli 0.1.7 是非官方、未完整开源的逆向工具。
+            ? "注意：密码只在登录调用期间保留在本机内存，不会写入磁盘或渲染层日志。"
+            : "短信或密码登录都可能触发人机验证。当前客户端暂不支持完成该验证，请使用九号官方客户端登录。"}
         </p>
       </section>
     </div>

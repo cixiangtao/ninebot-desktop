@@ -1,58 +1,39 @@
 import type { RideSpeedVerification, RideSummary } from "../../../shared/contracts";
-import { isLikelyCappedMaxSpeedDeclaration } from "../lib/format";
+import { resolveTrackPeakSpeed } from "../../../shared/ride-speed";
 
 interface RideSpeedReadingProps {
   ride: RideSummary;
   verification: RideSpeedVerification | null;
 }
 
-/**
- * Displays a ride-list maximum only when its source is trustworthy enough to identify.
- *
- * Ninebot can return 25 km/h as a historical month-row placeholder. Until a trail sample
- * confirms or contradicts it, the numeric value stays hidden instead of posing as a real peak.
- */
+/** Summary speed stays reference-only; a number here always means a loaded track peak. */
 export const RideSpeedReading = ({ ride, verification }: RideSpeedReadingProps) => {
-  const sampled = verification?.sampledMaxSpeed ?? null;
+  const peak = resolveTrackPeakSpeed(verification?.sampledMaxSpeed ?? null);
+  const source = verification === null ? "unread" : peak === null ? "unavailable" : "track";
   const declared = verification?.declaredMaxSpeed ?? ride.declaredMaxSpeed;
-  const unresolvedPlaceholder = sampled === null && declared === 25;
-  const displayed = unresolvedPlaceholder ? null : (sampled ?? declared);
-  const corrected = isLikelyCappedMaxSpeedDeclaration(sampled, declared);
-  const source = unresolvedPlaceholder
-    ? "placeholder"
-    : verification
-      ? "track"
-      : declared === null
-        ? "unavailable"
-        : "summary";
-  const status = unresolvedPlaceholder
-    ? verification
-      ? "无轨迹"
-      : "待校验"
-    : verification
-      ? corrected
-        ? "已纠正"
-        : sampled !== null
-          ? "轨迹"
-          : "摘要"
-      : declared === null
-        ? "无摘要"
-        : "摘要";
-  const accessibleLabel = unresolvedPlaceholder
-    ? verification
-      ? "最高速度无法校验，轨迹没有速度采样，接口摘要25公里每小时未采用"
-      : "最高速度待校验，接口摘要25公里每小时未采用"
-    : `最高速度${displayed === null ? "不可用" : `${Math.round(displayed)}公里每小时`}，${status}`;
-
+  const reference =
+    declared === null ? "接口未提供速度记录" : `接口极速 ${declared} km/h，仅供参考`;
+  const description =
+    source === "unread"
+      ? `轨迹峰值未读取；列表会自动读取附近行程，失败时可使用补全功能重试。${reference}。`
+      : peak === null
+        ? `轨迹峰值不可用：详情未提供有效速度采样。${reference}。`
+        : `轨迹峰值 ${Math.round(peak)} km/h，取自返回的轨迹速度采样最大值。${reference}。`;
   return (
     <span
-      className={`ride-speed-reading ${corrected ? "ride-speed-reading-corrected" : ""}`}
+      className="ride-speed-reading"
       data-source={source}
-      aria-label={accessibleLabel}
+      aria-label={description}
+      title={description}
     >
-      <strong>{displayed === null ? "—" : Math.round(displayed)}</strong>
-      <small>km/h</small>
-      <em>{status}</em>
+      {peak === null ? (
+        <strong className="ride-speed-unavailable">—</strong>
+      ) : (
+        <>
+          <strong>{Math.round(peak)}</strong>
+          <small>km/h</small>
+        </>
+      )}
     </span>
   );
 };

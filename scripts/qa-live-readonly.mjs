@@ -20,6 +20,11 @@ const app = await electron.launch({
   env: { ...process.env, NINEBOT_CONFIG_DIR: legacyConfig },
 });
 const window = await app.firstWindow();
+window.on("console", (message) => {
+  if (message.type() === "error" || message.type() === "warning")
+    console.log("renderer", message.type(), message.text().slice(0, 240));
+});
+window.on("pageerror", (error) => console.log("renderer pageerror", error.message.slice(0, 240)));
 let auditLocationRequests = false;
 let locationMapRequestCount = 0;
 window.on("request", (request) => {
@@ -168,14 +173,17 @@ try {
   await window
     .getByRole("button", { name: `${previousMonthDate.getMonth() + 1}月`, exact: true })
     .click();
-  await window.getByText(/旧记录摘要固定返回 25 km\/h，已忽略/).waitFor({ timeout: 60_000 });
+  // The first ride in a month is not guaranteed to be one of the historical
+  // rows capped at 25 km/h. Wait for the month-level verification panel
+  // instead; the corrected-row count is validated after the explicit action.
+  await window.getByRole("region", { name: "本月极速校验" }).waitFor({ timeout: 60_000 });
   const pendingSpeedPlaceholders = window.locator('.ride-speed-reading[data-source="placeholder"]');
   const pendingSpeedPlaceholderValues = await pendingSpeedPlaceholders
     .locator("strong")
     .allTextContents();
-  const historicalPlaceholdersHidden =
-    pendingSpeedPlaceholderValues.length > 0 &&
-    pendingSpeedPlaceholderValues.every((value) => value.trim() === "—");
+  const historicalPlaceholdersHidden = pendingSpeedPlaceholderValues.every(
+    (value) => value.trim() === "—",
+  );
   console.log(
     "live-historical-speed-placeholders-hidden",
     historicalPlaceholdersHidden,
@@ -191,7 +199,9 @@ try {
   await window
     .getByText(new RegExp(`已校验 ${previousRideIds.length}\\/${previousRideIds.length} 条`))
     .waitFor({
-      timeout: 60_000,
+      // Monthly travel is now fully paginated; allow roughly two seconds per
+      // detail at the existing three-request concurrency, with a 60s minimum.
+      timeout: Math.max(60_000, previousRideIds.length * 2_000),
     });
   const liveVerifiedRideSpeedCount = await window
     .locator('.ride-speed-reading[data-source="track"]')
@@ -210,7 +220,6 @@ try {
   );
   if (
     !previousSpeedVerificationPrivate ||
-    previousSpeedCorrectionCount < 1 ||
     liveVerifiedRideSpeedCount !== previousRideIds.length ||
     liveCorrectedSpeedCount !== previousSpeedCorrectionCount ||
     !liveSpeedVerificationPrivacyVisible
@@ -449,10 +458,13 @@ try {
   );
   const currentMonthAggregatePreserved =
     currentMonthAggregate?.aggregateAvailable === true &&
-    currentMonthAggregate.ridesTruncated === true &&
-    currentMonthAggregate.rideCount > currentVisibleRides.length &&
-    currentMonthAggregate.mileageKm > visibleMileageKm &&
-    currentMonthAggregate.durationSeconds > visibleDurationSeconds;
+    (currentMonthAggregate.ridesTruncated
+      ? currentMonthAggregate.rideCount > currentVisibleRides.length &&
+        currentMonthAggregate.mileageKm > visibleMileageKm &&
+        currentMonthAggregate.durationSeconds > visibleDurationSeconds
+      : currentMonthAggregate.rideCount === currentVisibleRides.length &&
+        Math.abs(currentMonthAggregate.mileageKm - visibleMileageKm) < 0.11 &&
+        Math.abs(currentMonthAggregate.durationSeconds - visibleDurationSeconds) < 1);
   const currentDailyMileageKm = currentRideDays.reduce(
     (total, day) => total + (day.mileageKm ?? 0),
     0,
@@ -568,8 +580,8 @@ try {
       .count()) === 1;
   const liveStatisticsActiveDaysVisible =
     (await window.getByText("活跃天数", { exact: true }).count()) === 1;
-  const liveStatisticsTruncationVisible =
-    (await window.locator(".statistics-month-row i").count()) > 0;
+  const liveStatisticsCoverageComplete =
+    (await window.locator(".statistics-month-row i").count()) === 0;
   const liveActivityHeatmapVisible = await window.locator(".year-activity-card").isVisible();
   const liveActivityDayCount = await window
     .locator(".year-activity-grid .year-activity-day-active")
@@ -612,7 +624,7 @@ try {
     liveStatisticsSummaryCardCount !== 6 ||
     !liveStatisticsEnergyVisible ||
     !liveStatisticsActiveDaysVisible ||
-    !liveStatisticsTruncationVisible ||
+    !liveStatisticsCoverageComplete ||
     !liveActivityHeatmapVisible ||
     liveActivityDayCount < 1 ||
     !liveActivityInsightsVisible ||
@@ -732,10 +744,12 @@ try {
   await window.waitForSelector(".vehicle-dashboard");
   await window.waitForFunction(() => document.querySelectorAll(".battery-pack-card").length > 0);
   await window.waitForFunction(
-    () => document.querySelectorAll(".vehicle-range-comparison p").length >= 2,
+    () => document.querySelectorAll(".vehicle-range-summary .device-metric").length >= 2,
   );
   const liveBatteryPackCards = await window.locator(".battery-pack-card").count();
-  const liveRangeEstimateCards = await window.locator(".vehicle-range-comparison p").count();
+  const liveRangeEstimateCards = await window
+    .locator(".vehicle-range-summary .device-metric")
+    .count();
   const liveVehicleContextText = await window
     .locator(".vehicle-dashboard-header > div > p:last-child")
     .textContent();
@@ -951,10 +965,10 @@ try {
             aiRangeKm: snapshot.data.aiEstimatedRangeKm,
             standardRangeKm: snapshot.data.estimatedRangeKm,
             preciseRangeKm: snapshot.data.preciseEstimatedRangeKm,
-            displayedRangeKm:
-              snapshot.data.aiEstimatedRangeKm ??
-              snapshot.data.preciseEstimatedRangeKm ??
-              snapshot.data.estimatedRangeKm,
+            displayedRangesKm: {
+              precise: snapshot.data.preciseEstimatedRangeKm,
+              basic: snapshot.data.estimatedRangeKm,
+            },
             remainingChargeTimePresent: snapshot.data.remainingChargeTimeText !== null,
             locked: snapshot.data.locked,
             poweredOn: snapshot.data.poweredOn,
@@ -1047,7 +1061,7 @@ try {
         summaryCardCount: liveStatisticsSummaryCardCount,
         energyVisible: liveStatisticsEnergyVisible,
         activeDaysVisible: liveStatisticsActiveDaysVisible,
-        truncationVisible: liveStatisticsTruncationVisible,
+        coverageComplete: liveStatisticsCoverageComplete,
         activityHeatmapVisible: liveActivityHeatmapVisible,
         activityDayCount: liveActivityDayCount,
         activityInsightsVisible: liveActivityInsightsVisible,

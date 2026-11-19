@@ -1,3 +1,5 @@
+import { parseTrail } from "@jiuhao/ninebot-client/track";
+export { parseTrail } from "@jiuhao/ninebot-client/track";
 import type {
   AccountProfile,
   BatteryPackSummary,
@@ -5,7 +7,6 @@ import type {
   RideDetail,
   RideMonth,
   RideSummary,
-  TrackPoint,
   VehicleLocation,
   VehicleLocationRead,
   VehicleSnapshot,
@@ -25,6 +26,28 @@ export interface ParsedRide extends Omit<RideSummary, "id"> {
 const asRecord = (value: unknown): JsonRecord | null => {
   if (value === null || typeof value !== "object" || Array.isArray(value)) return null;
   return value as JsonRecord;
+};
+
+/**
+ * Unwraps a telemetry business envelope while preserving the raw ninecli shape.
+ *
+ * The candidate Node client returns `{ code, data, desc, ... }`; status data is
+ * currently a one-item array while battery data is an object. The renderer
+ * parser consumes one vehicle record, so only the first status object is used.
+ */
+const unwrapTelemetryPayload = (value: unknown) => {
+  const record = asRecord(value);
+  if (!record || !("data" in record) || !("code" in record || "desc" in record)) return record;
+  const data = record.data;
+  if (Array.isArray(data)) return asRecord(data[0]);
+  return asRecord(data);
+};
+
+/** Unwraps the business envelope emitted by the travel candidate codec. */
+const unwrapTravelPayload = (value: unknown) => {
+  const record = asRecord(value);
+  const nested = asRecord(record?.data);
+  return nested && ("code" in (record ?? {}) || "desc" in (record ?? {})) ? nested : record;
 };
 
 const toNumber = (value: unknown, fallback = 0) => {
@@ -137,31 +160,6 @@ export const parseAccountProfile = (payload: unknown): AccountProfile => {
   };
 };
 
-/** Converts a Ninebot trail string into renderer-safe numeric samples. */
-export const parseTrail = (value: unknown, durationSeconds: number): TrackPoint[] => {
-  if (typeof value !== "string") return [];
-
-  const rawPoints = value
-    .split(";")
-    .map((entry) => entry.split(","))
-    .filter((fields) => fields.length >= 3)
-    .map((fields) => ({
-      longitude: Number(fields[0]),
-      latitude: Number(fields[1]),
-      speed: Number(fields[2]),
-    }))
-    .filter(
-      ({ longitude, latitude, speed }) =>
-        Number.isFinite(longitude) && Number.isFinite(latitude) && Number.isFinite(speed),
-    );
-
-  const denominator = Math.max(1, rawPoints.length - 1);
-  return rawPoints.map((point, index) => ({
-    ...point,
-    offsetSeconds: Math.round((index / denominator) * durationSeconds),
-  }));
-};
-
 /** Extracts owned/shared vehicles without exposing unrelated account fields. */
 export const parseVehicles = (payload: unknown): ParsedVehicle[] => {
   if (!Array.isArray(payload)) return [];
@@ -203,8 +201,8 @@ export const parseVehicleSnapshot = (
   batteryPayload: unknown,
   availability: VehicleSnapshot["availability"] = { status: true, battery: true },
 ): VehicleSnapshot => {
-  const status = asRecord(statusPayload) ?? {};
-  const battery = asRecord(batteryPayload) ?? {};
+  const status = unwrapTelemetryPayload(statusPayload) ?? {};
+  const battery = unwrapTelemetryPayload(batteryPayload) ?? {};
   const location = asRecord(status.loc) ?? {};
   const batteryMain = asRecord(battery.battery_main) ?? {};
   const rawBatteryPacks = Array.isArray(battery.battery_list) ? battery.battery_list : [];
@@ -282,7 +280,7 @@ export const parseRideDays = (value: unknown, requestedMonth: string): RideDaySu
 
 /** Extracts sharing permission plus the minimum location state after explicit user consent. */
 export const parseVehicleLocationRead = (statusPayload: unknown): VehicleLocationRead => {
-  const status = asRecord(statusPayload) ?? {};
+  const status = unwrapTelemetryPayload(statusPayload) ?? {};
   const permissions = asRecord(status.permissions);
   const explicitPermission = permissions ? toOptionalFlag(permissions.see_location) : null;
   const location = asRecord(status.loc);
@@ -347,13 +345,14 @@ export const parseRides = (payload: unknown): ParsedRide[] => {
   });
 };
 
-/** Preserves complete month totals even when ninecli caps the selectable ride rows. */
+/** Preserves complete month totals even when the available ride rows are incomplete. */
 export const parseRideMonth = (
   payload: unknown,
   requestedMonth: string,
 ): Omit<RideMonth, "rides"> & { rides: ParsedRide[] } => {
-  const record = asRecord(payload) ?? {};
-  const rides = parseRides(payload);
+  const normalizedPayload = unwrapTravelPayload(payload);
+  const record = normalizedPayload ?? {};
+  const rides = parseRides(normalizedPayload);
   const days = parseRideDays(record.detail, requestedMonth);
   const upstreamRideCount = toOptionalNonnegativeNumber(record.times);
   const upstreamMileageKm = toOptionalNonnegativeNumber(record.total_mileages);
@@ -405,7 +404,7 @@ export const parseRideDetail = (
   id: string,
   dayMileageKm: number | null = null,
 ): RideDetail => {
-  const record = asRecord(payload) ?? {};
+  const record = unwrapTravelPayload(payload) ?? {};
   const durationSeconds = toNumber(record.duration);
   const mileageKm = toNumber(record.mileages ?? record.mileage);
   const track = parseTrail(record.trail, durationSeconds);

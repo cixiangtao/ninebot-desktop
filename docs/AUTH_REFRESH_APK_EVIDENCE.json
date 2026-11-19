@@ -1,0 +1,56 @@
+{
+  "artifact": {
+    "package": "cn.ninebot.ninebot",
+    "versionName": "6.10.12",
+    "versionCode": 610124167,
+    "apkSha256": "6ac8bfb50504a7bef741b74fe9c7f6399985f19bd9afecfddcc924cee7dc7f8c",
+    "classesDexSha256": "db87f85c916921a5edd71d63d8c5f7c7059fde0be291b0959f41028fe0218bcc",
+    "source": "https://fga1.market.xiaomi.com/download/AppStore/06526052e73a240d09559655d54d3fd57b58a5bfa/cn.ninebot.ninebot.apk"
+  },
+  "staticRecovery": {
+    "regionBase": 51233168,
+    "regionBytes": 3255472,
+    "mapAbsolute": 54488420,
+    "stringCount": 30251,
+    "survivingStringIdsVerified": 29255,
+    "protectedFirstStringIds": 996,
+    "protectedPrefixBytes": 4096,
+    "prefixStringDataSorted": true,
+    "classCount": 2269,
+    "methodId": 1805,
+    "methodName": "Lcn/ninebot/lib/passport/account/PassportApiClient;->refreshAccessToken()",
+    "codeItemRelative": 1038720,
+    "instructionStartAbsolute": 52271904,
+    "instructionUnits": 124,
+    "instructionBytesSha256": "89c6cd8ef1ddefb4c502fd9b07e27d7a4fbf7aa863e83d7828f973360bc06f7a"
+  },
+  "observations": {
+    "wireFieldNames": ["access_token", "refresh_token", "device"],
+    "deviceValue": "ANDROID",
+    "path": "/v3/user/refresh",
+    "requestBuilderMethodId": 1729,
+    "headerBuilderMethodId": 1736,
+    "authorizationHeaderBuilderNotCalled": 1735,
+    "signBuilderMethodId": 1739,
+    "domesticStaticClientKeyMatchesExistingSdk": true,
+    "earlyRefreshGateInThisMethod": false,
+    "httpPostAnnotation": "Lretrofit2/http/POST;",
+    "contentTypeAnnotation": "Content-Type: application/json",
+    "signing": "Sorted raw key=value pairs joined with &, UTF-8 SHA-256 lowercase hex; no URL escaping in recovered SignUtil",
+    "tokenKeyStringIds": {
+      "access_token": 12734,
+      "refresh_token": 25645,
+      "device": 15720,
+      "ANDROID": 1131
+    }
+  },
+  "limits": [
+    "Static observations only; no target execution or real authentication.",
+    "DEX parsing and objdump results are ordinary local-tool evidence, not fabricated REA Evidence IDs.",
+    "Does not prove live refresh success or server timing policy.",
+    "Only the selected map region was decoded; not a claim to recover all protected code.",
+    "Optional security interception and caller configuration require separate evidence.",
+    "Hopper REA open_binary failed before bridge readiness and cleanup was unconfirmed; no retry.",
+    "Prefix string IDs inferred from standard string_data order, lexical ordering, and exact correspondence of all 29255 unaffected entries; key IDs above996 remain directly verified."
+  ]
+}

@@ -1,0 +1,474 @@
+{
+  "kind": "ordinary-static-dex-evidence-not-rea",
+  "artifacts": [
+    {
+      "bytes": 319870179,
+      "sha256": "6ac8bfb50504a7bef741b74fe9c7f6399985f19bd9afecfddcc924cee7dc7f8c",
+      "file": "cn.ninebot.ninebot-6.10.12.apk"
+    },
+    {
+      "bytes": 114690844,
+      "sha256": "db87f85c916921a5edd71d63d8c5f7c7059fde0be291b0959f41028fe0218bcc",
+      "file": "classes-complete.dex"
+    }
+  ],
+  "regionBase": 51233168,
+  "limitations": [
+    "996 leading string IDs reconstructed; country path strings are in this prefix",
+    "No APK execution, online country response, anonymous access or publisher certificate verification",
+    "Country-specific result-code policy and version/cache semantics unknown"
+  ],
+  "methods": [
+    {
+      "id": 1745,
+      "class": "Lcn/ninebot/lib/passport/account/PassportApiClient;",
+      "name": "getCountryList",
+      "codeOffset": 1039800,
+      "instructionsAbsoluteOffset": 52272984,
+      "instructionUnits": 6
+    },
+    {
+      "id": 1746,
+      "class": "Lcn/ninebot/lib/passport/account/PassportApiClient;",
+      "name": "getCountryList",
+      "codeOffset": 1039828,
+      "instructionsAbsoluteOffset": 52273012,
+      "instructionUnits": 10
+    },
+    {
+      "id": 1570,
+      "class": "Lcn/ninebot/lib/passport/account/PassportApiClient$19;",
+      "name": "call",
+      "codeOffset": 1032280,
+      "instructionsAbsoluteOffset": 52265464,
+      "instructionUnits": 102
+    },
+    {
+      "id": 1571,
+      "class": "Lcn/ninebot/lib/passport/account/PassportApiClient$19;",
+      "name": "call",
+      "codeOffset": 1032500,
+      "instructionsAbsoluteOffset": 52265684,
+      "instructionUnits": 5
+    },
+    {
+      "id": 1678,
+      "class": "Lcn/ninebot/lib/passport/account/PassportApiClient;",
+      "name": "access$2000",
+      "codeOffset": 1038576,
+      "instructionsAbsoluteOffset": 52271760,
+      "instructionUnits": 3
+    },
+    {
+      "id": 1687,
+      "class": "Lcn/ninebot/lib/passport/account/PassportApiClient;",
+      "name": "access$2900",
+      "codeOffset": 1043776,
+      "instructionsAbsoluteOffset": 52276960,
+      "instructionUnits": 3
+    },
+    {
+      "id": 1689,
+      "class": "Lcn/ninebot/lib/passport/account/PassportApiClient;",
+      "name": "access$3000",
+      "codeOffset": 1043800,
+      "instructionsAbsoluteOffset": 52276984,
+      "instructionUnits": 3
+    },
+    {
+      "id": 1688,
+      "class": "Lcn/ninebot/lib/passport/account/PassportApiClient;",
+      "name": "access$300",
+      "codeOffset": 1044832,
+      "instructionsAbsoluteOffset": 52278016,
+      "instructionUnits": 5
+    },
+    {
+      "id": 1736,
+      "class": "Lcn/ninebot/lib/passport/account/PassportApiClient;",
+      "name": "generateHeaders",
+      "codeOffset": 1045020,
+      "instructionsAbsoluteOffset": 52278204,
+      "instructionUnits": 91
+    },
+    {
+      "id": 1739,
+      "class": "Lcn/ninebot/lib/passport/account/PassportApiClient;",
+      "name": "generateSignString",
+      "codeOffset": 1044404,
+      "instructionsAbsoluteOffset": 52277588,
+      "instructionUnits": 60
+    },
+    {
+      "id": 2105,
+      "class": "Lcn/ninebot/lib/passport/account/utils/SignUtil;",
+      "name": "sign",
+      "codeOffset": 1055552,
+      "instructionsAbsoluteOffset": 52288736,
+      "instructionUnits": 10
+    },
+    {
+      "id": 1830,
+      "class": "Lcn/ninebot/lib/passport/account/PassportApiService;",
+      "name": "getCountryListNew",
+      "codeOffset": 0,
+      "instructionsAbsoluteOffset": null,
+      "instructionUnits": 0
+    },
+    {
+      "id": 1831,
+      "class": "Lcn/ninebot/lib/passport/account/PassportApiService;",
+      "name": "getCountryListOld",
+      "codeOffset": 0,
+      "instructionsAbsoluteOffset": null,
+      "instructionUnits": 0
+    },
+    {
+      "id": 1966,
+      "class": "Lcn/ninebot/lib/passport/account/beans/CountryResultBean$Data;",
+      "name": "getJson",
+      "codeOffset": 1051564,
+      "instructionsAbsoluteOffset": 52284748,
+      "instructionUnits": 3
+    },
+    {
+      "id": 1889,
+      "class": "Lcn/ninebot/lib/passport/account/PassportSubscriber;",
+      "name": "isSuccess",
+      "codeOffset": 1049044,
+      "instructionsAbsoluteOffset": 52282228,
+      "instructionUnits": 7
+    },
+    {
+      "id": 2097,
+      "class": "Lcn/ninebot/lib/passport/account/utils/SignUtil$MapKeyComparator;",
+      "name": "compare",
+      "codeOffset": 1055120,
+      "instructionsAbsoluteOffset": 52288304,
+      "instructionUnits": 5
+    },
+    {
+      "id": 2100,
+      "class": "Lcn/ninebot/lib/passport/account/utils/SignUtil;",
+      "name": "createLinkString",
+      "codeOffset": 1055348,
+      "instructionsAbsoluteOffset": 52288532,
+      "instructionUnits": 76
+    },
+    {
+      "id": 2101,
+      "class": "Lcn/ninebot/lib/passport/account/utils/SignUtil;",
+      "name": "encodeHex",
+      "codeOffset": 1055196,
+      "instructionsAbsoluteOffset": 52288380,
+      "instructionUnits": 6
+    },
+    {
+      "id": 2102,
+      "class": "Lcn/ninebot/lib/passport/account/utils/SignUtil;",
+      "name": "encodeHex",
+      "codeOffset": 1055224,
+      "instructionsAbsoluteOffset": 52288408,
+      "instructionUnits": 12
+    },
+    {
+      "id": 2104,
+      "class": "Lcn/ninebot/lib/passport/account/utils/SignUtil;",
+      "name": "encodeHexString",
+      "codeOffset": 1055516,
+      "instructionsAbsoluteOffset": 52288700,
+      "instructionUnits": 10
+    },
+    {
+      "id": 2106,
+      "class": "Lcn/ninebot/lib/passport/account/utils/SignUtil;",
+      "name": "sortMapByKey",
+      "codeOffset": 1055684,
+      "instructionsAbsoluteOffset": 52288868,
+      "instructionUnits": 22
+    },
+    {
+      "id": 2107,
+      "class": "Lcn/ninebot/lib/passport/account/utils/SignUtil;",
+      "name": "stringForSHA256",
+      "codeOffset": 1055588,
+      "instructionsAbsoluteOffset": 52288772,
+      "instructionUnits": 32
+    }
+  ],
+  "annotations": [
+    {
+      "kind": "method",
+      "id": 1830,
+      "owner": {
+        "id": 1830,
+        "class": "Lcn/ninebot/lib/passport/account/PassportApiService;",
+        "name": "getCountryListNew",
+        "args": ["Ljava/lang/String;", "Ljava/util/Map;", "Lokhttp3/RequestBody;"],
+        "return": "Lio/reactivex/Observable;",
+        "access": 1025,
+        "code": 0
+      },
+      "annotations": [
+        {
+          "absoluteOffset": 54117525,
+          "type": "Ldalvik/annotation/Signature;",
+          "values": {
+            "value": [
+              "(",
+              "Ljava/lang/String;",
+              "Ljava/util/Map<",
+              "Ljava/lang/String;",
+              "Ljava/lang/String;",
+              ">;",
+              "Lokhttp3/RequestBody;",
+              ")",
+              "Lio/reactivex/Observable<",
+              "Lcn/ninebot/lib/passport/account/beans/CountryResultBean;",
+              ">;"
+            ]
+          }
+        },
+        {
+          "absoluteOffset": 54117505,
+          "type": "Lretrofit2/http/Headers;",
+          "values": {
+            "value": ["Content-Type: application/json"]
+          }
+        },
+        {
+          "absoluteOffset": 54117517,
+          "type": "Lretrofit2/http/POST;",
+          "values": {}
+        }
+      ]
+    },
+    {
+      "kind": "method",
+      "id": 1831,
+      "owner": {
+        "id": 1831,
+        "class": "Lcn/ninebot/lib/passport/account/PassportApiService;",
+        "name": "getCountryListOld",
+        "args": ["Ljava/lang/String;", "Ljava/util/Map;", "Ljava/util/Map;"],
+        "return": "Lio/reactivex/Observable;",
+        "access": 1025,
+        "code": 0
+      },
+      "annotations": [
+        {
+          "absoluteOffset": 54117567,
+          "type": "Ldalvik/annotation/Signature;",
+          "values": {
+            "value": [
+              "(",
+              "Ljava/lang/String;",
+              "Ljava/util/Map<",
+              "Ljava/lang/String;",
+              "Ljava/lang/String;",
+              ">;",
+              "Ljava/util/Map<",
+              "Ljava/lang/String;",
+              "Ljava/lang/String;",
+              ">;)",
+              "Lio/reactivex/Observable<",
+              "Lcn/ninebot/lib/passport/account/beans/CountryResultBean;",
+              ">;"
+            ]
+          }
+        },
+        {
+          "absoluteOffset": 54117459,
+          "type": "Lretrofit2/http/GET;",
+          "values": {}
+        }
+      ]
+    },
+    {
+      "kind": "parameters",
+      "id": 1830,
+      "owner": {
+        "id": 1830,
+        "class": "Lcn/ninebot/lib/passport/account/PassportApiService;",
+        "name": "getCountryListNew",
+        "args": ["Ljava/lang/String;", "Ljava/util/Map;", "Lokhttp3/RequestBody;"],
+        "return": "Lio/reactivex/Observable;",
+        "access": 1025,
+        "code": 0
+      },
+      "annotations": [
+        [
+          {
+            "absoluteOffset": 54117396,
+            "type": "Lretrofit2/http/Url;",
+            "values": {}
+          }
+        ],
+        [
+          {
+            "absoluteOffset": 54117400,
+            "type": "Lretrofit2/http/HeaderMap;",
+            "values": {}
+          }
+        ],
+        [
+          {
+            "absoluteOffset": 54117521,
+            "type": "Lretrofit2/http/Body;",
+            "values": {}
+          }
+        ]
+      ]
+    },
+    {
+      "kind": "parameters",
+      "id": 1831,
+      "owner": {
+        "id": 1831,
+        "class": "Lcn/ninebot/lib/passport/account/PassportApiService;",
+        "name": "getCountryListOld",
+        "args": ["Ljava/lang/String;", "Ljava/util/Map;", "Ljava/util/Map;"],
+        "return": "Lio/reactivex/Observable;",
+        "access": 1025,
+        "code": 0
+      },
+      "annotations": [
+        [
+          {
+            "absoluteOffset": 54117396,
+            "type": "Lretrofit2/http/Url;",
+            "values": {}
+          }
+        ],
+        [
+          {
+            "absoluteOffset": 54117400,
+            "type": "Lretrofit2/http/HeaderMap;",
+            "values": {}
+          }
+        ],
+        [
+          {
+            "absoluteOffset": 54117404,
+            "type": "Lretrofit2/http/QueryMap;",
+            "values": {}
+          }
+        ]
+      ]
+    },
+    {
+      "kind": "field",
+      "id": 45810,
+      "owner": {
+        "class": "Lcn/ninebot/lib/passport/account/beans/CountryInfoBean;",
+        "type": "Ljava/lang/String;",
+        "name": "areaCode"
+      },
+      "annotations": [
+        {
+          "absoluteOffset": 54118451,
+          "type": "Lcom/google/gson/annotations/SerializedName;",
+          "values": {
+            "value": "N"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "field",
+      "id": 45811,
+      "owner": {
+        "class": "Lcn/ninebot/lib/passport/account/beans/CountryInfoBean;",
+        "type": "Ljava/lang/String;",
+        "name": "enName"
+      },
+      "annotations": [
+        {
+          "absoluteOffset": 54118461,
+          "type": "Lcom/google/gson/annotations/SerializedName;",
+          "values": {
+            "value": "C_en"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "field",
+      "id": 45813,
+      "owner": {
+        "class": "Lcn/ninebot/lib/passport/account/beans/CountryInfoBean;",
+        "type": "Ljava/lang/String;",
+        "name": "isoCode"
+      },
+      "annotations": [
+        {
+          "absoluteOffset": 54118471,
+          "type": "Lcom/google/gson/annotations/SerializedName;",
+          "values": {
+            "value": "B"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "field",
+      "id": 45815,
+      "owner": {
+        "class": "Lcn/ninebot/lib/passport/account/beans/CountryInfoBean;",
+        "type": "Ljava/lang/String;",
+        "name": "region"
+      },
+      "annotations": [
+        {
+          "absoluteOffset": 54118481,
+          "type": "Lcom/google/gson/annotations/SerializedName;",
+          "values": {
+            "value": "R"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "field",
+      "id": 45816,
+      "owner": {
+        "class": "Lcn/ninebot/lib/passport/account/beans/CountryInfoBean;",
+        "type": "Ljava/lang/String;",
+        "name": "zhName"
+      },
+      "annotations": [
+        {
+          "absoluteOffset": 54118491,
+          "type": "Lcom/google/gson/annotations/SerializedName;",
+          "values": {
+            "value": "C_zh"
+          }
+        }
+      ]
+    },
+    {
+      "kind": "field",
+      "id": 45817,
+      "owner": {
+        "class": "Lcn/ninebot/lib/passport/account/beans/CountryResultBean$Data;",
+        "type": "Ljava/util/Map;",
+        "name": "countryList"
+      },
+      "annotations": [
+        {
+          "absoluteOffset": 54118555,
+          "type": "Ldalvik/annotation/Signature;",
+          "values": {
+            "value": [
+              "Ljava/util/Map<",
+              "Ljava/lang/String;",
+              "Ljava/util/List<",
+              "Lcn/ninebot/lib/passport/account/beans/CountryInfoBean;",
+              ">;>;"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

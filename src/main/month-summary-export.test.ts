@@ -61,14 +61,14 @@ describe("month summary export", () => {
     };
 
     expect(document.fileName).toBe("韭号出行-F90-202607月度清单.json");
-    expect(payload.schemaVersion).toBe(1);
+    expect(payload.schemaVersion).toBe(2);
     expect(payload.coverage).toMatchObject({
       rideCount: 31,
       visibleRideCount: 2,
       ridesTruncated: true,
       verifiedSpeedCount: 1,
-      correctedSpeedCount: 1,
-      unverifiedCappedSpeedCount: 1,
+      speedDifferenceCount: 1,
+      unreadSpeedCount: 1,
     });
     expect(payload.rides[0]).toMatchObject({
       declaredMaxSpeedKmh: 25,
@@ -80,7 +80,7 @@ describe("month summary export", () => {
       declaredMaxSpeedKmh: 25,
       sampledMaxSpeedKmh: null,
       displayedMaxSpeedKmh: null,
-      maximumSpeedSource: "unverified-capped",
+      maximumSpeedSource: "unread",
     });
     expect(document.content).not.toMatch(/longitude|latitude|trail|vehicleId|travel[_I]d|"id"/i);
   });
@@ -95,6 +95,41 @@ describe("month summary export", () => {
     expect(header).toContain("maximum_speed_source");
     expect(lines.some((line) => line.startsWith("day,F90,202607,1,"))).toBe(true);
     expect(lines.some((line) => line.includes(",68,68,track,"))).toBe(true);
-    expect(lines.some((line) => line.includes(",25,,,unverified-capped,"))).toBe(true);
+    expect(lines.some((line) => line.includes(",25,,,unread,"))).toBe(true);
+  });
+  it("never exports interface 41 as a displayed track peak before or without samples", () => {
+    const recent = {
+      ...input,
+      month: {
+        ...input.month,
+        rides: input.month.rides.map((ride) => ({ ...ride, declaredMaxSpeed: 41 })),
+      },
+      speedVerifications: [],
+    };
+    const unread = JSON.parse(createMonthSummaryExportDocument(recent).content);
+    expect(unread.rides[0]).toMatchObject({
+      declaredMaxSpeedKmh: 41,
+      displayedMaxSpeedKmh: null,
+      maximumSpeedSource: "unread",
+    });
+    const read = JSON.parse(
+      createMonthSummaryExportDocument({
+        ...recent,
+        speedVerifications: [
+          { id: "ride-1", declaredMaxSpeed: 41, sampledMaxSpeed: 37 },
+          { id: "ride-2", declaredMaxSpeed: 41, sampledMaxSpeed: null },
+        ],
+      }).content,
+    );
+    expect(read.rides[0]).toMatchObject({
+      declaredMaxSpeedKmh: 41,
+      displayedMaxSpeedKmh: 37,
+      maximumSpeedSource: "track",
+    });
+    expect(read.rides[1]).toMatchObject({
+      declaredMaxSpeedKmh: 41,
+      displayedMaxSpeedKmh: null,
+      maximumSpeedSource: "unavailable",
+    });
   });
 });

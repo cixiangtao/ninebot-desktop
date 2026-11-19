@@ -7,6 +7,8 @@ import {
   formatHistoryStartDate,
   formatLongDuration,
   formatMonth,
+  formatRideDate,
+  formatRideTimeRange,
   getMonthNumber,
   getMonthFromUnixSeconds,
   getMonthYear,
@@ -14,6 +16,35 @@ import {
   isFutureMonth,
   resolveDisplayedMaxSpeed,
 } from "./format";
+
+const seconds = (year: number, month: number, day: number, hour: number, minute: number) =>
+  new Date(year, month - 1, day, hour, minute).getTime() / 1000;
+
+describe("ride time ranges", () => {
+  it("shows the start date and both times for a same-day ride", () => {
+    const start = seconds(2026, 10, 28, 18, 10);
+    expect(formatRideTimeRange(start, seconds(2026, 10, 28, 18, 30))).toBe(
+      `${formatRideDate(start)}～18:30`,
+    );
+  });
+
+  it("retains the end date and both years when crossing calendar boundaries", () => {
+    const start = seconds(2026, 10, 28, 23, 50);
+    const end = seconds(2026, 10, 29, 0, 20);
+    expect(formatRideTimeRange(start, end)).toBe(
+      `${formatRideDate(start)}～${formatRideDate(end)}`,
+    );
+    const newYear = formatRideTimeRange(seconds(2026, 12, 31, 23, 50), seconds(2027, 1, 1, 0, 20));
+    expect(newYear).toContain("2026");
+    expect(newYear).toContain("2027");
+  });
+
+  it("does not invent an end time when it is missing or precedes the start", () => {
+    const start = seconds(2026, 10, 28, 18, 10);
+    expect(formatRideTimeRange(start, 0)).toBe(`${formatRideDate(start)}～—`);
+    expect(formatRideTimeRange(start, start - 60)).toBe(`${formatRideDate(start)}～—`);
+  });
+});
 
 describe("duration formatting", () => {
   it("carries rounded seconds into the next minute", () => {
@@ -69,13 +100,15 @@ describe("month formatting", () => {
 
 describe("maximum speed display", () => {
   it("prefers the observed track maximum over a capped upstream declaration", () => {
-    expect(resolveDisplayedMaxSpeed(70, 25)).toBe(70);
-    expect(resolveDisplayedMaxSpeed(23, 25)).toBe(23);
+    expect(resolveDisplayedMaxSpeed(70)).toBe(70);
+    expect(resolveDisplayedMaxSpeed(23)).toBe(23);
   });
 
-  it("falls back to the upstream declaration when track samples are unavailable", () => {
-    expect(resolveDisplayedMaxSpeed(null, 64)).toBe(64);
-    expect(resolveDisplayedMaxSpeed(null, null)).toBe(0);
+  it("keeps unknown distinct from an observed zero without a summary fallback", () => {
+    expect(resolveDisplayedMaxSpeed(null)).toBeNull();
+    expect(resolveDisplayedMaxSpeed(0)).toBe(0);
+    expect(resolveDisplayedMaxSpeed(Number.NaN)).toBeNull();
+    expect(resolveDisplayedMaxSpeed(-1)).toBeNull();
   });
 
   it("identifies the historical 25 km/h summary cap only when trail evidence disagrees", () => {

@@ -5,6 +5,7 @@ import {
   getKeyboardTrackPosition,
   getSpeedColor,
   getSpeedZoneIndex,
+  getTrackMaximumPoint,
   getTrackBounds,
   getTrackInterpolation,
   getTrackPositionFromHorizontalOffset,
@@ -79,6 +80,24 @@ describe("map track data", () => {
     expect(getTrackBounds([])).toBeNull();
     expect(
       toMapCoordinate({ longitude: 200, latitude: 31, speed: 0, offsetSeconds: 0 }),
+    ).toBeNull();
+  });
+
+  it("locates the first highest-speed sample", () => {
+    expect(
+      getTrackMaximumPoint([
+        { longitude: 1, latitude: 2, speed: 42, offsetSeconds: 0 },
+        { longitude: 3, latitude: 4, speed: 68, offsetSeconds: 10 },
+        { longitude: 5, latitude: 6, speed: 68, offsetSeconds: 20 },
+        { longitude: 7, latitude: 8, speed: Number.NaN, offsetSeconds: 30 },
+      ]),
+    ).toEqual({
+      index: 1,
+      point: { longitude: 3, latitude: 4, speed: 68, offsetSeconds: 10 },
+    });
+    expect(getTrackMaximumPoint([])).toBeNull();
+    expect(
+      getTrackMaximumPoint([{ longitude: 1, latitude: 2, speed: Number.NaN, offsetSeconds: 0 }]),
     ).toBeNull();
   });
 });

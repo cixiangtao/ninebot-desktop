@@ -1,10 +1,16 @@
+import type { TrackPoint } from "@jiuhao/ninebot-client/track";
+export type { TrackPoint } from "@jiuhao/ninebot-client/track";
 export const ipcChannels = {
   authStatus: "ninebot:auth:status",
   authProfile: "ninebot:auth:profile",
   passwordLogin: "ninebot:auth:password-login",
   requestSmsCode: "ninebot:auth:request-sms-code",
+  cancelSmsCode: "ninebot:auth:cancel-sms-code",
   smsCodeLogin: "ninebot:auth:sms-code-login",
   authLogout: "ninebot:auth:logout",
+  accountsList: "ninebot:accounts:list",
+  accountsSwitch: "ninebot:accounts:switch",
+  accountsRemove: "ninebot:accounts:remove",
   runtimeSecurity: "ninebot:runtime:security",
   listVehicles: "ninebot:vehicles:list",
   getVehicleSnapshot: "ninebot:vehicles:snapshot",
@@ -43,6 +49,18 @@ export interface AccountProfile {
   passwordConfigured: boolean | null;
 }
 
+/** Local account summaries never include session tokens or upstream user IDs. */
+export interface SavedAccount {
+  id: string;
+  label: string;
+  needsLogin: boolean;
+}
+export interface SavedAccountsState {
+  supported: boolean;
+  activeId: string | null;
+  accounts: SavedAccount[];
+}
+
 export interface PasswordLoginInput {
   areaCode: string;
   user: string;
@@ -52,20 +70,32 @@ export interface PasswordLoginInput {
 export interface SmsCodeRequestInput {
   areaCode: string;
   phone: string;
+  /** Identifies this form attempt so stale verification can be cancelled. */
+  requestId?: string;
+}
+
+export interface SmsCodeCancelInput {
+  requestId: string;
 }
 
 export interface SmsCodeLoginInput extends SmsCodeRequestInput {
   code: string;
 }
 
-export interface SmsCodeRequestStatus {
-  sent: true;
-}
+export type SmsCodeRequestStatus = { sent: true } | { sent: false; cancelled: true };
 
 export interface RuntimeSecurityStatus {
   version: string;
+  candidate: {
+    requestTimeoutMs: number;
+    domains: {
+      vehicle: "candidate" | "ninecli";
+      telemetry: "candidate" | "ninecli";
+      travel: "candidate" | "ninecli";
+    };
+  };
   binary: {
-    status: "verified" | "mismatch" | "unsupported" | "unavailable";
+    status: "verified" | "mismatch" | "unsupported" | "unavailable" | "not-required";
     sha256: string | null;
     expectedSha256: string | null;
     platform: string;
@@ -79,8 +109,8 @@ export interface RuntimeSecurityStatus {
   policy: {
     allowedCommands: readonly string[];
     environment: "minimal";
-    passwordTransport: "process-arguments";
-    smsCodeTransport: "process-arguments";
+    passwordTransport: "process-arguments" | "in-memory-call";
+    smsCodeTransport: "process-arguments" | "in-memory-call";
     vehicleControlsExposed: false;
     sessionCache: {
       storage: "memory-only";
@@ -178,6 +208,7 @@ export interface RideSummary {
   endTime: number;
   mileageKm: number;
   durationSeconds: number;
+  /** Upstream speed reference; never a substitute for a track-sample peak. */
   declaredMaxSpeed: number | null;
   /** Ride energy returned by ninecli's `ec` field, in watt-hours. */
   energyWh: number | null;
@@ -187,7 +218,7 @@ export interface RideSummary {
   dayMileageKm: number | null;
 }
 
-/** Complete month totals plus the ride rows currently exposed by ninecli. */
+/** Complete month totals plus the ride rows currently available to the client. */
 export interface RideMonthSummary {
   /** Requested month in YYYYMM form. */
   month: string;
@@ -198,11 +229,11 @@ export interface RideMonthSummary {
   durationSeconds: number;
   /** Complete month energy from ninecli's top-level `ec` field, in watt-hours. */
   energyWh: number | null;
-  /** Number of ride rows available for selection, which can be lower than `rideCount`. */
+  /** Number of ride rows available for selection, which can be lower than `rideCount` if incomplete. */
   visibleRideCount: number;
-  /** Whether count, mileage, and duration came from ninecli's complete month aggregate. */
+  /** Whether count, mileage, and duration came from the upstream month aggregate. */
   aggregateAvailable: boolean;
-  /** Whether ninecli returned fewer selectable rows than the month contains. */
+  /** Whether the client received fewer selectable rows than the month contains. */
   ridesTruncated: boolean;
   /** Active calendar days derived from ninecli's complete monthly `detail` mileage array. */
   activeDayCount: number | null;
@@ -219,17 +250,9 @@ export interface RideDaySummary {
 
 export interface RideMonth {
   summary: RideMonthSummary;
-  /** Complete per-day mileage when ninecli exposes its monthly `detail` array. */
+  /** Complete per-day mileage when the upstream exposes its monthly `detail` array. */
   days: RideDaySummary[];
   rides: RideSummary[];
-}
-
-export interface TrackPoint {
-  longitude: number;
-  latitude: number;
-  speed: number;
-  /** Estimated elapsed seconds because the upstream trail has no per-point timestamp. */
-  offsetSeconds: number;
 }
 
 export interface RideDetail extends RideSummary {
@@ -264,13 +287,14 @@ export interface RideDetailInput {
 
 export interface RideSpeedVerificationInput {
   vehicleId: string;
-  /** Opaque ids from the currently visible month, limited by ninecli to at most 20 rows. */
+  /** Opaque ids from the currently visible month; the client may include multiple upstream pages. */
   rideIds: string[];
 }
 
 export interface RideSpeedVerification {
   /** Opaque renderer-safe ride id; no upstream travel id or GPS point crosses this bridge. */
   id: string;
+  /** Upstream speed reference; never a substitute for a track-sample peak. */
   declaredMaxSpeed: number | null;
   sampledMaxSpeed: number | null;
 }
@@ -301,7 +325,7 @@ export type MonthSummaryExportFormat = "csv" | "json";
 
 export interface MonthSummaryExportInput {
   vehicleName: string;
-  /** Already-loaded month aggregate, daily mileage, and at most 20 selectable ride rows. */
+  /** Already-loaded month aggregate, daily mileage, and paginated selectable ride rows. */
   month: RideMonth;
   /** Optional track-derived maxima already verified during this renderer session. */
   speedVerifications: RideSpeedVerification[];
@@ -324,12 +348,21 @@ export interface YearSummaryExportInput {
 
 export interface NinebotBridge {
   auth: {
+    /** Current-session reads require reconnection; notification never clears stored tokens. */
+    onSessionExpired: (listener: () => void) => () => void;
     status: () => Promise<BridgeResult<AuthStatus>>;
-    profile: () => Promise<BridgeResult<AccountProfile>>;
+    /** Passive settings inspection leaves the account selector open on an expired session. */
+    profile: (options?: { passive?: boolean }) => Promise<BridgeResult<AccountProfile>>;
     passwordLogin: (input: PasswordLoginInput) => Promise<BridgeResult<AuthStatus>>;
     requestSmsCode: (input: SmsCodeRequestInput) => Promise<BridgeResult<SmsCodeRequestStatus>>;
+    cancelSmsCode: (input: SmsCodeCancelInput) => Promise<BridgeResult<{ cancelled: true }>>;
     smsCodeLogin: (input: SmsCodeLoginInput) => Promise<BridgeResult<AuthStatus>>;
     logout: () => Promise<BridgeResult<AuthStatus>>;
+  };
+  accounts: {
+    list: () => Promise<BridgeResult<SavedAccountsState>>;
+    switch: (input: { id: string }) => Promise<BridgeResult<SavedAccountsState>>;
+    remove: (input: { id: string }) => Promise<BridgeResult<SavedAccountsState>>;
   };
   runtime: {
     security: () => Promise<BridgeResult<RuntimeSecurityStatus>>;

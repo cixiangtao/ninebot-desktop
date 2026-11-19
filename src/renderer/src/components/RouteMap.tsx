@@ -19,6 +19,7 @@ import {
   getSpeedColor,
   getTrackInterpolation,
   getTrackBounds,
+  getTrackMaximumPoint,
   interpolateTrackPoint,
   projectTrack,
   speedColorStops,
@@ -42,6 +43,9 @@ const MAP_LOAD_TIMEOUT_MS = 10_000;
 const ROUTE_SOURCE_ID = "ride-route";
 const ROUTE_CASING_LAYER_ID = "ride-route-casing";
 const ROUTE_LAYER_ID = "ride-route-line";
+const MAXIMUM_SOURCE_ID = "ride-maximum";
+const MAXIMUM_LABEL_LAYER_ID = "ride-maximum-label";
+const MAXIMUM_IMAGE_ID = "ride-maximum-image";
 type LinePaint = NonNullable<Extract<AddLayerObject, { type: "line" }>["paint"]>;
 const routeSpeedColorExpression: NonNullable<LinePaint["line-color"]> = [
   "step",
@@ -73,9 +77,9 @@ const fitRoute = (map: MapLibreMapInstance, bounds: TrackBounds, animated: boole
   const { clientHeight, clientWidth } = map.getContainer();
   map.fitBounds(bounds, {
     padding: {
-      top: 72,
-      right: Math.min(340, Math.round(clientWidth * 0.28)),
-      bottom: Math.min(230, Math.round(clientHeight * 0.3)),
+      top: 96,
+      right: Math.min(340, Math.round(clientWidth * 0.46)),
+      bottom: Math.min(80, Math.round(clientHeight * 0.2)),
       left: 56,
     },
     maxZoom: 16,
@@ -85,7 +89,7 @@ const fitRoute = (map: MapLibreMapInstance, bounds: TrackBounds, animated: boole
 
 const setMapLabelsVisible = (map: MapLibreMapInstance, visible: boolean) => {
   for (const layer of map.getStyle().layers ?? []) {
-    if (layer.type === "symbol") {
+    if (layer.type === "symbol" && layer.id !== MAXIMUM_LABEL_LAYER_ID) {
       map.setLayoutProperty(layer.id, "visibility", visible ? "visible" : "none");
     }
   }
@@ -106,6 +110,41 @@ const createPlaybackElement = () => {
   element.className = "map-playback-marker";
   element.setAttribute("aria-hidden", "true");
   return element;
+};
+
+const createMaximumImage = (speed: number) => {
+  const canvas = document.createElement("canvas");
+  canvas.width = 132;
+  canvas.height = 64;
+  const context = canvas.getContext("2d");
+  if (!context) return null;
+  const label = `极速 ${Math.round(speed)} km/h`;
+  context.font = "760 15px -apple-system, BlinkMacSystemFont, sans-serif";
+  const labelWidth = Math.ceil(context.measureText(label).width);
+  const bubbleWidth = Math.max(104, labelWidth + 24);
+  const bubbleHeight = 34;
+  const bubbleLeft = Math.round((canvas.width - bubbleWidth) / 2);
+  const bubbleTop = 4;
+  const radius = bubbleHeight / 2;
+  context.fillStyle = "#f05a3f";
+  context.strokeStyle = "#ffffff";
+  context.lineWidth = 4;
+  context.beginPath();
+  context.roundRect(bubbleLeft, bubbleTop, bubbleWidth, bubbleHeight, radius);
+  context.fill();
+  context.stroke();
+  context.beginPath();
+  context.moveTo(canvas.width / 2 - 9, bubbleTop + bubbleHeight - 1);
+  context.lineTo(canvas.width / 2, canvas.height - 3);
+  context.lineTo(canvas.width / 2 + 9, bubbleTop + bubbleHeight - 1);
+  context.closePath();
+  context.fill();
+  context.stroke();
+  context.fillStyle = "#ffffff";
+  context.textAlign = "center";
+  context.textBaseline = "middle";
+  context.fillText(label, canvas.width / 2, bubbleTop + bubbleHeight / 2 + 1);
+  return context.getImageData(0, 0, canvas.width, canvas.height);
 };
 
 /** Displays an interactive online map with a local SVG fallback. */
@@ -139,6 +178,8 @@ export const RouteMap = ({
   }, [displayTrack]);
   const activePoint = interpolateTrackPoint(displayTrack, playbackPosition);
   const activeCoordinate = activePoint ? toMapCoordinate(activePoint) : null;
+  const maximum = useMemo(() => getTrackMaximumPoint(displayTrack), [displayTrack]);
+  const maximumCoordinate = maximum ? toMapCoordinate(maximum.point) : null;
   const previewAnchor = track[Math.floor(track.length / 2)];
   const previewShiftMeters = previewAnchor ? getCoordinatePreviewShiftMeters(previewAnchor) : null;
   const latestActiveCoordinateRef = useRef(activeCoordinate);
@@ -194,6 +235,35 @@ export const RouteMap = ({
         layout: { "line-cap": "round", "line-join": "round" },
         paint: { "line-color": routeSpeedColorExpression, "line-width": 7 },
       });
+      if (maximumCoordinate && maximum) {
+        const maximumImage = createMaximumImage(maximum.point.speed);
+        if (maximumImage) {
+          map.addImage(MAXIMUM_IMAGE_ID, maximumImage, { pixelRatio: 1 });
+        }
+        map.addSource(MAXIMUM_SOURCE_ID, {
+          type: "geojson",
+          data: {
+            type: "Feature",
+            properties: {
+              speed: Math.round(maximum.point.speed),
+            },
+            geometry: { type: "Point", coordinates: maximumCoordinate },
+          },
+        });
+        if (maximumImage) {
+          map.addLayer({
+            id: MAXIMUM_LABEL_LAYER_ID,
+            type: "symbol",
+            source: MAXIMUM_SOURCE_ID,
+            layout: {
+              "icon-image": MAXIMUM_IMAGE_ID,
+              "icon-anchor": "bottom",
+              "icon-allow-overlap": true,
+              "icon-ignore-placement": true,
+            },
+          });
+        }
+      }
 
       new Marker({ element: createEndpointElement("起", "start"), anchor: "bottom" })
         .setLngLat(startCoordinate)
@@ -253,12 +323,14 @@ export const RouteMap = ({
 
   return (
     <div className="route-map" aria-label="轨迹回放地图">
-      <RouteFallbackCanvas
-        track={track}
-        playbackPosition={playbackPosition}
-        labelsVisible={labelsVisible}
-        routePulse={fallbackPulse}
-      />
+      {mapStatus !== "ready" ? (
+        <RouteFallbackCanvas
+          track={track}
+          playbackPosition={playbackPosition}
+          labelsVisible={labelsVisible}
+          routePulse={fallbackPulse}
+        />
+      ) : null}
       <div
         ref={containerRef}
         className={`online-map ${mapStatus === "ready" ? "online-map-ready" : ""}`}
@@ -342,6 +414,8 @@ const RouteFallbackCanvas = ({
   routePulse,
 }: RouteFallbackCanvasProps) => {
   const points = useMemo(() => projectTrack(track, 1000, 700, 118), [track]);
+  const maximum = useMemo(() => getTrackMaximumPoint(track), [track]);
+  const maximumPoint = maximum ? points[maximum.index] : null;
   const route = svgPath(points);
   const routeSegments = points.slice(0, -1).flatMap((from, index) => {
     const to = points[index + 1];
@@ -438,6 +512,9 @@ const RouteFallbackCanvas = ({
       </g>
       {start ? <MapPin x={start.x} y={start.y} label="起" tone="#10bda9" /> : null}
       {end ? <MapPin x={end.x} y={end.y} label="终" tone="#ff5b62" /> : null}
+      {maximum && maximumPoint ? (
+        <MapMaximumPin x={maximumPoint.x} y={maximumPoint.y} speed={maximum.point.speed} />
+      ) : null}
       {activePoint ? (
         <g transform={`translate(${activePoint.x} ${activePoint.y})`} className="route-marker">
           <circle r="19" fill="#ffffff" opacity="0.96" />
@@ -454,6 +531,34 @@ const RouteFallbackCanvas = ({
     </svg>
   );
 };
+
+interface MapMaximumPinProps {
+  x: number;
+  y: number;
+  speed: number;
+}
+
+const MapMaximumPin = ({ x, y, speed }: MapMaximumPinProps) => (
+  <g
+    transform={`translate(${x} ${y})`}
+    className="route-maximum-marker"
+    data-peak-speed={Math.round(speed)}
+  >
+    <title>最高时速点：{Math.round(speed)} km/h</title>
+    <path
+      d="M0 18 L-13 5 L-13 -10 L0 -23 L13 -10 L13 5Z"
+      fill="#f05a3f"
+      stroke="#ffffff"
+      strokeWidth="5"
+      strokeLinejoin="round"
+    />
+    <circle cy="-3" r="4" fill="#ffffff" />
+    <rect x="-44" y="-64" width="88" height="22" rx="11" fill="#18232f" />
+    <text y="-49" textAnchor="middle" fill="#ffffff" fontSize="11" fontWeight="760">
+      极速 {Math.round(speed)} km/h
+    </text>
+  </g>
+);
 
 const SpeedLegend = ({ loading }: { loading: boolean }) => (
   <div

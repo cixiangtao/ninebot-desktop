@@ -1,11 +1,15 @@
-import { spawn } from "node:child_process";
+import { spawn, type ChildProcess } from "node:child_process";
 import { createHash } from "node:crypto";
 import { constants } from "node:fs";
 import { access, chmod, mkdir, readFile, rm, stat } from "node:fs/promises";
 import { basename, join } from "node:path";
+import { NinebotClientError } from "./app-client.js";
+
+const candidateRequestTimeoutMs = 45_000;
 
 export const ninecliVersion = "0.1.7";
 const commandTimeoutMs = 45_000;
+const transientWhoamiRetryDelaysMs = [300, 900, 1_800] as const;
 const maxOutputLength = 12 * 1024 * 1024;
 
 const allowedCommands = [
@@ -53,11 +57,24 @@ const environmentKeys = [
   "SSL_CERT_DIR",
 ] as const;
 
-const tokenFiles = ["tokens.json", "vehicles.json"] as const;
+const tokenFiles = [
+  "tokens.json",
+  "auth-session.json",
+  "vehicles.json",
+  "vehicle-cache.json",
+] as const;
 const restrictedFiles = ["config.json", ...tokenFiles] as const;
 
 export interface RuntimeSecurityStatus {
   version: string;
+  candidate: {
+    requestTimeoutMs: number;
+    domains: {
+      vehicle: "candidate" | "ninecli";
+      telemetry: "candidate" | "ninecli";
+      travel: "candidate" | "ninecli";
+    };
+  };
   binary: {
     status: "verified" | "mismatch" | "unsupported" | "unavailable";
     sha256: string | null;
@@ -99,10 +116,10 @@ export const runtimePolicy = {
   },
 } as const satisfies RuntimeSecurityStatus["policy"];
 
-export class NineCliError extends Error {
+export class NineCliError extends NinebotClientError {
   constructor(
     message: string,
-    readonly kind:
+    kind:
       | "missing"
       | "auth"
       | "verification"
@@ -110,7 +127,7 @@ export class NineCliError extends Error {
       | "unsupported"
       | "upstream" = "upstream",
   ) {
-    super(message);
+    super(message, kind);
     this.name = "NineCliError";
   }
 }
@@ -129,6 +146,11 @@ export const getExpectedBinarySha256 = (
   platform: NodeJS.Platform = process.platform,
   architecture = process.arch,
 ) => expectedBinaryHashes[`${platform}-${architecture}`] ?? null;
+
+const delay = (milliseconds: number) =>
+  new Promise<void>((resolve) => {
+    setTimeout(resolve, milliseconds);
+  });
 
 interface BundledNineCliLocation {
   appPath: string;
@@ -205,7 +227,7 @@ export const classifyNineCliFailure = (stdout: string, stderr: string) => {
   const output = `${stderr}\n${stdout}`;
   if (/resultCode[=:]90202|send code need verify|captcha|yidun|NECaptcha/i.test(output)) {
     return new NineCliError(
-      "九号要求先完成人机验证；ninecli 0.1.7 暂不支持该验证，请改用密码登录。",
+      "九号要求先完成人机验证，当前登录流程暂不支持。请在九号官方客户端完成登录。",
       "verification",
     );
   }
@@ -215,11 +237,44 @@ export const classifyNineCliFailure = (stdout: string, stderr: string) => {
   return new NineCliError("ninecli 请求失败，请稍后重试。", "upstream");
 };
 
+/** ninecli can exit 0 and print "SMS sent" for a rejected Passport response. */
+export const assertNineCliSmsSent = (stdout: string): void => {
+  let response: unknown;
+  try {
+    // --json still prints a human-readable preamble before the final JSON object.
+    const start = stdout.search(/(?:^|\n)\s*\{/);
+    if (start < 0) throw new Error();
+    response = JSON.parse(stdout.slice(start).trim());
+  } catch {
+    throw new NineCliError("无法确认验证码发送结果，请稍后重试。");
+  }
+  if (response === null || typeof response !== "object" || Array.isArray(response)) {
+    throw new NineCliError("无法确认验证码发送结果，请稍后重试。");
+  }
+  const record = response as Record<string, unknown>;
+  if (record.resultCode === 90202 || record.resultCode === "90202") {
+    throw new NineCliError(
+      "九号要求先完成人机验证；请在官方客户端完成验证后再重试。",
+      "verification",
+    );
+  }
+  if (
+    (record.resultCode !== 90000 && record.resultCode !== "90000") ||
+    (record.code !== undefined && record.code !== 0 && record.code !== "0") ||
+    (record.resultDesc !== undefined &&
+      record.resultDesc !== null &&
+      typeof record.resultDesc !== "string")
+  ) {
+    throw new NineCliError("验证码请求未成功，请稍后重试。");
+  }
+};
+
 const collectProcess = (
   executable: string,
   args: string[],
   environment: NodeJS.ProcessEnv,
   missingMessage: string,
+  registerChild?: (child: ChildProcess) => () => void,
 ) =>
   new Promise<{ stdout: string; stderr: string; code: number | null }>((resolve, reject) => {
     const child = spawn(executable, args, {
@@ -227,6 +282,7 @@ const collectProcess = (
       shell: false,
       stdio: ["ignore", "pipe", "pipe"],
     });
+    const unregisterChild = registerChild?.(child);
     let stdout = "";
     let stderr = "";
     let settled = false;
@@ -234,6 +290,7 @@ const collectProcess = (
       if (settled) return;
       settled = true;
       clearTimeout(timer);
+      unregisterChild?.();
       callback();
     };
     const timer = setTimeout(() => {
@@ -266,22 +323,43 @@ const collectProcess = (
 /** Narrow adapter around a fixed, integrity-checked subset of ninecli. */
 export class NineCliClient {
   private binaryPathPromise: Promise<string> | null = null;
+  private readonly activeChildren = new Set<ChildProcess>();
 
   constructor(
     private readonly configDirectory: string,
     private readonly bundledBinaryPath: string,
   ) {}
 
+  /** Verifies that the bundled executable is available before the first request. */
+  async start() {
+    await this.prepareConfigDirectory();
+    await this.resolveVerifiedBinaryPath();
+  }
+
+  /** Terminates in-flight commands and forgets runtime discovery state. */
+  stop() {
+    for (const child of this.activeChildren) child.kill("SIGTERM");
+    this.activeChildren.clear();
+    this.binaryPathPromise = null;
+  }
+
+  clear() {
+    this.stop();
+  }
+
   async login(user: string, areaCode: string, password: string) {
     await this.run("login", ["--area", areaCode, "--user", user, "--password", password], false);
+    await this.requireCompleteSession();
   }
 
   async requestSmsCode(phone: string, areaCode: string) {
-    await this.run("login-code", ["--area", areaCode, "--phone", phone], false);
+    const response = await this.run("login-code", ["--area", areaCode, "--phone", phone], true);
+    assertNineCliSmsSent(response);
   }
 
   async loginWithSmsCode(phone: string, areaCode: string, code: string) {
     await this.run("login-code", ["--area", areaCode, "--phone", phone, "--code", code], false);
+    await this.requireCompleteSession();
   }
 
   async logout() {
@@ -292,7 +370,25 @@ export class NineCliClient {
   }
 
   async whoami() {
-    return this.runJson("whoami");
+    await this.requireCompleteSession();
+    return this.runJsonWithUpstreamRetries("whoami", [], transientWhoamiRetryDelaysMs);
+  }
+
+  private async requireCompleteSession() {
+    try {
+      const value: unknown = JSON.parse(
+        await readFile(join(this.configDirectory, "tokens.json"), "utf8"),
+      );
+      if (value === null || typeof value !== "object" || Array.isArray(value)) throw new Error();
+      const fields = value as Record<string, unknown>;
+      for (const key of ["access_token", "refresh_token", "uuid", "business_uid"]) {
+        if (typeof fields[key] !== "string" || !fields[key].trim()) throw new Error();
+      }
+    } catch {
+      // Native finishLogin can persist Passport-only tokens, then exit 0 after a
+      // Business failure. Preserve that file but never promote it to connected.
+      throw new NineCliError("登录会话尚不完整，请重新连接九号账号完成登录。", "auth");
+    }
   }
 
   async vehicles() {
@@ -335,6 +431,14 @@ export class NineCliClient {
 
     return {
       version: ninecliVersion,
+      candidate: {
+        requestTimeoutMs: candidateRequestTimeoutMs,
+        domains: {
+          vehicle: "ninecli",
+          telemetry: "ninecli",
+          travel: "ninecli",
+        },
+      },
       binary: {
         status: binaryStatus,
         sha256,
@@ -368,13 +472,18 @@ export class NineCliClient {
   }
 
   private async hasTokens() {
-    try {
-      await stat(join(this.configDirectory, "tokens.json"));
-      return true;
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === "ENOENT") return false;
-      throw error;
-    }
+    const presence = await Promise.all(
+      ["tokens.json", "auth-session.json"].map(async (file) => {
+        try {
+          await stat(join(this.configDirectory, file));
+          return true;
+        } catch (error) {
+          if ((error as NodeJS.ErrnoException).code === "ENOENT") return false;
+          throw error;
+        }
+      }),
+    );
+    return presence.some(Boolean);
   }
 
   private async getStoragePermissions(): Promise<RuntimeSecurityStatus["storage"]["permissions"]> {
@@ -451,6 +560,27 @@ export class NineCliClient {
     }
   }
 
+  private async runJsonWithUpstreamRetries(
+    command: AllowedCommand,
+    args: string[],
+    retryDelays: readonly number[],
+  ): Promise<unknown> {
+    try {
+      return await this.runJson(command, args);
+    } catch (error) {
+      const [nextDelay, ...remainingDelays] = retryDelays;
+      if (
+        !(error instanceof NineCliError) ||
+        error.kind !== "upstream" ||
+        nextDelay === undefined
+      ) {
+        throw error;
+      }
+      await delay(nextDelay);
+      return this.runJsonWithUpstreamRetries(command, args, remainingDelays);
+    }
+  }
+
   private async run(command: AllowedCommand, args: string[], json: boolean) {
     if (!isAllowedNineCliCommand(command)) {
       throw new NineCliError("该 ninecli 命令未被应用安全策略允许。", "integrity");
@@ -467,12 +597,24 @@ export class NineCliClient {
         commandArgs,
         createNineCliEnvironment(),
         "内置数据组件不可用，请重新安装韭号出行。",
+        (child) => {
+          this.activeChildren.add(child);
+          return () => this.activeChildren.delete(child);
+        },
       );
     } finally {
       // Login may create token files, so close their permissions before returning control.
       await this.prepareConfigDirectory();
     }
     if (result.code === 0) return result.stdout;
+
+    console.warn("ninecli command failed", {
+      command,
+      exitCode: result.code,
+      stdoutLength: result.stdout.length,
+      stderrLength: result.stderr.length,
+      configDirectory: basename(this.configDirectory),
+    });
 
     throw classifyNineCliFailure(result.stdout, result.stderr);
   }

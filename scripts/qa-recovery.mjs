@@ -27,7 +27,7 @@ const waitForMainWindowUrl = async (pattern) => {
 };
 
 try {
-  await window.locator(".playback-panel").waitFor();
+  await window.locator(".unauthenticated-page, .app-shell").first().waitFor();
   await app.evaluate(({ BrowserWindow }) => {
     const webContents = BrowserWindow.getAllWindows()[0]?.webContents;
     webContents?.emit("render-process-gone", {}, { reason: "crashed", exitCode: 1 });
@@ -47,7 +47,9 @@ try {
   await waitForMainWindowUrl(/^ninebot-desktop:\/\/app\/index\.html$/);
   const reloadSucceeded = await app.evaluate(async ({ BrowserWindow }) => {
     const webContents = BrowserWindow.getAllWindows()[0]?.webContents;
-    return webContents?.executeJavaScript(`document.querySelector('.playback-panel') !== null`);
+    return webContents?.executeJavaScript(
+      `document.querySelector('.unauthenticated-page, .app-shell') !== null`,
+    );
   });
   const result = {
     recoveryVisible: recoveryState?.heading === "界面需要重新加载",

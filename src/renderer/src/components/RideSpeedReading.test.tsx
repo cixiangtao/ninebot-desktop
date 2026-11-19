@@ -19,44 +19,33 @@ const renderReading = (verification: RideSpeedVerification | null, summary = rid
   renderToStaticMarkup(<RideSpeedReading ride={summary} verification={verification} />);
 
 describe("RideSpeedReading", () => {
-  it("does not present an unverified 25 km/h historical placeholder as a real maximum", () => {
-    const markup = renderReading(null);
-
-    expect(markup).toContain('data-source="placeholder"');
-    expect(markup).toContain("最高速度待校验，接口摘要25公里每小时未采用");
-    expect(markup).toContain("<strong>—</strong>");
-    expect(markup).not.toContain("<strong>25</strong>");
-  });
-
-  it("replaces the placeholder with a disagreeing sampled trail maximum", () => {
-    const markup = renderReading({ id: ride.id, declaredMaxSpeed: 25, sampledMaxSpeed: 70 });
-
+  it.each([25, 41, 64])(
+    "does not use an unread upstream speed %s as a track peak",
+    (declaredMaxSpeed) => {
+      const markup = renderReading(null, { ...ride, declaredMaxSpeed });
+      expect(markup).toContain('data-source="unread"');
+      expect(markup).toContain("轨迹峰值未读取");
+      expect(markup).toContain('class="ride-speed-unavailable">—</strong>');
+      expect(markup).not.toContain(`<strong>${declaredMaxSpeed}</strong>`);
+    },
+  );
+  it("shows the same sampled 37 before and after selection rather than substituting interface 41", () => {
+    const markup = renderReading({ id: ride.id, declaredMaxSpeed: 41, sampledMaxSpeed: 37 });
+    expect(markup).toContain("<strong>37</strong>");
     expect(markup).toContain('data-source="track"');
-    expect(markup).toContain("<strong>70</strong>");
-    expect(markup).toContain("已纠正");
+    expect(markup).toContain("接口极速 41 km/h，仅供参考");
+    expect(markup).not.toContain("<strong>41</strong>");
   });
-
-  it("accepts 25 km/h when the trail itself confirms that maximum", () => {
-    const markup = renderReading({ id: ride.id, declaredMaxSpeed: 25, sampledMaxSpeed: 25 });
-
-    expect(markup).toContain('data-source="track"');
-    expect(markup).toContain("<strong>25</strong>");
-    expect(markup).toContain("轨迹");
+  it("keeps a read-but-unavailable peak empty even when the interface has a value", () => {
+    const markup = renderReading({ id: ride.id, declaredMaxSpeed: 64, sampledMaxSpeed: null });
+    expect(markup).toContain('data-source="unavailable"');
+    expect(markup).not.toContain("<strong>64</strong>");
   });
-
-  it("keeps the placeholder hidden when a detail has no usable trail samples", () => {
-    const markup = renderReading({ id: ride.id, declaredMaxSpeed: 25, sampledMaxSpeed: null });
-
-    expect(markup).toContain('data-source="placeholder"');
-    expect(markup).toContain("轨迹没有速度采样");
-    expect(markup).toContain("无轨迹");
-    expect(markup).not.toContain("<strong>25</strong>");
-  });
-
-  it("continues to show a non-placeholder monthly summary before verification", () => {
-    const markup = renderReading(null, { ...ride, declaredMaxSpeed: 64 });
-
-    expect(markup).toContain('data-source="summary"');
-    expect(markup).toContain("<strong>64</strong>");
+  it("preserves an observed zero and a genuine 25 km/h track peak", () => {
+    for (const sampledMaxSpeed of [0, 25]) {
+      expect(renderReading({ id: ride.id, declaredMaxSpeed: 25, sampledMaxSpeed })).toContain(
+        `<strong>${sampledMaxSpeed}</strong>`,
+      );
+    }
   });
 });

@@ -1,34 +1,36 @@
+/** Platform-neutral public API. Native adapters live in explicit subpaths. */
+export { createNinebotSdk, createNinebotSessionFields } from "./sdk.ts";
+export type { NinebotSdk, CreateNinebotSdkOptions } from "./sdk.ts";
+export { createNinebotAuthSessionManager } from "./auth-client.ts";
+export type { CreateNinebotAuthSessionManagerOptions } from "./auth-client.ts";
+export * from "./auth.ts";
+export type { NinebotDeviceContext, NinebotDeviceContextStore } from "./device-context.ts";
+export type {
+  NinebotCryptoAdapter,
+  NinebotCryptoAdapterOptions,
+  NinebotEncodedRequest,
+  NinebotResponseBodyDecoder,
+} from "./platform.ts";
+export * from "./candidate-session-core.ts";
+export { createNinebotServiceClients } from "./services.ts";
+export type { NinebotServiceClientsOptions } from "./services.ts";
+export { NinebotHttpError } from "./client.ts";
+export { NinebotBusinessSessionError } from "./business-session-core.ts";
+export { NinebotHumanVerificationRequiredError } from "./passport-auth-provider.ts";
 export {
-  defaultNinebotServiceEndpoints,
-  ninebotServiceNames,
-  readOnlyOracleCapabilities,
-} from "./protocol-lab.ts";
+  PassportLoginBusinessError,
+  PassportLoginHttpError,
+  PassportRefreshMaterialError,
+} from "./passport-login-client.ts";
+export { NinebotTelemetryBusinessError } from "./telemetry-protocol.ts";
+export { createFetchNinebotTransport, NinebotPassportRedirectError } from "./transport.ts";
 export type {
-  NinebotServiceEndpoint,
-  NinebotServiceName,
-  ReadOnlyOracleCapability,
-} from "./protocol-lab.ts";
-export { buildWhoamiRequest, whoamiRequestBody } from "./whoami.ts";
-export type {
-  BuildWhoamiRequestOptions,
-  NinebotRequestSigner,
-  WhoamiSigningInput,
-} from "./whoami.ts";
-export { createFetchNinebotTransport } from "./transport.ts";
-export type {
-  FetchNinebotTransportOptions,
-  NinebotHttpMethod,
   NinebotRequest,
   NinebotResponse,
   NinebotTransport,
+  FetchNinebotTransportOptions,
 } from "./transport.ts";
-export { decodeJsonEnvelope } from "./response.ts";
-export type { NinebotResponseEnvelope } from "./response.ts";
-export type { NinebotResponseDecoder } from "./client.ts";
-export { parseNinebotEncryptedRequest, parseNinebotEncryptedResponse } from "./crypto-envelope.ts";
-export type {
-  NinebotEncryptedRequestEnvelope,
-  NinebotEncryptedResponseEnvelope,
-} from "./crypto-envelope.ts";
-export { createNinebotClient, NinebotHttpError } from "./client.ts";
-export type { NinebotClient, NinebotClientOptions } from "./client.ts";
+export { defaultNinebotServiceEndpoints, ninebotServiceNames } from "./service-endpoints.ts";
+export type { NinebotServiceName } from "./service-endpoints.ts";
+
+export { ninebotSmsVerification } from "./sms-verification.ts";

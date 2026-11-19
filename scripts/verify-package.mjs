@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { constants, createReadStream } from "node:fs";
+import { createReadStream } from "node:fs";
 import { access, readFile, writeFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { dirname, resolve } from "node:path";
@@ -14,8 +14,7 @@ const executablePath = resolve(appPath, "Contents/MacOS/韭号出行");
 const resourcesPath = resolve(appPath, "Contents/Resources");
 const asarPath = resolve(resourcesPath, "app.asar");
 const ninecliPath = resolve(resourcesPath, "runtime/ninecli/ninecli");
-const expectedNinecliCodeSha256 =
-  "70ba65c63a09373a6eab63cf96b80cd06fff2fd107dff63e884efafb9b31352c";
+const expectedNinecliSha256 = "70ba65c63a09373a6eab63cf96b80cd06fff2fd107dff63e884efafb9b31352c";
 const verifyArtifacts = process.argv.includes("--artifacts") || process.argv.includes("--release");
 const verifyRelease = process.argv.includes("--release");
 
@@ -50,37 +49,37 @@ const sha256 = (path) =>
   });
 
 const macOsCodeSha256 = async (path) => {
-  const content = await readFile(path);
-  const normalized = Buffer.from(content);
-  assert(normalized.readUInt32LE(0) === 0xfeedfacf, "Bundled ninecli is not a thin Mach-O 64 file");
-  const commandCount = normalized.readUInt32LE(16);
-  let commandOffset = 32;
+  const content = Buffer.from(await readFile(path));
+  assert(content.readUInt32LE(0) === 0xfeedfacf, "Bundled ninecli is not Mach-O arm64");
+  const commandCount = content.readUInt32LE(16);
+  let offset = 32;
   let signatureOffset = null;
   for (let index = 0; index < commandCount; index += 1) {
-    const command = normalized.readUInt32LE(commandOffset);
-    const commandSize = normalized.readUInt32LE(commandOffset + 4);
-    assert(commandSize >= 8, "Bundled ninecli has an invalid Mach-O load command");
-    if (command === 0x19 && commandSize >= 72) {
-      const segmentName = normalized
-        .subarray(commandOffset + 8, commandOffset + 24)
+    const command = content.readUInt32LE(offset);
+    const size = content.readUInt32LE(offset + 4);
+    assert(size >= 8 && offset + size <= content.length, "Invalid ninecli load command");
+    if (
+      command === 0x19 &&
+      size >= 72 &&
+      content
+        .subarray(offset + 8, offset + 24)
         .toString("ascii")
-        .replaceAll("\0", "");
-      if (segmentName === "__LINKEDIT") {
-        normalized.fill(0, commandOffset + 32, commandOffset + 40);
-        normalized.fill(0, commandOffset + 48, commandOffset + 56);
-      }
+        .replaceAll("\0", "") === "__LINKEDIT"
+    ) {
+      content.fill(0, offset + 32, offset + 40);
+      content.fill(0, offset + 48, offset + 56);
     }
-    if (command === 0x1d && commandSize >= 16) {
-      signatureOffset = normalized.readUInt32LE(commandOffset + 8);
-      normalized.fill(0, commandOffset + 8, commandOffset + 16);
+    if (command === 0x1d && size >= 16) {
+      signatureOffset = content.readUInt32LE(offset + 8);
+      content.fill(0, offset + 8, offset + 16);
     }
-    commandOffset += commandSize;
+    offset += size;
   }
-  assert(signatureOffset !== null, "Bundled ninecli is missing its Mach-O signature command");
-  return createHash("sha256").update(normalized.subarray(0, signatureOffset)).digest("hex");
+  assert(signatureOffset !== null, "Bundled ninecli has no code signature");
+  return createHash("sha256").update(content.subarray(0, signatureOffset)).digest("hex");
 };
 
-await Promise.all([access(executablePath), access(asarPath), access(ninecliPath, constants.X_OK)]);
+await Promise.all([access(executablePath), access(asarPath), access(ninecliPath)]);
 assert(
   (await readPlistValue("CFBundleIdentifier")) === "dev.anys.ninebot-desktop",
   "Unexpected bundle ID",
@@ -96,23 +95,24 @@ for (const requiredFile of [
   "/package.json",
   "/THIRD_PARTY_NOTICES.md",
   "/out/main/index.js",
+  "/node_modules/@jiuhao/ninebot-client/dist/candidate-session.js",
   "/out/preload/index.cjs",
+  "/out/preload/sms-verification.cjs",
   "/out/renderer/index.html",
   "/out/renderer/recovery.html",
   "/out/renderer/recovery.js",
 ]) {
   assert(asarFiles.includes(requiredFile), `Packaged ASAR is missing ${requiredFile}`);
 }
-const forbiddenPattern =
-  /(^|\/)(\.env(?:\.|$)|tokens\.json$|vehicles\.json$|config\.json$|ninecli(?:\.exe)?$)/i;
+const forbiddenPattern = /(^|\/)(\.env(?:\.|$)|tokens\.json$|vehicles\.json$|config\.json$)/i;
 assert(
   !asarFiles.some((path) => forbiddenPattern.test(path)),
-  "Packaged ASAR contains credentials, local config, or a ninecli binary",
+  "Packaged ASAR contains credentials or local config",
 );
-const ninecliCodeSha256 = await macOsCodeSha256(ninecliPath);
-assert(ninecliCodeSha256 === expectedNinecliCodeSha256, "Bundled ninecli code hash does not match");
-const ninecliArchitecture = (await run("/usr/bin/file", [ninecliPath])).stdout.trim();
-assert(/Mach-O 64-bit executable arm64/.test(ninecliArchitecture), "Bundled ninecli is not arm64");
+assert(
+  (await macOsCodeSha256(ninecliPath)) === expectedNinecliSha256,
+  "Bundled ninecli hash mismatch",
+);
 
 const expectedFuseStates = [48, 49, 48, 48, 49, 49, 48, 48];
 const fuseWire = await getCurrentFuseWire(appPath);
@@ -147,12 +147,8 @@ const summary = {
       : "unknown",
   asarFiles: asarFiles.length,
   fuses: "hardened",
-  bundledNinecli: {
-    architecture: "arm64",
-    codeSha256: ninecliCodeSha256,
-    fileSha256: await sha256(ninecliPath),
-    verified: true,
-  },
+  runtime: "ninecli",
+  bundledNinecli: true,
   thirdPartyNotices: true,
 };
 

@@ -1,14 +1,16 @@
 import { access, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   classifyNineCliFailure,
+  assertNineCliSmsSent,
   createNineCliEnvironment,
   getBundledNineCliBinaryPath,
   getExpectedBinarySha256,
   isAllowedNineCliCommand,
   NineCliClient,
+  NineCliError,
   runtimePolicy,
 } from "./ninecli.js";
 
@@ -21,6 +23,107 @@ afterEach(async () => {
 });
 
 describe("ninecli runtime policy", () => {
+  it.each(["password", "sms"] as const)(
+    "requires complete Business material after native %s exit 0",
+    async (method) => {
+      const directory = await mkdtemp(join(tmpdir(), "ninecli-auth-completion-"));
+      temporaryDirectories.push(directory);
+      const client = new NineCliClient(directory, "unused-synthetic-binary");
+      const run = vi
+        .spyOn(client as unknown as { run: (...args: unknown[]) => Promise<string> }, "run")
+        .mockResolvedValue("synthetic exit 0");
+      const tokens = {
+        access_token: "synthetic-access",
+        refresh_token: "synthetic-refresh",
+        uuid: "synthetic-uuid",
+      };
+      const login = () =>
+        method === "password"
+          ? client.login("synthetic", "86", "synthetic")
+          : client.loginWithSmsCode("15500000000", "86", "123456");
+      await writeFile(join(directory, "tokens.json"), JSON.stringify(tokens));
+      await expect(login()).rejects.toMatchObject({ kind: "auth" });
+      expect(JSON.parse(await readFile(join(directory, "tokens.json"), "utf8"))).toEqual(tokens);
+      await writeFile(
+        join(directory, "tokens.json"),
+        JSON.stringify({ ...tokens, business_uid: "synthetic-business" }),
+      );
+      await expect(login()).resolves.toBeUndefined();
+      expect(run).toHaveBeenCalledTimes(2);
+    },
+  );
+
+  it("never calls whoami for absent or partial native sessions", async () => {
+    const directory = await mkdtemp(join(tmpdir(), "ninecli-auth-status-"));
+    temporaryDirectories.push(directory);
+    const client = new NineCliClient(directory, "unused-synthetic-binary");
+    const run = vi
+      .spyOn(
+        client as unknown as {
+          runJsonWithUpstreamRetries: (...args: unknown[]) => Promise<unknown>;
+        },
+        "runJsonWithUpstreamRetries",
+      )
+      .mockResolvedValue({ username: "synthetic" });
+    await expect(client.whoami()).rejects.toMatchObject({ kind: "auth" });
+    await writeFile(join(directory, "tokens.json"), '{"access_token":"synthetic"}');
+    await expect(client.whoami()).rejects.toMatchObject({ kind: "auth" });
+    expect(run).not.toHaveBeenCalled();
+    await writeFile(
+      join(directory, "tokens.json"),
+      JSON.stringify({
+        access_token: "synthetic",
+        refresh_token: "synthetic",
+        uuid: "synthetic",
+        business_uid: "synthetic",
+      }),
+    );
+    await expect(client.whoami()).resolves.toEqual({ username: "synthetic" });
+  });
+  it("checks structured SMS results even when the process reports success", async () => {
+    const client = new NineCliClient("unused-synthetic-directory", "unused-synthetic-binary");
+    const run = vi.spyOn(
+      client as unknown as { run: (...args: unknown[]) => Promise<string> },
+      "run",
+    );
+    run.mockResolvedValue(
+      'SMS sent to synthetic phone.\n{\n"resultCode":90202,"resultDesc":"send code need verify","data":{}\n}',
+    );
+    await expect(client.requestSmsCode("15500000000", "86")).rejects.toMatchObject({
+      kind: "verification",
+    });
+    expect(run).toHaveBeenCalledWith(
+      "login-code",
+      ["--area", "86", "--phone", "15500000000"],
+      true,
+    );
+    run.mockResolvedValue('SMS sent to synthetic phone.\n{\n"resultCode":90000,"data":{}\n}');
+    await expect(client.requestSmsCode("15500000000", "86")).resolves.toBeUndefined();
+  });
+
+  it.each([90000, "90000"])("accepts explicit SMS success %s", (resultCode) => {
+    expect(() => assertNineCliSmsSent(JSON.stringify({ resultCode, data: {} }))).not.toThrow();
+  });
+
+  it.each([
+    "SMS sent to synthetic phone",
+    "not-json",
+    "{}",
+    '{"resultCode":0}',
+    '{"resultCode":null}',
+    '{"resultCode":true}',
+    '{"resultCode":2,"resultDesc":"synthetic-secret"}',
+    '{"resultCode":90000,"code":2}',
+    '{"resultCode":90000,"resultDesc":{}}',
+    '{"resultCode":90000}\n{"resultCode":90202}',
+  ])("fails closed without leaking an unconfirmed SMS response", (raw) => {
+    expect(() => assertNineCliSmsSent(raw)).toThrow(NineCliError);
+    try {
+      assertNineCliSmsSent(raw);
+    } catch (error) {
+      expect(String(error)).not.toContain("synthetic-secret");
+    }
+  });
   it("passes only the minimal environment and keeps proxy connectivity", () => {
     const environment = createNineCliEnvironment({
       PATH: "/usr/bin",
@@ -76,6 +179,7 @@ describe("ninecli runtime policy", () => {
     expect(error.kind).toBe("verification");
     expect(error.message).toContain("人机验证");
     expect(error.message).not.toContain("90202");
+    expect(error.message).not.toContain("改用密码登录");
   });
 
   it("pins the verified macOS arm64 and Windows x64 binary digests", () => {

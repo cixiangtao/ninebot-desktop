@@ -201,7 +201,7 @@ try {
   );
   console.log(
     "range-estimate-source-count",
-    await window.locator(".vehicle-range-comparison p").count(),
+    await window.locator(".vehicle-range-summary .device-metric").count(),
   );
   console.log(
     "charging-time-visible",
@@ -245,7 +245,7 @@ try {
   console.log("single-battery-pack-count", await window.locator(".battery-pack-card").count());
   console.log(
     "single-vehicle-range-estimates",
-    await window.locator(".vehicle-range-comparison p").count(),
+    await window.locator(".vehicle-range-summary .device-metric").count(),
   );
   console.log(
     "power-and-acc-separated",
@@ -792,7 +792,7 @@ try {
     "login-dialog",
     await window.getByRole("dialog", { name: "连接九号账号" }).isVisible(),
   );
-  console.log("login-warning", await window.getByText(/ninecli 0\.1\.7/).isVisible());
+  console.log("login-warning", await window.getByText(/网易易盾人机验证/).isVisible());
   console.log(
     "password-login-default",
     await window.getByRole("tab", { name: "密码登录" }).getAttribute("aria-selected"),
